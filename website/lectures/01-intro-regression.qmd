@@ -1,0 +1,12 @@
+---
+title: "Lecture 1: Linear & Logistic Regression"
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 1: Class Introduction; Linear &amp; Logistic Regression</h1>
+</div>
+```
+
+*Notes for this lecture are coming soon.*

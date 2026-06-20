@@ -1,0 +1,33 @@
+/* Dark mode overrides */
+body { color: #e0e2f0; }
+
+h1 { border-bottom-color: #3a3d5c; }
+
+#quarto-sidebar {
+  background: #1a1c2e;
+  border-right-color: #2e3050;
+}
+
+#quarto-sidebar .sidebar-title { color: #9fa8da; border-bottom-color: #2e3050; }
+.sidebar-item-text { color: #b0b8d0; }
+.sidebar-item.active > .sidebar-item-text { color: #9fa8da; }
+
+.callout-note     { background: #1e2040; border-left-color: #7986cb; }
+.callout-warning  { background: #2a1800; border-left-color: #ff8f00; }
+.callout-tip      { background: #0d2010; border-left-color: #66bb6a; }
+.callout-important{ background: #2a0000; border-left-color: #ef9a9a; }
+
+.boxed-eq { background: #1e2040; border-color: #5c6bc0; }
+.algorithm { background: #0d2010; border-color: #388e3c; }
+.algorithm h4 { color: #81c784; border-bottom-color: #2e5c32; }
+
+.interactive-widget { background: #141628; border-color: #2e3050; }
+.interactive-widget .widget-title { color: #9fa8da; }
+
+.definition-block { background: #1a1c38; }
+.theorem-block    { background: #1e1030; }
+
+thead th { background: #3040a0; }
+tbody tr:nth-child(even) { background: #181a2c; }
+tbody tr:hover           { background: #1e2240; }
+tbody td { border-bottom-color: #2e3050; }

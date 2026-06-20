@@ -1,0 +1,48 @@
+project:
+  type: book
+  output-dir: _site
+
+book:
+  title: "Neural Networks and Deep Learning"
+  subtitle: "CSC413 / CSC2516 · University of Toronto — Fall 2026"
+  author: ""
+  date: "Fall 2026"
+  search: true
+  repo-url: https://github.com/r-three/csc413-2516-deep-learning-fall-2026
+  repo-actions: [issue]
+  sharing: [twitter, linkedin]
+  sidebar:
+    style: floating
+    background: white
+  chapters:
+    - index.qmd
+    - lectures/01-intro-regression.qmd
+    - lectures/02-mlp-backprop.qmd
+
+format:
+  html:
+    theme: cosmo
+    css: styles/custom.css
+    fontsize: 16px
+    linestretch: 1.6
+    toc: true
+    toc-depth: 3
+    toc-title: "On this page"
+    number-sections: false
+    number-depth: 2
+    smooth-scroll: true
+    html-math-method: katex
+    code-copy: true
+    code-fold: false
+    highlight-style: github
+    fig-responsive: true
+    link-external-newwindow: true
+    include-in-header:
+      text: |
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet">
+
+execute:
+  echo: false
+  warning: false
+  freeze: auto

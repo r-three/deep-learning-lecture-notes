@@ -1,0 +1,175 @@
+---
+title: "Lecture 3: Regularization & Overfitting"
+description: "Why neural networks overfit, and the toolkit for keeping them in check — weight decay, dropout, early stopping, and data augmentation."
+---
+
+```{=html}
+<div class="lecture-banner">
+  <h1>Lecture 3 — Regularization &amp; Overfitting</h1>
+  <p class="lecture-meta">CSC413 / 2516 Deep Learning &nbsp;·&nbsp; Fall 2026</p>
+  <div class="lecture-topics">
+    <span class="tag">Bias–variance tradeoff</span>
+    <span class="tag">L1 / L2 regularization</span>
+    <span class="tag">Dropout</span>
+    <span class="tag">Early stopping</span>
+    <span class="tag">Data augmentation</span>
+  </div>
+</div>
+```
+
+**Recap.** Last lecture we proved (informally) that a wide-enough MLP can fit
+*any* function — and immediately noted that this means it can also *overfit*
+perfectly to training data. This lecture is about preventing that.
+
+---
+
+## The Problem: Overfitting
+
+A model **overfits** when it performs well on training data but poorly on held-out
+test data. It has memorised the training set rather than learning the underlying
+pattern.
+
+### Bias–Variance Decomposition
+
+For a regression target $y = f^*(x) + \varepsilon$ with noise $\varepsilon$,
+the expected test error of a model $\hat{f}$ decomposes as:
+
+$$\mathbb{E}[(y - \hat{f}(x))^2] = \underbrace{\text{Bias}^2[\hat{f}]}_{\text{systematic error}} + \underbrace{\text{Var}[\hat{f}]}_{\text{sensitivity to training data}} + \underbrace{\sigma^2_\varepsilon}_{\text{irreducible noise}}$$
+
+- **High bias** = underfitting (model too simple, wrong inductive bias).
+- **High variance** = overfitting (model too expressive, fits noise).
+
+Regularisation shifts the bias–variance tradeoff: deliberately introduce a
+little bias to substantially reduce variance.
+
+---
+
+## L2 Regularisation (Weight Decay)
+
+Add a penalty on the squared norm of the weights to the cost function:
+
+$$\tilde{C}(W) = C(W) + \frac{\lambda}{2} \|W\|_F^2$$
+
+where $\lambda > 0$ is the **regularisation strength** (a hyperparameter) and
+$\|\cdot\|_F$ is the Frobenius norm.
+
+The gradient becomes:
+
+$$\frac{\partial \tilde{C}}{\partial W} = \frac{\partial C}{\partial W} + \lambda W$$
+
+The gradient-descent update is therefore:
+
+$$W \leftarrow W - \eta\left(\frac{\partial C}{\partial W} + \lambda W\right) = (1 - \eta\lambda)\,W - \eta\frac{\partial C}{\partial W}$$
+
+The factor $(1 - \eta\lambda)$ *shrinks* the weights each step — hence the
+name **weight decay**. Large weights are penalised, pushing the model toward
+simpler functions.
+
+### L1 Regularisation (Lasso)
+
+$$\tilde{C}(W) = C(W) + \lambda \|W\|_1$$
+
+L1 promotes **sparsity** — many weights are driven exactly to zero. This is
+useful when you believe most features are irrelevant. L1 is less common in
+deep learning than L2 but can be combined with it (Elastic Net).
+
+---
+
+## Dropout
+
+Dropout (Srivastava et al., 2014) is one of the most effective regularisers
+for neural networks. During each forward pass in training, each neuron is
+independently set to zero with probability $p$ (the *drop rate*):
+
+$$\tilde{h}_i = \begin{cases} 0 & \text{with prob } p \\ \frac{h_i}{1-p} & \text{with prob } 1-p \end{cases}$$
+
+The $\frac{1}{1-p}$ factor is the **inverted dropout** rescaling — it keeps
+the expected activation unchanged.
+
+At **test time**, dropout is turned off (no dropping, no scaling needed because
+of the inverted scaling during training).
+
+### Why Does Dropout Work?
+
+Several complementary explanations:
+
+1. **Ensemble interpretation.** Each training step trains a different
+   sub-network. Test-time inference approximates averaging over all $2^N$
+   possible sub-networks.
+2. **Reduces co-adaptation.** Neurons cannot rely on specific partners being
+   present; each must learn independently useful features.
+3. **Adds noise.** Similar to data augmentation — training on noisy versions
+   of activations improves generalisation.
+
+---
+
+## Early Stopping
+
+Monitor **validation loss** during training. Stop when it starts increasing —
+even if training loss is still decreasing.
+
+```
+Training loss:    ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓
+Validation loss:  ↓ ↓ ↓ ↓ ↓ → ↑ ↑ ↑ ↑ ↑
+                              ↑
+                           Stop here
+```
+
+Early stopping is implicit regularisation: it constrains training to the region
+of parameter space reachable in a limited number of gradient steps.
+
+### Practical Recipe
+
+1. Hold out a **validation set** (typically 10–20% of training data, separate
+   from the test set).
+2. Checkpoint model weights at each epoch.
+3. Track validation loss; restore the checkpoint with the best validation loss
+   if it has not improved for $k$ epochs (*patience* $= k$).
+
+---
+
+## Data Augmentation
+
+If the model is fitting noise, give it more (and more varied) signal. For images:
+
+| Augmentation | Effect |
+|---|---|
+| Random horizontal flip | Translation invariance |
+| Random crop / padding | Scale / position invariance |
+| Colour jitter | Photometric invariance |
+| Gaussian noise | Robustness to sensor noise |
+| Mixup / CutMix | Interpolation-based augmentation |
+
+Data augmentation is domain-specific: always choose transformations that
+preserve the semantics of the label (a horizontally-flipped cat is still a cat;
+a vertically-flipped digit "6" might not still be a "6").
+
+---
+
+## Batch Normalisation (Preview)
+
+Batch normalisation (Ioffe & Szegedy, 2015) normalises the pre-activations of
+each layer across the mini-batch:
+
+$$\hat{z}^m_i = \frac{z^m_i - \mu_\mathcal{B}}{\sqrt{\sigma^2_\mathcal{B} + \epsilon}} \cdot \gamma + \beta$$
+
+While primarily designed to stabilise training and allow higher learning rates,
+batch norm also acts as a regulariser (the mini-batch noise provides implicit
+regularisation). We return to batch norm in Lecture 6.
+
+---
+
+## Summary
+
+| Technique | What it penalises / does | Hyperparameter |
+|---|---|---|
+| L2 / weight decay | Large weight norms | $\lambda$ |
+| L1 | Non-sparse weights | $\lambda$ |
+| Dropout | Co-adaptation of neurons | drop rate $p$ |
+| Early stopping | Too many training steps | patience $k$ |
+| Data augmentation | Lack of transformation invariance | augmentation type |
+
+::: {.callout-note}
+**Next lecture:** Optimisation & Automatic Differentiation — how to efficiently
+compute the gradients we need, and how PyTorch does it for you.
+:::
