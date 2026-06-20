@@ -216,7 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# macOS
 .DS_Store
 
+# Quarto build artifacts
+website/_site/
 website/.quarto/
 **/*.quarto_ipynb
