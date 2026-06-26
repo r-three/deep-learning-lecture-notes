@@ -1,0 +1,50 @@
+# Notation
+
+Below we catalog some of the variable naming conventions used in these notes.
+Perfect consistency is generally impossible, so look out for contextual exceptions!
+
+| Symbol | Meaning | Shape |
+|---|---|---|
+| $a$ | A scalar value | Typically $\mathbb{R}$ or $\mathbb{Z}$|
+| $\bm{a}$ | A vector | $\mathbb{R}^{d \times 1}$ for some $d$ |
+| $\bm{a}_i$ | $i$th element of the vector $\mathbb{a}$ | $\mathbb{R}$ |
+| $\bm{a}^\mathsf{T}$ | The transpose of the vector $\bm{a}$ | $\mathbb{R}^{1 \times d}$ |
+| $\bm{A}$ | A matrix | $\mathbb{R}^{m \times n}$ for some $m$ and $n$ |
+| $\bm{A}_{i, j}$ | $j$th entry of the $i$th row of $\bm{A}$ | $\mathbb{R}$ |
+| $\bm{A}_{i, :}$ | the $i$th row of $\bm{A}$ | $\mathbb{R}^{1 \times n}$ |
+| $\bm{A}_{:, j}$ | $j$th entry of the $i$th row of $\bm{A}$ | $\mathbb{R}^{m \times 1}$ |
+| $\bm{A}^\mathsf{T}$ | The transpose of matrix $\bm{A}$ | $\mathbb{R}^{n \times m}$ |
+
+# Conventions
+
+As much as possible, we aim to assign the same semantic meaning to variables that use the same symbol.
+The following table catalogs some such conventions.
+
+| Symbol | Meaning |
+|---|---|
+| $\bm{x}$ | The input vector to a model |
+| $\bm{X}$ | A batch of input vectors, stacked row-wise |
+| $y$ | The target value to be predicted |
+| $\hat{y}$ | The predicted target |
+| $\mathcal{L}$ | A loss function |
+| $\bm{W}$ | A weight matrix |
+| $\bm{b}$ | A bias vector |
+| $\bm{W}\bm{x} + \bm{b}$ | A standard linear (or dense, or fully connected) layer |
+| $\sigma(\cdot)$ | An activation function or nonlinearity |
+| $\bm{h}$ | A hidden vector, or activations, in a model |
+| $\bm{a}$ | Preactivations such that $\bm{h} = \sigma(a)$ |
+| $\bm{\theta}$ | The full collection of parameters of a model, grouped in a vector |
+| $L$ | The number of layers in a model |
+| $N$ | The number of units or activations in a given layer |
+| $T$ | The lengh of a sequence |
+
+# Operations
+
+Below is a subset of the operations used throughout these notes.
+
+| Symbol | Meaning |
+|---|---|
+| $\frac{df}{dx}$ | The derivative of a scalar-valued function $f$ with respect to its input $x$ |
+| $\frac{\partial f}{\partial x}$ | The partial derivative of $f$ with respect to *one of* its input $x$ |
+| $\nabla_{\bm{x}} f$ | The gradient of $f$ with respect to the vetor $\bm{x}$ |
+| $\square^i$ | The $i$th element in a collection of things |
