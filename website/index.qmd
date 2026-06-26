@@ -27,8 +27,6 @@ number-sections: false
 </div>
 ```
 
----
-
 Deep learning is the branch of machine learning focused on training neural
 networks. Neural networks have proven to be powerful across a wide range of
 domains and tasks, including computer vision, natural language processing,
@@ -41,8 +39,15 @@ using neural networks.
 In this course, we will provide a thorough introduction to the field of deep
 learning. We will cover the basics of building and optimizing neural networks
 in addition to specifics of different model architectures and training schemes.
-The course will cover portions of the
-[Dive into Deep Learning](https://d2l.ai/) textbook.
+Beyond the official lecture notes provided here, the course does not follow
+a specific textbook. Other references (all free) include:
+
+- [Neural Networks and Deep Learning (Nielsen)](http://neuralnetworksanddeeplearning.com/)
+- [Dive into Deep Learning (Zhang, Lipton, Li, and Smola)](https://d2l.ai/)
+- [Deep Learning (Goodfellow, Bengio, and Courville)](https://www.deeplearningbook.org/)
+- [The Little Book of Deep Learning (Fleuret)](https://fleuret.org/francois/lbdl.html)
+- [Understanding Deep Learning (Prince)](https://udlbook.github.io/udlbook/)
+- [Practical Deep Learning (Howard)](https://course.fast.ai/)
 
 ## Prerequisites {.unnumbered}
 
@@ -53,26 +58,22 @@ reading and writing Python code. For a list of courses that serve as
 prerequisites for the undergraduate version of this course, see
 [here](https://artsci.calendar.utoronto.ca/course/csc413h1).
 
----
-
 ## Lectures {.unnumbered}
 
-Readings refer to [Dive into Deep Learning](https://d2l.ai/) (d2l.ai) by section number.
-
-| # | Title | Reading |
-|---|---|---|
-| 1 | Class introduction; linear & logistic regression | §2.1–2.7, 3.1–3.5, 4.1–4.5 |
-| 2 | [Multilayer perceptrons, backpropagation](lectures/02-mlp-backprop.qmd) | §5.1–5.4, 5.6 |
-| 3 | Under/overfitting, regularization, numerical stability, autodiff | §3.6–3.7, 5.3, 5.5 |
-| 4 | Gradient descent, adaptive gradient methods | §12.1–12.6, 12.10 |
-| 5 | Convolutional neural networks, batch/layer normalization, residual connections | §7.1–7.5, 8.5–8.6 |
-| 6 | Sequences, recurrent neural networks, and sequence-to-sequence learning | §9.1–9.7, 10.1–10.8 |
-| 7 | Attention | §11.1–11.6 |
-| 8 | Transformers part 1 | §11.7, 15.8–15.10 |
-| 9 | Transformers part 2, large language models | §11.8–11.9 |
-| 10 | Architecture grab bag part 1: LoRA, GNNs, and MoEs | |
-| 11 | Architecture grab bag part 2: transposed convolution, UNet, autoencoders, and VAEs | §14.1 |
-| 12 | Deep learning engineering; fairness, accountability, and transparency | §13.5–13.6, 4.7 |
+| # | Title |
+|---|---|
+| 1 | Class introduction; linear & logistic regression |
+| 2 | [Multilayer perceptrons, backpropagation](lectures/02-mlp-backprop.qmd) |
+| 3 | Under/overfitting, regularization, numerical stability, autodiff |
+| 4 | Gradient descent, adaptive gradient methods |
+| 5 | Convolutional neural networks, batch/layer normalization, residual connections |
+| 6 | Sequences, recurrent neural networks, and sequence-to-sequence learning |
+| 7 | Attention |
+| 8 | Transformers part 1 |
+| 9 | Transformers part 2, large language models |
+| 10 | Architecture grab bag part 1: LoRA, GNNs, and MoEs |
+| 11 | Architecture grab bag part 2: transposed convolution, UNet, autoencoders, and VAEs |
+| 12 | Deep learning engineering; fairness, accountability, and transparency |
 
 ---
 
