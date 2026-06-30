@@ -597,8 +597,3 @@ This is a remarkably clean result: **the gradient is simply the prediction error
 :::
 
 **Next lecture:** Multi-layer perceptrons and backpropagation — why even the most clever stacking of linear models still yields a linear model, how adding nonlinearity overcomes this, and the algorithm that makes training deep networks efficient.
-
-## References {#sec-references .unnumbered}
-
-::: {#refs}
-:::
