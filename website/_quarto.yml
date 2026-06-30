@@ -16,7 +16,6 @@ book:
     background: white
   chapters:
     - index.qmd
-    - notation.qmd
     - lectures/01-intro-regression.qmd
     - lectures/02-mlp-backprop.qmd
 
