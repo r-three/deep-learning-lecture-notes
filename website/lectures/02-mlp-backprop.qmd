@@ -309,23 +309,23 @@ its variants (Leaky ReLU, GELU, SiLU, etc.).
 
 ## Backpropagation {#sec-backprop}
 
-Let $C$ denote the **cost (or loss) function**, a scalar that measures the discrepancy between the model's predictions and the true targets. Training proceeds by minimizing $C$ using gradient descent, which requires computing the gradient of the loss with respect to every parameter in the model, i.e., $\dfrac{\partial C}{\partial W^m}$ for each weight matrix $W^m$.
+Let $\mathcal{L}$ denote the **loss function**, a scalar that measures the discrepancy between the model's predictions and the true targets. Training proceeds by minimizing $\mathcal{L}$ using gradient descent, which requires computing the gradient of the loss with respect to every parameter in the model, i.e., $\dfrac{\partial \mathcal{L}}{\partial W^m}$ for each weight matrix $W^m$.
 
 **Backpropagation** provides an algorithm for evaluating all such gradients by systematically applying the chain rule of calculus from the output layer back to the input layer. It can achieve more efficiency by reusing intermediate quantities computed during the forward pass, avoiding redundant calculations and enabling gradient computation in time proportional to a single forward evaluation.
 
 ### The Chain Rule — Two Cases
 
-**Case 1: single intermediate variable.** If $C = C(z(w))$:
+**Case 1: single intermediate variable.** If $\mathcal{L} = \mathcal{L}(z(w))$:
 
-$$\frac{dC}{dw} = \frac{dC}{dz}\,\frac{dz}{dw}$$
+$$\frac{d\mathcal{L}}{dw} = \frac{d\mathcal{L}}{dz}\,\frac{dz}{dw}$$
 
-**Case 2: multiple intermediate variables.** If $C$ reaches $w$ through
-$z_1(w), z_2(w), \ldots, z_N(w)$ independently, i.e. $C = C(z_1(w), z_2(w), \ldots, z_N(w))$:
+**Case 2: multiple intermediate variables.** If $\mathcal{L}$ reaches $w$ through
+$z_1(w), z_2(w), \ldots, z_N(w)$ independently, i.e. $\mathcal{L} = \mathcal{L}(z_1(w), z_2(w), \ldots, z_N(w))$:
 
-$$\frac{dC}{dw} = \sum_{i=1}^{N} \frac{\partial C}{\partial z_i}\,\frac{dz_i}{dw}$$
+$$\frac{d\mathcal{L}}{dw} = \sum_{i=1}^{N} \frac{\partial \mathcal{L}}{\partial z_i}\,\frac{dz_i}{dw}$$
 
 Think of it as: sum the derivative contribution along *every path* from $w$ to
-$C$. Both cases come up repeatedly in the backprop derivation.
+$\mathcal{L}$. Both cases come up repeatedly in the backprop derivation.
 
 ### Notation and Definitions
 
@@ -338,225 +338,77 @@ For an $L$-layer MLP:
 | $W^m$ | Weight matrix for layer $m$ | $\mathbb{R}^{N^m \times N^{m-1}}$ |
 | $b^m$ | Bias vector for layer $m$ | $\mathbb{R}^{N^m}$ |
 | $\sigma^m$ | Nonlinearity at layer $m$ | $\mathbb{R}^{N^m} \to \mathbb{R}^{N^m}$ (element-wise) |
-| $z^m$ | Pre-activations for layer $m$ | $\mathbb{R}^{N^m}$ |
-| $a^m$ | Activations for layer $m$ | $\mathbb{R}^{N^m}$ |
-| $a^0$ | Model input $\mathbf{x}$ | $\mathbb{R}^{N^0}$ |
+| $a^m$ | Pre-activations for layer $m$ | $\mathbb{R}^{N^m}$ |
+| $h^m$ | Activations for layer $m$ | $\mathbb{R}^{N^m}$ |
+| $h^0$ | Model input $\mathbf{x}$ | $\mathbb{R}^{N^0}$ |
 | $y$ | Target output | $\mathbb{R}^{N^L}$ |
-| $C$ | Cost / loss: $C(a^L,\, y) \in \mathbb{R}$ | scalar (real number) |
+| $\mathcal{L}$ | Loss: $\mathcal{L}(h^L,\, y) \in \mathbb{R}$ | scalar (real number) |
 
 The **forward pass** computes, for $m = 1, \ldots, L$:
 
-$$z^m = W^m a^{m-1} + b^m \qquad (\text{pre-activations})$$
-$$a^m = \sigma^m(z^m) \qquad (\text{activations})$$
+$$a^m = W^m h^{m-1} + b^m \qquad (\text{pre-activations})$$
+$$h^m = \sigma^m(a^m) \qquad (\text{activations})$$
 
 Backprop requires two quantities **pre-specified** from the model design:
 
-- $\frac{\partial C}{\partial a^L}$: derivative of the loss w.r.t. the model output (e.g. cross-entropy gradient).
-- $\frac{da^m}{dz^m} = (\sigma^m)'(z^m)$: derivative of the nonlinearity (sigmoid, ReLU, etc.), computed in @sec-activations.
+- $\frac{\partial \mathcal{L}}{\partial h^L}$: derivative of the loss w.r.t. the model output (e.g. cross-entropy gradient).
+- $\frac{dh^m}{da^m} = (\sigma^m)'(a^m)$: derivative of the nonlinearity (sigmoid, ReLU, etc.), computed in @sec-activations.
 
 ### Deriving the Weight Gradient
 
-We want $\frac{\partial C}{\partial W^m_{ij}}$ for any entry $(i,j)$, where $i \in \{1,\ldots,N^m\}$ indexes the unit in layer $m$ (row) and $j \in \{1,\ldots,N^{m-1}\}$ indexes the unit in layer $m-1$ (column). In other words, $W^m_{ij}$ is the weight of the connection from unit $j$ in layer $m-1$ to unit $i$ in layer $m$.
+We want $\frac{\partial \mathcal{L}}{\partial W^m_{ij}}$ for any entry $(i,j)$, where $i \in \{1,\ldots,N^m\}$ indexes the unit in layer $m$ (row) and $j \in \{1,\ldots,N^{m-1}\}$ indexes the unit in layer $m-1$ (column). In other words, $W^m_{ij}$ is the weight of the connection from unit $j$ in layer $m-1$ to unit $i$ in layer $m$.
 
-**Step 1 — Apply the chain rule, pivoting through $z^m$.**
+**Step 1 — Apply the chain rule, pivoting through $a^m$.**
 
-$$\frac{\partial C}{\partial W^m_{ij}} = \sum_{k=1}^{N^m} \frac{\partial C}{\partial z^m_k} \frac{\partial z^m_k}{\partial W^m_{ij}}$$
+$$\frac{\partial \mathcal{L}}{\partial W^m_{ij}} = \sum_{k=1}^{N^m} \frac{\partial \mathcal{L}}{\partial a^m_k} \frac{\partial a^m_k}{\partial W^m_{ij}}$$
 
-**Step 2 — Evaluate $\partial z^m_k / \partial W^m_{ij}$.**
+**Step 2 — Evaluate $\partial a^m_k / \partial W^m_{ij}$.**
 
-Expanding $z^m_k$ explicitly: $z^m_k = \sum_{\ell=1}^{N^{m-1}} W^m_{k\ell}\,a^{m-1}_\ell + b^m_k$.
+Expanding $a^m_k$ explicitly: $a^m_k = \sum_{\ell=1}^{N^{m-1}} W^m_{k\ell}\,h^{m-1}_\ell + b^m_k$.
 
-The weight $W^m_{ij}$ appears *only* in the formula for $z^m_i$ (the $i$-th
+The weight $W^m_{ij}$ appears *only* in the formula for $a^m_i$ (the $i$-th
 row). Therefore:
 
-$$\frac{\partial z^m_k}{\partial W^m_{ij}} = \begin{cases} a^{m-1}_j & k = i \\ 0 & k \neq i \end{cases}$$
+$$\frac{\partial a^m_k}{\partial W^m_{ij}} = \begin{cases} h^{m-1}_j & k = i \\ 0 & k \neq i \end{cases}$$
 
 **Step 3 — Collapse the sum.** All terms except $k=i$ are zero:
 
-$$\frac{\partial C}{\partial W^m_{ij}} = \frac{\partial C}{\partial z^m_i} \cdot a^{m-1}_j$$
+$$\frac{\partial \mathcal{L}}{\partial W^m_{ij}} = \frac{\partial \mathcal{L}}{\partial a^m_i} \cdot h^{m-1}_j$$
 
-**Step 4 — Matrix form.** The vector $\frac{\partial C}{\partial z^m}$ has
-shape $N^m$ and $a^{m-1}$ has shape $N^{m-1}$. Their outer product gives the
+**Step 4 — Matrix form.** The vector $\frac{\partial \mathcal{L}}{\partial a^m}$ has
+shape $N^m$ and $h^{m-1}$ has shape $N^{m-1}$. Their outer product gives the
 gradient matrix of shape $N^m \times N^{m-1}$, matching $W^m$:
 
 ::: {.boxed-eq}
-$$\frac{\partial C}{\partial W^m} = \frac{\partial C}{\partial z^m} \cdot (a^{m-1})^\top$$
+$$\frac{\partial \mathcal{L}}{\partial W^m} = \frac{\partial \mathcal{L}}{\partial a^m} \cdot (h^{m-1})^\top$$
 :::
 
 ### The Backward Recursion
 
-We still need $\frac{\partial C}{\partial z^m}$. This is where the "back" in
+We still need $\frac{\partial \mathcal{L}}{\partial a^m}$. This is where the "back" in
 backprop comes from.
 
 **Base case ($m = L$):**
 
-$$\frac{\partial C}{\partial z^L} = \frac{\partial C}{\partial a^L} \odot \frac{da^L}{dz^L}$$
+$$\frac{\partial \mathcal{L}}{\partial a^L} = \frac{\partial \mathcal{L}}{\partial h^L} \odot \frac{dh^L}{da^L}$$
 
 Both factors are pre-specified. $\odot$ is element-wise (Hadamard) multiplication.
 
 **Recursive case ($m < L$):** Expanding via the chain rule, pivoting through
-the *next* layer's pre-activations $z^{m+1}$:
+the *next* layer's pre-activations $a^{m+1}$:
 
-$$\frac{\partial C}{\partial z^m_k} = \left(\sum_{\ell=1}^{N^{m+1}} \frac{\partial C}{\partial z^{m+1}_\ell} \cdot W^{m+1}_{\ell k}\right) \cdot \frac{da^m_k}{dz^m_k}$$
+$$\frac{\partial \mathcal{L}}{\partial a^m_k} = \left(\sum_{\ell=1}^{N^{m+1}} \frac{\partial \mathcal{L}}{\partial a^{m+1}_\ell} \cdot W^{m+1}_{\ell k}\right) \cdot \frac{dh^m_k}{da^m_k}$$
 
 In matrix form:
 
 ::: {.boxed-eq}
-$$\frac{\partial C}{\partial z^m} = \left({W^{m+1}}^\top \frac{\partial C}{\partial z^{m+1}}\right) \odot \frac{da^m}{dz^m}$$
+$$\frac{\partial \mathcal{L}}{\partial a^m} = \left({W^{m+1}}^\top \frac{\partial \mathcal{L}}{\partial a^{m+1}}\right) \odot \frac{dh^m}{da^m}$$
 :::
 
-**The key observation**: $\frac{\partial C}{\partial z^m}$ depends on
-$\frac{\partial C}{\partial z^{m+1}}$; the gradient one layer *forward*.
+**The key observation**: $\frac{\partial \mathcal{L}}{\partial a^m}$ depends on
+$\frac{\partial \mathcal{L}}{\partial a^{m+1}}$; the gradient one layer *forward*.
 Starting from $m=L$ and going backwards, each step feeds the next. This is
 *back*propagation.
-
-### The Algorithm
-
-As an example, the computation graphs below show data flow through a 2-layer MLP. **(a)** shows individual scalar units with all weight connections; **(b)** is the vectorized form. Nodes are variables; **red** = parameters; **blue** = intermediate computations; **green** = loss.
-
-```{=html}
-<div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 760 210" width="100%" style="max-width:760px; display:block; margin:auto; font-family:serif;">
-  <defs>
-    <marker id="cgab-arr" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
-      <polygon points="0 0, 6 2.5, 0 5" fill="#333"/>
-    </marker>
-    <marker id="cgab-arr-r" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">
-      <polygon points="0 0, 6 2.5, 0 5" fill="#c62828"/>
-    </marker>
-  </defs>
-
-  <!-- ======== PART (a): Full scalar computation graph ======== -->
-
-  <!-- Input nodes a₁⁽⁰⁾, a₂⁽⁰⁾ (black, bold) -->
-  <text x="38"  y="74"  text-anchor="middle" font-size="14" font-weight="700" fill="#1a1a1a">a₁<tspan font-size="9" dy="-5">(0)</tspan></text>
-  <text x="38"  y="124" text-anchor="middle" font-size="14" font-weight="700" fill="#1a1a1a">a₂<tspan font-size="9" dy="-5">(0)</tspan></text>
-
-  <!-- Layer-1 pre-activations z₁, z₂ (blue) -->
-  <text x="142" y="74"  text-anchor="middle" font-size="17" fill="#1565c0">z₁</text>
-  <text x="142" y="124" text-anchor="middle" font-size="17" fill="#1565c0">z₂</text>
-
-  <!-- Layer-1 activations a₁⁽¹⁾, a₂⁽¹⁾ (blue) -->
-  <text x="218" y="74"  text-anchor="middle" font-size="14" fill="#1565c0">a₁<tspan font-size="9" dy="-5">(1)</tspan></text>
-  <text x="218" y="124" text-anchor="middle" font-size="14" fill="#1565c0">a₂<tspan font-size="9" dy="-5">(1)</tspan></text>
-
-  <!-- Layer-2 activations a₁⁽²⁾, a₂⁽²⁾ (blue) -->
-  <text x="298" y="74"  text-anchor="middle" font-size="14" fill="#1565c0">a₁<tspan font-size="9" dy="-5">(2)</tspan></text>
-  <text x="298" y="124" text-anchor="middle" font-size="14" fill="#1565c0">a₂<tspan font-size="9" dy="-5">(2)</tspan></text>
-
-  <!-- Loss C (green) -->
-  <text x="362" y="101" text-anchor="middle" font-size="22" fill="#1b5e20" font-style="italic">C</text>
-
-  <!-- Targets t₁, t₂ (black) -->
-  <text x="370" y="42"  text-anchor="middle" font-size="16" font-weight="600" fill="#1a1a1a">t₁</text>
-  <text x="370" y="153" text-anchor="middle" font-size="16" font-weight="600" fill="#1a1a1a">t₂</text>
-
-  <!-- x to z connections (all-to-all) -->
-  <line x1="50" y1="68"  x2="130" y2="68"  stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="50" y1="70"  x2="130" y2="118" stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="50" y1="118" x2="130" y2="72"  stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="50" y1="122" x2="130" y2="122" stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-
-  <!-- z to h (σ applied element-wise) -->
-  <line x1="154" y1="68"  x2="206" y2="68"  stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="154" y1="122" x2="206" y2="122" stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-
-  <!-- h to y connections (all-to-all) -->
-  <line x1="230" y1="68"  x2="284" y2="68"  stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="230" y1="70"  x2="284" y2="118" stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="230" y1="118" x2="284" y2="72"  stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="230" y1="122" x2="284" y2="122" stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-
-  <!-- y to C -->
-  <line x1="308" y1="66"  x2="350" y2="87"  stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="308" y1="122" x2="350" y2="104" stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-
-  <!-- t to C -->
-  <line x1="370" y1="46"  x2="367" y2="84"  stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-  <line x1="370" y1="149" x2="367" y2="112" stroke="#555" stroke-width="1.3" marker-end="url(#cgab-arr)"/>
-
-  <!-- Layer-1 weight labels (red) — upper: w₁₁⁽¹⁾, w₁₂⁽¹⁾, b₁⁽¹⁾ entering z₁ -->
-  <text x="75"  y="17" text-anchor="middle" font-size="10" fill="#c62828">w₁₁⁽¹⁾</text>
-  <line x1="81"  y1="20" x2="133" y2="61" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="108" y="17" text-anchor="middle" font-size="10" fill="#c62828">w₁₂⁽¹⁾</text>
-  <line x1="114" y1="20" x2="135" y2="63" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="150" y="17" text-anchor="middle" font-size="10" fill="#c62828">b₁⁽¹⁾</text>
-  <line x1="150" y1="20" x2="143" y2="62" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- Layer-1 weight labels (red) — lower: w₂₁⁽¹⁾, w₂₂⁽¹⁾, b₂⁽¹⁾ entering z₂ (centred below z₂ to avoid crossing main arrows) -->
-  <text x="100" y="195" text-anchor="middle" font-size="10" fill="#c62828">w₂₁⁽¹⁾</text>
-  <line x1="104" y1="190" x2="133" y2="128" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="140" y="195" text-anchor="middle" font-size="10" fill="#c62828">w₂₂⁽¹⁾</text>
-  <line x1="140" y1="190" x2="139" y2="129" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="175" y="195" text-anchor="middle" font-size="10" fill="#c62828">b₂⁽¹⁾</text>
-  <line x1="172" y1="190" x2="147" y2="129" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- Layer-2 weight labels (red) — upper: w₁₁⁽²⁾, w₁₂⁽²⁾, b₁⁽²⁾ entering y₁ -->
-  <text x="246" y="17" text-anchor="middle" font-size="10" fill="#c62828">w₁₁⁽²⁾</text>
-  <line x1="252" y1="20" x2="288" y2="61" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="276" y="17" text-anchor="middle" font-size="10" fill="#c62828">w₁₂⁽²⁾</text>
-  <line x1="281" y1="20" x2="291" y2="63" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="308" y="17" text-anchor="middle" font-size="10" fill="#c62828">b₁⁽²⁾</text>
-  <line x1="308" y1="20" x2="300" y2="62" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- Layer-2 weight labels (red) — lower: w₂₁⁽²⁾, w₂₂⁽²⁾, b₂⁽²⁾ entering y₂ (centred below y₂ to avoid crossing main arrows) -->
-  <text x="258" y="195" text-anchor="middle" font-size="10" fill="#c62828">w₂₁⁽²⁾</text>
-  <line x1="262" y1="190" x2="288" y2="128" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="296" y="195" text-anchor="middle" font-size="10" fill="#c62828">w₂₂⁽²⁾</text>
-  <line x1="296" y1="190" x2="295" y2="129" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-  <text x="333" y="195" text-anchor="middle" font-size="10" fill="#c62828">b₂⁽²⁾</text>
-  <line x1="330" y1="190" x2="304" y2="129" stroke="#c62828" stroke-width="1.1" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- (a) label -->
-  <text x="185" y="207" text-anchor="middle" font-size="13" fill="#555">(a)</text>
-
-  <!-- Divider between (a) and (b) -->
-  <line x1="385" y1="5" x2="385" y2="198" stroke="#d0d0d0" stroke-width="1" stroke-dasharray="4,3"/>
-
-  <!-- ======== PART (b): Vectorized computation graph ======== -->
-
-  <!-- Main chain arrows -->
-  <line x1="416" y1="88" x2="470" y2="88" stroke="#333" stroke-width="1.5" marker-end="url(#cgab-arr)"/>
-  <line x1="495" y1="88" x2="535" y2="88" stroke="#333" stroke-width="1.5" marker-end="url(#cgab-arr)"/>
-  <line x1="558" y1="88" x2="597" y2="88" stroke="#333" stroke-width="1.5" marker-end="url(#cgab-arr)"/>
-  <line x1="620" y1="88" x2="652" y2="88" stroke="#333" stroke-width="1.5" marker-end="url(#cgab-arr)"/>
-  <line x1="672" y1="88" x2="704" y2="88" stroke="#333" stroke-width="1.5" marker-end="url(#cgab-arr)"/>
-
-  <!-- Main chain nodes -->
-  <text x="405" y="96" text-anchor="middle" font-size="16" font-weight="700" fill="#1a1a1a">a<tspan font-size="10" dy="-5">(0)</tspan></text>
-  <text x="482" y="96" text-anchor="middle" font-size="18" fill="#1565c0">z<tspan font-size="11" dy="-5">(1)</tspan></text>
-  <text x="547" y="96" text-anchor="middle" font-size="16" fill="#1565c0">a<tspan font-size="10" dy="-5">(1)</tspan></text>
-  <text x="609" y="96" text-anchor="middle" font-size="18" fill="#1565c0">z<tspan font-size="11" dy="-5">(2)</tspan></text>
-  <text x="662" y="96" text-anchor="middle" font-size="16" fill="#1565c0">a<tspan font-size="10" dy="-5">(2)</tspan></text>
-  <text x="720" y="100" text-anchor="middle" font-size="24" fill="#1b5e20" font-style="italic">C</text>
-
-  <!-- W⁽¹⁾ upper-left → z⁽¹⁾ -->
-  <text x="452" y="44" text-anchor="middle" font-size="14" font-weight="700" fill="#c62828">W<tspan font-size="9" dy="-4">(1)</tspan></text>
-  <line x1="464" y1="48" x2="473" y2="79" stroke="#c62828" stroke-width="1.4" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- b⁽¹⁾ lower-left → z⁽¹⁾ -->
-  <text x="452" y="140" text-anchor="middle" font-size="14" font-weight="700" fill="#c62828">b<tspan font-size="9" dy="-4">(1)</tspan></text>
-  <line x1="464" y1="134" x2="473" y2="97" stroke="#c62828" stroke-width="1.4" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- W⁽²⁾ upper-left → z⁽²⁾ -->
-  <text x="578" y="44" text-anchor="middle" font-size="14" font-weight="700" fill="#c62828">W<tspan font-size="9" dy="-4">(2)</tspan></text>
-  <line x1="590" y1="48" x2="600" y2="79" stroke="#c62828" stroke-width="1.4" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- b⁽²⁾ lower-left → z⁽²⁾ -->
-  <text x="578" y="140" text-anchor="middle" font-size="14" font-weight="700" fill="#c62828">b<tspan font-size="9" dy="-4">(2)</tspan></text>
-  <line x1="590" y1="134" x2="600" y2="97" stroke="#c62828" stroke-width="1.4" marker-end="url(#cgab-arr-r)"/>
-
-  <!-- t upper-right → C -->
-  <text x="742" y="44" text-anchor="middle" font-size="18" font-weight="700" fill="#1a1a1a">t</text>
-  <line x1="740" y1="50" x2="728" y2="80" stroke="#333" stroke-width="1.4" marker-end="url(#cgab-arr)"/>
-
-  <!-- (b) label -->
-  <text x="572" y="207" text-anchor="middle" font-size="13" fill="#555">(b)</text>
-</svg>
-</div>
-```
-
-Here $t$ denotes the **target** (ground truth label), which is the true output value the network should predict. The cost $C$ measures the discrepancy between the network's prediction $y$ and $t$.
 
 Summarized as a clean algorithm:
 
@@ -565,23 +417,23 @@ Summarized as a clean algorithm:
 
 **Pre-specify** (from model design):
 
-- $\frac{\partial C}{\partial a^L}$ — loss gradient w.r.t. the model output.
-- $\frac{da^m}{dz^m} = (\sigma^m)'(z^m)$ — nonlinearity derivative at each layer.
+- $\frac{\partial \mathcal{L}}{\partial h^L}$ — loss gradient w.r.t. the model output.
+- $\frac{dh^m}{da^m} = (\sigma^m)'(a^m)$ — nonlinearity derivative at each layer.
 
 **Forward pass** — compute and *cache* all activations:
-$$a^0 = \mathbf{x}, \quad z^m = W^m a^{m-1} + b^m, \quad a^m = \sigma^m(z^m), \quad m=1,\ldots,L$$
+$$h^0 = \mathbf{x}, \quad a^m = W^m h^{m-1} + b^m, \quad h^m = \sigma^m(a^m), \quad m=1,\ldots,L$$
 
 **Step 1 — Base case** (output layer):
-$$\frac{\partial C}{\partial z^L} = \frac{\partial C}{\partial a^L} \odot \frac{da^L}{dz^L}$$
+$$\frac{\partial \mathcal{L}}{\partial a^L} = \frac{\partial \mathcal{L}}{\partial h^L} \odot \frac{dh^L}{da^L}$$
 
 **Step 2 — Backward recursion** for $m = L-1, L-2, \ldots, 1$:
-$$\frac{\partial C}{\partial z^m} = \underbrace{\left({W^{m+1}}^\top \frac{\partial C}{\partial z^{m+1}}\right)}_{\text{from prev step}} \odot \underbrace{\frac{da^m}{dz^m}}_{\text{known}}$$
+$$\frac{\partial \mathcal{L}}{\partial a^m} = \underbrace{\left({W^{m+1}}^\top \frac{\partial \mathcal{L}}{\partial a^{m+1}}\right)}_{\text{from prev step}} \odot \underbrace{\frac{dh^m}{da^m}}_{\text{known}}$$
 
 **Step 3 — Weight gradients** for all $m$:
-$$\frac{\partial C}{\partial W^m} = \underbrace{\frac{\partial C}{\partial z^m}}_{\text{step 2}} \cdot \underbrace{(a^{m-1})^\top}_{\text{forward pass}}$$
+$$\frac{\partial \mathcal{L}}{\partial W^m} = \underbrace{\frac{\partial \mathcal{L}}{\partial a^m}}_{\text{step 2}} \cdot \underbrace{(h^{m-1})^\top}_{\text{forward pass}}$$
 
 **Gradient descent update:**
-$$W^m \leftarrow W^m - \eta\,\frac{\partial C}{\partial W^m}$$
+$$W^m \leftarrow W^m - \eta\,\frac{\partial \mathcal{L}}{\partial W^m}$$
 :::
 
 **Why is this efficient?** A single forward pass (caching all $a^m$) plus a
@@ -591,7 +443,7 @@ $2,\ldots,L$ for every single weight, which is exponentially more expensive.
 
 ### Connecting Back to Vanishing Gradients
 
-In the backward recursion, each step multiplies by $\frac{da^m}{dz^m}$.
+In the backward recursion, each step multiplies by $\frac{dh^m}{da^m}$.
 For sigmoid, $\max_x \frac{d}{dx}\operatorname{sigmoid}(x) = \frac{1}{4}$.
 In an $L$-layer sigmoid network, the gradient reaching layer 1 is scaled by
 roughly $\left(\frac{1}{4}\right)^L$, vanishing rapidly.
