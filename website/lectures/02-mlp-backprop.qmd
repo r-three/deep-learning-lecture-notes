@@ -456,21 +456,263 @@ the saturation visually.
 ## Universal Approximation Theorem {#sec-uat}
 
 ::: {.theorem-block}
-**Theorem (Universal Approximation, informal).** A sufficiently *wide* MLP with
-a **single hidden layer** can approximate any continuous function on a compact
-domain arbitrarily well.
-*Width* = the number of hidden units $N^1$.
+**Theorem (Universal Approximation).** The Universal Approximation
+Theorem states that a feedforward neural network with a single hidden layer
+and a sufficiently large number of neurons can approximate any continuous
+function on a bounded domain to arbitrary accuracy, provided it uses a
+suitable nonlinear activation function. This means that, in principle, even
+a relatively simple neural-network architecture can represent highly complex
+mappings with multiple inputs and outputs. The theorem establishes the
+expressive power of neural networks, although it does not specify how many
+neurons are required, how the network should be trained, or whether it will
+generalize well to unseen data.
 :::
 
 ### Visual Proof via Bump Functions
 
-The following interactive demo lets you build a function approximation using
-"bump functions".
-Each pair of neurons produces one bump; together they tile the input space.
+No matter what the function looks like, the theorem guarantees some network
+whose output matches it, or comes arbitrarily close, for every input. For
+a single input and output, that just means *some* network computes $f(x)$:
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 480 200" width="100%" style="max-width:480px;display:block;margin:auto;font-family:Inter,sans-serif;">
+  <defs>
+    <marker id="arrGen" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#999"/>
+    </marker>
+  </defs>
+  <g stroke="#bbb" stroke-width="1" marker-end="url(#arrGen)">
+    <line x1="62" y1="100" x2="188" y2="45"/>
+    <line x1="62" y1="100" x2="188" y2="100"/>
+    <line x1="62" y1="100" x2="188" y2="155"/>
+    <line x1="222" y1="45"  x2="338" y2="95"/>
+    <line x1="222" y1="100" x2="338" y2="100"/>
+    <line x1="222" y1="155" x2="338" y2="105"/>
+  </g>
+  <circle cx="40" cy="100" r="22" fill="#fff" stroke="#aaa" stroke-width="1.3"/>
+  <text x="40" y="105" text-anchor="middle" font-size="13" fill="#555">x</text>
+  <circle cx="205" cy="45"  r="20" fill="#fff" stroke="#aaa" stroke-width="1.3"/>
+  <circle cx="205" cy="100" r="20" fill="#fff" stroke="#aaa" stroke-width="1.3"/>
+  <circle cx="205" cy="155" r="20" fill="#fff" stroke="#aaa" stroke-width="1.3"/>
+  <circle cx="360" cy="100" r="22" fill="#fff" stroke="#aaa" stroke-width="1.3"/>
+  <text x="404" y="105" text-anchor="start" font-size="14" fill="#3b4080" font-weight="600">f(x)</text>
+</svg>
+</div>
+```
+
+This holds even when the function has many inputs and many outputs. Here's a
+network computing $f = f(x_1, x_2, x_3)$ with $m=3$ inputs and $n=2$ outputs,
+$f^1(x_1,x_2,x_3)$ and $f^2(x_1,x_2,x_3)$:
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 580 260" width="100%" style="max-width:580px;display:block;margin:auto;font-family:Inter,sans-serif;">
+  <defs>
+    <marker id="arrGen2" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#999"/>
+    </marker>
+  </defs>
+  <g stroke="#bbb" stroke-width="0.8" marker-end="url(#arrGen2)" opacity="0.85">
+    <!-- x1 -> h1..h4 -->
+    <line x1="62" y1="60"  x2="198" y2="30"/><line x1="62" y1="60"  x2="198" y2="90"/>
+    <line x1="62" y1="60"  x2="198" y2="150"/><line x1="62" y1="60"  x2="198" y2="210"/>
+    <!-- x2 -> h1..h4 -->
+    <line x1="62" y1="130" x2="198" y2="30"/><line x1="62" y1="130" x2="198" y2="90"/>
+    <line x1="62" y1="130" x2="198" y2="150"/><line x1="62" y1="130" x2="198" y2="210"/>
+    <!-- x3 -> h1..h4 -->
+    <line x1="62" y1="200" x2="198" y2="30"/><line x1="62" y1="200" x2="198" y2="90"/>
+    <line x1="62" y1="200" x2="198" y2="150"/><line x1="62" y1="200" x2="198" y2="210"/>
+    <!-- h1..h4 -> o1, o2 -->
+    <line x1="222" y1="30"  x2="378" y2="80"/><line x1="222" y1="30"  x2="378" y2="180"/>
+    <line x1="222" y1="90"  x2="378" y2="80"/><line x1="222" y1="90"  x2="378" y2="180"/>
+    <line x1="222" y1="150" x2="378" y2="80"/><line x1="222" y1="150" x2="378" y2="180"/>
+    <line x1="222" y1="210" x2="378" y2="80"/><line x1="222" y1="210" x2="378" y2="180"/>
+  </g>
+  <g fill="#fff" stroke="#aaa" stroke-width="1.3">
+    <circle cx="40" cy="60"  r="20"/><circle cx="40" cy="130" r="20"/><circle cx="40" cy="200" r="20"/>
+  </g>
+  <g font-size="12" text-anchor="middle" fill="#555">
+    <text x="40" y="65">x₁</text><text x="40" y="135">x₂</text><text x="40" y="205">x₃</text>
+  </g>
+  <g fill="#fff" stroke="#aaa" stroke-width="1.3">
+    <circle cx="210" cy="30"  r="18"/><circle cx="210" cy="90"  r="18"/>
+    <circle cx="210" cy="150" r="18"/><circle cx="210" cy="210" r="18"/>
+  </g>
+  <circle cx="400" cy="80"  r="20" fill="#fff" stroke="#aaa" stroke-width="1.3"/>
+  <circle cx="400" cy="180" r="20" fill="#fff" stroke="#aaa" stroke-width="1.3"/>
+  <text x="430" y="85"  text-anchor="start" font-size="13" fill="#3b4080" font-weight="600">f¹(x₁, x₂, x₃)</text>
+  <text x="430" y="185" text-anchor="start" font-size="13" fill="#3b4080" font-weight="600">f²(x₁, x₂, x₃)</text>
+</svg>
+</div>
+```
+
+That's the *statement* of the theorem: "an existence claim". The rest of this
+section makes it *constructive*: rather than proving it algebraically, we
+build an arbitrary function out of small neural-network pieces, one step at
+a time. Each widget below shows the same two things side by side: a tiny
+network with labelled weights, and the function it computes. Therefore, you can
+watch how turning a knob in the diagram reshapes the curve.
+
+#### Step 1 — One Neuron Makes a Step
+
+A single sigmoid unit $h = \sigma(wx+b)$ starts out as a smooth S-curve. As
+$|w|$ grows, the curve gets steeper until it looks like a hard *step*: 0 on
+one side, 1 on the other. The step's location is set entirely by the ratio
+of bias to weight:
+$$wx + b = 0 \;\Longrightarrow\; x = s := -\frac{b}{w}.$$
 
 ```{=html}
 <div class="interactive-widget">
-<div class="widget-title">Universal Approximation — Interactive Demo</div>
+<div class="widget-title">Step 1 — Single Neuron → Step Function</div>
+```
+
+```{ojs}
+//| echo: false
+
+viewof singleW = Inputs.range([1, 40], { value: 10, step: 0.5, label: "weight w" })
+viewof singleB = Inputs.range([-20, 20], { value: -5, step: 0.25, label: "bias b" })
+
+singleS = -singleB / singleW
+
+singleXs = Array.from({ length: 400 }, (_, i) => -0.5 + i * (2 / 399))
+singleSigmoid = x => 1 / (1 + Math.exp(-(singleW * x + singleB)))
+
+singlePlot = Plot.plot({
+  width: 380, height: 230,
+  marginLeft: 42,
+  x: { label: "x →", domain: [-0.5, 1.5], grid: true },
+  y: { label: "h(x)", domain: [-0.05, 1.05], grid: true },
+  marks: [
+    Plot.ruleY([0, 1], { stroke: "#eee" }),
+    Plot.ruleX([singleS], { stroke: "#e53935", strokeDasharray: "4,2", strokeWidth: 1.5 }),
+    Plot.line(singleXs.map(x => ({ x, y: singleSigmoid(x) })),
+      { x: "x", y: "y", stroke: "#5c6bc0", strokeWidth: 2.5 }),
+    Plot.text([{ x: singleS, y: 1.05, label: `s = ${singleS.toFixed(2)}` }],
+      { x: "x", y: "y", text: "label", dy: -6, fill: "#e53935", fontSize: 11, fontWeight: 600 })
+  ]
+})
+
+singleDiagram = html`<svg viewBox="0 0 250 170" width="250" style="display:block;font-family:Inter,sans-serif;">
+  <defs>
+    <marker id="arrS" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <line x1="55" y1="85" x2="112" y2="85" stroke="#888" stroke-width="1.2" marker-end="url(#arrS)"/>
+  <line x1="160" y1="85" x2="197" y2="85" stroke="#888" stroke-width="1.2" marker-end="url(#arrS)"/>
+  <circle cx="35" cy="85" r="20" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+  <text x="35" y="90" text-anchor="middle" font-size="13" fill="#3b4080">x</text>
+  <circle cx="135" cy="85" r="25" fill="#e8f5e9" stroke="#66bb6a" stroke-width="1.5"/>
+  <text x="135" y="82" text-anchor="middle" font-size="13" fill="#2e7d32">σ</text>
+  <text x="135" y="97" text-anchor="middle" font-size="9" fill="#2e7d32">b=${singleB.toFixed(1)}</text>
+  <circle cx="217" cy="85" r="17" fill="#fff3e0" stroke="#ffa726" stroke-width="1.5"/>
+  <text x="217" y="90" text-anchor="middle" font-size="12" fill="#e65100">h</text>
+  <text x="83" y="75" text-anchor="middle" font-size="10" fill="#5c6bc0" font-weight="600">w=${singleW.toFixed(1)}</text>
+  <text x="178" y="145" text-anchor="middle" font-size="9" fill="#888">step at s=−b/w</text>
+</svg>`
+
+html`<div style="display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center; justify-content:center;">${singleDiagram}${singlePlot}</div>`
+```
+
+```{=html}
+</div>
+```
+
+#### Step 2 — Two Neurons Make a Bump
+
+Take two step neurons with step points $s_1 < s_2$, and feed both into the
+next neuron with opposite-signed weights $+h$ and $-h$:
+$$\text{output} \approx h\cdot\mathbf{1}[x \ge s_1] - h\cdot\mathbf{1}[x \ge s_2]
+= h\cdot\mathbf{1}[s_1 \le x < s_2].$$
+The two steps cancel everywhere except the interval $[s_1, s_2)$, leaving a
+single rectangular *bump* of height $h$, the basic unit we'll tile the
+domain with next.
+
+```{=html}
+<div class="interactive-widget">
+<div class="widget-title">Step 2 — Two Neurons → One Bump</div>
+```
+
+```{ojs}
+//| echo: false
+
+viewof twoBumpS1 = Inputs.range([0, 1], { value: 0.2, step: 0.01, label: "step point s₁" })
+viewof twoBumpS2 = Inputs.range([0, 1], { value: 0.6, step: 0.01, label: "step point s₂" })
+viewof twoBumpH  = Inputs.range([-2, 2], { value: 1.2, step: 0.05, label: "height h" })
+
+twoBumpLo = Math.min(twoBumpS1, twoBumpS2)
+twoBumpHi = Math.max(twoBumpS1, twoBumpS2)
+twoBumpC  = 250 // steepness constant; large w approximates a hard step
+
+twoBumpStep = (x, s) => 1 / (1 + Math.exp(-twoBumpC * (x - s)))
+twoBumpFn   = x => twoBumpH * (twoBumpStep(x, twoBumpLo) - twoBumpStep(x, twoBumpHi))
+
+twoBumpXs = Array.from({ length: 500 }, (_, i) => -0.1 + i * (1.2 / 499))
+
+twoBumpPlot = Plot.plot({
+  width: 380, height: 230,
+  marginLeft: 42,
+  x: { label: "x →", domain: [-0.1, 1.1], grid: true },
+  y: { label: "output", domain: [-2.2, 2.2], grid: true },
+  marks: [
+    Plot.ruleY([0], { stroke: "#eee" }),
+    Plot.line(twoBumpXs.map(x => ({ x, y: twoBumpH * twoBumpStep(x, twoBumpLo) })),
+      { x: "x", y: "y", stroke: "#9fa8da", strokeWidth: 1.5, strokeDasharray: "5,3" }),
+    Plot.line(twoBumpXs.map(x => ({ x, y: -twoBumpH * twoBumpStep(x, twoBumpHi) })),
+      { x: "x", y: "y", stroke: "#c5cae9", strokeWidth: 1.5, strokeDasharray: "5,3" }),
+    Plot.line(twoBumpXs.map(x => ({ x, y: twoBumpFn(x) })),
+      { x: "x", y: "y", stroke: "#5c6bc0", strokeWidth: 2.5 })
+  ]
+})
+
+twoBumpDiagram = html`<svg viewBox="0 0 250 180" width="250" style="display:block;font-family:Inter,sans-serif;">
+  <defs>
+    <marker id="arrB" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <g stroke="#888" stroke-width="1.1">
+    <line x1="50" y1="90" x2="105" y2="45" marker-end="url(#arrB)"/>
+    <line x1="50" y1="90" x2="105" y2="135" marker-end="url(#arrB)"/>
+    <line x1="150" y1="45" x2="190" y2="80" marker-end="url(#arrB)"/>
+    <line x1="150" y1="135" x2="190" y2="95" marker-end="url(#arrB)"/>
+  </g>
+  <circle cx="32" cy="90" r="18" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+  <text x="32" y="94" text-anchor="middle" font-size="12" fill="#3b4080">x</text>
+  <circle cx="128" cy="45" r="22" fill="#e8f5e9" stroke="#66bb6a" stroke-width="1.5"/>
+  <text x="128" y="49" text-anchor="middle" font-size="11" fill="#2e7d32">σ</text>
+  <circle cx="128" cy="135" r="22" fill="#e8f5e9" stroke="#66bb6a" stroke-width="1.5"/>
+  <text x="128" y="139" text-anchor="middle" font-size="11" fill="#2e7d32">σ</text>
+  <circle cx="207" cy="90" r="18" fill="#fff3e0" stroke="#ffa726" stroke-width="1.5"/>
+  <text x="207" y="94" text-anchor="middle" font-size="11" fill="#e65100">Σ</text>
+  <text x="78" y="60"  text-anchor="middle" font-size="9" fill="#2e7d32">s₁=${twoBumpLo.toFixed(2)}</text>
+  <text x="78" y="121" text-anchor="middle" font-size="9" fill="#2e7d32">s₂=${twoBumpHi.toFixed(2)}</text>
+  <text x="172" y="58" text-anchor="middle" font-size="10" fill="#2e7d32" font-weight="600">+h</text>
+  <text x="172" y="122" text-anchor="middle" font-size="10" fill="#e53935" font-weight="600">−h</text>
+  <text x="115" y="170" text-anchor="middle" font-size="9" fill="#888">h=${twoBumpH.toFixed(2)}</text>
+</svg>`
+
+html`<div style="display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center; justify-content:center;">${twoBumpDiagram}${twoBumpPlot}</div>`
+```
+
+```{=html}
+</div>
+```
+
+#### Step 3 — Many Bumps Tile the Domain
+
+Partition the input range into $K$ equal intervals and place one bump per
+interval, each pair of neurons contributing one bump. Setting each bump's
+height to $f\!\left(\tfrac{i+0.5}{K}\right)$, the target value at the
+interval centre, gives a piecewise-constant approximation with error
+$O(1/K)$, so as $K \to \infty$ it converges uniformly to any continuous $f$.
+The network diagram now scales with $K$: every extra bump costs one more
+pair of hidden neurons.
+
+```{=html}
+<div class="interactive-widget">
+<div class="widget-title">Step 3 — K Bump Pairs → Tile the Domain</div>
 ```
 
 ```{ojs}
@@ -576,39 +818,141 @@ metricDisplay = html`
   <span style="background:#7986cb; opacity:0.4; display:inline-block; width:12px; height:10px; border-radius:2px; vertical-align:middle;"></span> bump regions
 </div>`
 
-html`${uatPlot}${metricDisplay}`
+nBumpsDiagram = html`<svg viewBox="0 0 225 170" width="225" style="display:block;font-family:Inter,sans-serif;">
+  <defs>
+    <marker id="arrN" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <line x1="45" y1="85" x2="95" y2="85" stroke="#888" stroke-width="1.1" marker-end="url(#arrN)"/>
+  <line x1="150" y1="85" x2="180" y2="85" stroke="#888" stroke-width="1.1" marker-end="url(#arrN)"/>
+  <circle cx="28" cy="85" r="17" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+  <text x="28" y="89" text-anchor="middle" font-size="11" fill="#3b4080">x</text>
+  <g fill="#e8f5e9" stroke="#66bb6a" stroke-width="1.4">
+    <circle cx="120" cy="30" r="13"/><circle cx="120" cy="55" r="13"/>
+    <circle cx="120" cy="115" r="13"/><circle cx="120" cy="140" r="13"/>
+  </g>
+  <text x="120" y="90" text-anchor="middle" font-size="16" fill="#66bb6a">⋮</text>
+  <circle cx="195" cy="85" r="17" fill="#fff3e0" stroke="#ffa726" stroke-width="1.5"/>
+  <text x="195" y="89" text-anchor="middle" font-size="11" fill="#e65100">Σ</text>
+  <text x="120" y="163" text-anchor="middle" font-size="10" fill="#888">${2 * nBumps} hidden neurons</text>
+</svg>`
+
+html`<div style="display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center; justify-content:center;">${nBumpsDiagram}${uatPlot}</div>${metricDisplay}`
 ```
 
 ```{=html}
 </div>
 ```
 
-**How it works:**
+Try increasing "Number of bumps" to see the approximation converge, and watch
+the hidden layer in the diagram grow by two neurons per bump. Also try
+switching to "Sawtooth" or "W-shape" to see even jagged
+functions get approximated!
 
-1. **One neuron → step function.** A single sigmoid unit $h = \sigma(wx+b)$
-   transitions from 0 to 1 around the point where its input is zero:
-   $$wx + b = 0 \;\Longrightarrow\; x = s := -\tfrac{b}{w}.$$
-   As $w \to \infty$ the sigmoid sharpens into a Heaviside step: $h \approx
-   \mathbf{1}[x \ge s]$. The step location $s = -b/w$ is controlled entirely
-   by the bias-to-weight ratio.
+#### Step 4 — Two Inputs Make a Tower
 
-2. **Two neurons → bump function.** Take two such step units with step
-   locations $s_1 < s_2$ and attach output weights $+c$ and $-c$:
-   $$\text{output} \approx c\,\mathbf{1}[x \ge s_1] - c\,\mathbf{1}[x \ge s_2]
-   = c\,\mathbf{1}[s_1 \le x < s_2].$$
-   This is a rectangular pulse (bump) of height $c$ supported on $[s_1, s_2)$.
-   Setting $c$ to the desired function value at that interval and choosing
-   $s_1, s_2$ to set its width gives full control over the bump.
+So far, the input has been one-dimensional. With **two** inputs $(x, y)$, the
+same trick builds a *tower*: use two neuron pairs to make an x-bump and a
+y-bump, then combine all four with a fifth neuron whose large bias makes it
+fire only when *both* bumps are active simultaneously (an AND-like gate).
+Concretely, each bump neuron outputs $\approx 1$ when "on" and $\approx 0$
+when "off". Give the combining neuron weight $+1$ from each of the four, so
+its pre-activation is $(\text{number of active bumps}) + b$. For the neuron
+to fire only when *all four* are on, this must be positive at 4 active
+bumps but negative at 3: $4+b>0$ and $3+b<0$, i.e. $b \in (-4,-3)$. Picking
+$b = -3.5 (the midpoint of that range) gives the largest safety margin
+against the bump neurons' outputs being only approximately 0/1; a steep
+sigmoid then turns this pre-activation into a clean AND gate. The result is
+a rectangular tower of height $h$ over the footprint
+$[s_{1x},s_{2x}]\times[s_{1y},s_{2y}]$, and tiling a 2D function takes one
+tower (5 neurons) per patch, instead of one bump (2 neurons) per interval.
 
-3. **$K$ pairs → tile the domain.** Partition the input range into $K$ equal
-   intervals. Place one bump per interval, setting its height to
-   $f\!\left(\tfrac{i+0.5}{K}\right)$, which is the target value at the interval
-   centre. The piecewise-constant approximation has error $O(1/K)$, so as
-   $K \to \infty$ it converges uniformly to any continuous $f$.
+```{=html}
+<div class="interactive-widget">
+<div class="widget-title">Step 4 — Two Inputs → One Tower</div>
+```
 
-Try increasing "Number of bumps" to see the approximation converge. Also try
-switching to the "Sawtooth" or "W-shape" to see even discontinuous/jagged functions
-can be approximated!
+```{ojs}
+//| echo: false
+
+viewof towerS1x = Inputs.range([0, 1], { value: 0.25, step: 0.02, label: "x range: s₁ₓ" })
+viewof towerS2x = Inputs.range([0, 1], { value: 0.65, step: 0.02, label: "x range: s₂ₓ" })
+viewof towerS1y = Inputs.range([0, 1], { value: 0.3,  step: 0.02, label: "y range: s₁ᵧ" })
+viewof towerS2y = Inputs.range([0, 1], { value: 0.7,  step: 0.02, label: "y range: s₂ᵧ" })
+viewof towerH   = Inputs.range([0.2, 1.4], { value: 0.9, step: 0.05, label: "height h" })
+
+towerLoX = Math.min(towerS1x, towerS2x)
+towerHiX = Math.max(towerS1x, towerS2x)
+towerLoY = Math.min(towerS1y, towerS2y)
+towerHiY = Math.max(towerS1y, towerS2y)
+
+// oblique projection of (x, y, z) onto the 2D canvas
+towerProj = (x, y, z) => ({ X: 90 + x * 170 - y * 70, Y: 210 - y * 90 - z * 110 })
+
+towerPts = pts => pts.map(p => `${p.X},${p.Y}`).join(" ")
+
+towerFloor = [towerProj(0,0,0), towerProj(1,0,0), towerProj(1,1,0), towerProj(0,1,0)]
+towerBase  = [towerProj(towerLoX,towerLoY,0), towerProj(towerHiX,towerLoY,0),
+              towerProj(towerHiX,towerHiY,0), towerProj(towerLoX,towerHiY,0)]
+towerTop   = [towerProj(towerLoX,towerLoY,towerH), towerProj(towerHiX,towerLoY,towerH),
+              towerProj(towerHiX,towerHiY,towerH), towerProj(towerLoX,towerHiY,towerH)]
+
+towerPlot = html`<svg viewBox="0 0 340 240" width="340" height="240" style="display:block;font-family:Inter,sans-serif;">
+  <polygon points="${towerPts(towerFloor)}" fill="#fafbff" stroke="#c5cae9" stroke-width="1"/>
+  <text x="${towerProj(1,0,0).X + 6}" y="${towerProj(1,0,0).Y + 4}" font-size="10" fill="#888">x</text>
+  <text x="${towerProj(0,1,0).X - 12}" y="${towerProj(0,1,0).Y - 4}" font-size="10" fill="#888">y</text>
+  <polygon points="${towerPts(towerBase)}" fill="none" stroke="#9fa8da" stroke-width="1.3" stroke-dasharray="4,3"/>
+  <line x1="${towerBase[0].X}" y1="${towerBase[0].Y}" x2="${towerTop[0].X}" y2="${towerTop[0].Y}" stroke="#5c6bc0" stroke-width="1.6"/>
+  <line x1="${towerBase[1].X}" y1="${towerBase[1].Y}" x2="${towerTop[1].X}" y2="${towerTop[1].Y}" stroke="#5c6bc0" stroke-width="1.6"/>
+  <line x1="${towerBase[2].X}" y1="${towerBase[2].Y}" x2="${towerTop[2].X}" y2="${towerTop[2].Y}" stroke="#5c6bc0" stroke-width="1.6"/>
+  <line x1="${towerBase[3].X}" y1="${towerBase[3].Y}" x2="${towerTop[3].X}" y2="${towerTop[3].Y}" stroke="#5c6bc0" stroke-width="1.6"/>
+  <polygon points="${towerPts(towerTop)}" fill="#5c6bc0" fill-opacity="0.55" stroke="#3b4080" stroke-width="1.8"/>
+  <text x="${towerTop[1].X + 8}" y="${(towerTop[1].Y + towerBase[1].Y)/2}" font-size="10" fill="#3b4080" font-weight="600">h=${towerH.toFixed(2)}</text>
+</svg>`
+
+towerDiagram = html`<svg viewBox="0 0 240 220" width="240" style="display:block;font-family:Inter,sans-serif;">
+  <g stroke="#888" stroke-width="1">
+    <line x1="45" y1="55"  x2="90" y2="30"/><line x1="45" y1="55"  x2="90" y2="60"/>
+    <line x1="45" y1="165" x2="90" y2="140"/><line x1="45" y1="165" x2="90" y2="170"/>
+    <line x1="112" y1="30"  x2="155" y2="105"/><line x1="112" y1="60"  x2="155" y2="105"/>
+    <line x1="112" y1="140" x2="155" y2="105"/><line x1="112" y1="170" x2="155" y2="105"/>
+    <line x1="177" y1="105" x2="200" y2="105"/>
+  </g>
+  <circle cx="28" cy="55"  r="16" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+  <text x="28" y="59" text-anchor="middle" font-size="11" fill="#3b4080">x</text>
+  <circle cx="28" cy="165" r="16" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+  <text x="28" y="169" text-anchor="middle" font-size="11" fill="#3b4080">y</text>
+  <g fill="#e8f5e9" stroke="#66bb6a" stroke-width="1.4">
+    <circle cx="100" cy="30"  r="12"/><circle cx="100" cy="60"  r="12"/>
+    <circle cx="100" cy="140" r="12"/><circle cx="100" cy="170" r="12"/>
+  </g>
+  <g font-size="10" fill="#2e7d32" text-anchor="middle">
+    <text x="100" y="33">σ</text><text x="100" y="63">σ</text>
+    <text x="100" y="143">σ</text><text x="100" y="173">σ</text>
+  </g>
+  <circle cx="166" cy="105" r="16" fill="#fff3e0" stroke="#ffa726" stroke-width="1.5"/>
+  <text x="166" y="102" text-anchor="middle" font-size="9" fill="#e65100">AND</text>
+  <text x="166" y="112" text-anchor="middle" font-size="7" fill="#e65100">big bias</text>
+  <circle cx="211" cy="105" r="11" fill="#fff3e0" stroke="#ffa726" stroke-width="1.5"/>
+  <text x="211" y="108" text-anchor="middle" font-size="9" fill="#e65100">t</text>
+  <text x="115" y="10"  text-anchor="middle" font-size="9" fill="#888">x-bump: s₁ₓ,s₂ₓ</text>
+  <text x="115" y="200" text-anchor="middle" font-size="9" fill="#888">y-bump: s₁ᵧ,s₂ᵧ</text>
+</svg>`
+
+html`<div style="display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center; justify-content:center;">${towerDiagram}${towerPlot}</div>`
+```
+
+```{=html}
+</div>
+```
+
+Drag the range sliders to move and resize the tower's footprint, and raise or
+lower it with the height slider. Building an arbitrary function of $d$
+inputs this way takes one tower, and $\mathcal{O}(d)$ neurons, per small
+patch of the input space, but the *number of patches* needed to cover a
+$d$-dimensional region grows exponentially in $d$. That exponential blow-up
+is exactly the second caveat below.
 
 ### Caveats: Is This Actually Useful?
 
@@ -619,8 +963,8 @@ foreshadow most of what we'll learn this semester.
 
 | Caveat | What it means | Motivates |
 |---|---|---|
-| **It implies we can overfit** | We have training data, not the true function. A wide enough MLP can memorise every training point. | Regularisation (Lecture 3) |
-| **The model may be enormous** | The number of bumps to tile a $d$-dimensional space grows exponentially in $d$. | Specialised architectures (i.g., CNNs, Transformers) |
+| **It implies we can overfit** | We have training data, not the true function. A wide enough MLP can memorize every training point. | Regularization (Lecture 3) |
+| **The model may be enormous** | The number of bumps to tile a $d$-dimensional space grows exponentially in $d$. | Specialized architectures (i.g., CNNs, Transformers) |
 | **It doesn't tell us how** | The constructive proof hand-picks weights. We can't do that at scale. | Gradient descent, backprop, adaptive optimizers |
 
 ---
@@ -648,7 +992,7 @@ foreshadow most of what we'll learn this semester.
 :::
 
 **Next lecture:** Regularization and Overfitting - how to prevent the MLP
-from simply memorizing training data.
+from simply memorizing training data?
 
 ## References {#sec-references .unnumbered}
 
