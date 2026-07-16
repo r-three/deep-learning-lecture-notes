@@ -105,13 +105,13 @@ A **feature vector** $\bm{x}$ assembles all measurements for a single input into
 ```
 
 ::: {.callout-warning}
-**The feature bottleneck.** The success of old-fashioned ML depends critically on the quality of hand-designed features. For digit classification this is feasible. For large-scale object recognition across tens of thousands of categories, it is essentially impossible — feature engineering becomes the limiting factor, and it requires deep domain expertise.
+**The feature bottleneck.** The success of old-fashioned ML depends critically on the quality of hand-designed features. For digit classification this is feasible. For large-scale object recognition across tens of thousands of categories, it is essentially impossible: feature engineering becomes the limiting factor, and it requires deep domain expertise.
 :::
 
 ### Deep learning: learning the features too
 
 ::: {.definition-block}
-**Definition.** A *deep learning* model is a **big, complex, differentiable** function built by composing many **small, simple, differentiable** functions called *layers*. Because the full composition is differentiable, the parameters of every layer can be trained jointly — *end-to-end* — with gradient descent.
+**Definition.** A *deep learning* model is a **big, complex, differentiable** function built by composing many **small, simple, differentiable** functions called *layers*. Because the full composition is differentiable, the parameters of every layer can be trained jointly, *end-to-end*, with gradient descent.
 :::
 
 ```{=html}
@@ -155,12 +155,12 @@ A **feature vector** $\bm{x}$ assembles all measurements for a single input into
   <text x="618" y="66" text-anchor="middle" font-size="10" fill="#999">dog    6%</text>
   <!-- Caption -->
   <text x="60" y="105" text-anchor="middle" font-size="10.5" fill="#666">input</text>
-  <text x="339" y="105" text-anchor="middle" font-size="10.5" fill="#666" font-style="italic">differentiable end-to-end — train all layers jointly with gradient descent</text>
+  <text x="339" y="105" text-anchor="middle" font-size="10.5" fill="#666" font-style="italic">differentiable end-to-end: train all layers jointly with gradient descent</text>
 </svg>
 </div>
 ```
 
-The composition of many small differentiable functions is itself differentiable — by the chain rule. This is the key insight that makes end-to-end training possible, and is the foundation of **backpropagation** (Lecture 2).
+The composition of many small differentiable functions is itself differentiable, by the chain rule. This is the key insight that makes end-to-end training possible, and is the foundation of **backpropagation** (Lecture 2).
 
 ---
 
@@ -168,7 +168,7 @@ The composition of many small differentiable functions is itself differentiable 
 
 If this approach is so powerful, why didn't we have modern AI systems in the 1980s? The core obstacle is the **loss landscape**.
 
-For old-fashioned ML with fixed features and a simple classifier, the training loss is often **convex** as a function of the parameters — a smooth bowl with a single global optimum. Gradient descent is guaranteed to find it, and the solution generalizes well to unseen data.
+For old-fashioned ML with fixed features and a simple classifier, the training loss is often **convex** as a function of the parameters, a smooth bowl with a single global optimum. Gradient descent is guaranteed to find it, and the solution generalizes well to unseen data.
 
 For deep learning models, the loss is highly **non-convex**: riddled with local optima, saddle points, and flat regions. Gradient descent offers no guarantee of reaching the best solution, and small errors in training can lead to large errors at test time.
 
@@ -181,26 +181,26 @@ For deep learning models, the loss is highly **non-convex**: riddled with local 
     </marker>
   </defs>
 
-  <!-- ── LEFT: Old-fashioned ML ── -->
-  <text x="155" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#444">Old-fashioned ML</text>
+  <!-- ── LEFT: Classic ML ── -->
+  <text x="155" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#444">Classic ML</text>
   <!-- Axes -->
   <line x1="35" y1="185" x2="275" y2="185" stroke="#555" stroke-width="1.2" marker-end="url(#ax)"/>
   <line x1="35" y1="185" x2="35" y2="30" stroke="#555" stroke-width="1.2" marker-end="url(#ax)"/>
   <text x="155" y="210" text-anchor="middle" font-size="9" fill="#666">parameter</text>
   <text x="14" y="108" text-anchor="middle" font-size="9" fill="#666" transform="rotate(-90,14,108)">train loss</text>
-  <!-- Convex bowl (smooth spline through exact parabola samples, y = 170 - 0.0127*(x-155)^2) -->
-  <path d="M 50.00,29.98 C 55.00,41.41 72.17,82.34 80.00,98.56 C 87.83,114.78 91.33,118.93 97.00,127.28 C 102.67,135.63 108.33,142.75 114.00,148.65 C 119.67,154.55 125.33,159.23 131.00,162.68 C 136.67,166.13 144.00,168.16 148.00,169.38 C 152.00,170.60 152.67,170.00 155.00,170.00 C 157.33,170.00 158.00,170.60 162.00,169.38 C 166.00,168.16 173.33,166.13 179.00,162.68 C 184.67,159.23 190.33,154.55 196.00,148.65 C 201.67,142.75 207.33,135.63 213.00,127.28 C 218.67,118.93 222.17,114.78 230.00,98.56 C 237.83,82.34 255.00,41.41 260.00,29.98" fill="none" stroke="#5c6bc0" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Convex bowl, shifted up so the "global optimum" label clears the axis (y = 150 - 0.0109*(x-155)^2) -->
+  <path d="M 50.00,30.05 C 55.00,39.84 72.17,74.91 80.00,88.80 C 87.83,102.69 91.33,106.25 97.00,113.40 C 102.67,120.55 108.33,126.66 114.00,131.71 C 119.67,136.77 125.33,140.77 131.00,143.73 C 136.67,146.69 144.00,148.43 148.00,149.47 C 152.00,150.51 152.67,150.00 155.00,150.00 C 157.33,150.00 158.00,150.51 162.00,149.47 C 166.00,148.43 173.33,146.69 179.00,143.73 C 184.67,140.77 190.33,136.77 196.00,131.71 C 201.67,126.66 207.33,120.55 213.00,113.40 C 218.67,106.25 222.17,102.69 230.00,88.80 C 237.83,74.91 255.00,39.84 260.00,30.05" fill="none" stroke="#5c6bc0" stroke-width="2.2" stroke-linecap="round"/>
   <!-- Start dot -->
-  <circle cx="230" cy="98.56" r="5" fill="#fbc02d"/>
+  <circle cx="230" cy="88.8" r="5" fill="#fbc02d"/>
   <!-- GD steps (middle points) -->
-  <circle cx="213" cy="127.28" r="5" fill="#e53935" opacity="0.85"/>
-  <circle cx="196" cy="148.65" r="5" fill="#e53935" opacity="0.85"/>
-  <circle cx="179" cy="162.68" r="5" fill="#e53935" opacity="0.85"/>
-  <circle cx="162" cy="169.38" r="5" fill="#e53935" opacity="0.85"/>
+  <circle cx="213" cy="113.4" r="5" fill="#e53935" opacity="0.85"/>
+  <circle cx="196" cy="131.71" r="5" fill="#e53935" opacity="0.85"/>
+  <circle cx="179" cy="143.73" r="5" fill="#e53935" opacity="0.85"/>
+  <circle cx="162" cy="149.47" r="5" fill="#e53935" opacity="0.85"/>
   <!-- Global optimum dot -->
-  <circle cx="155" cy="170" r="6" fill="#2e7d32"/>
-  <circle cx="155" cy="170" r="5" fill="#2e7d32"/>
-  <text x="155" y="184" text-anchor="middle" font-size="9" fill="#2e7d32">global optimum</text>
+  <circle cx="155" cy="150" r="6" fill="#2e7d32"/>
+  <circle cx="155" cy="150" r="5" fill="#2e7d32"/>
+  <text x="155" y="172" text-anchor="middle" font-size="9" fill="#2e7d32">global optimum</text>
 
   <!-- ── RIGHT: Deep learning ── -->
   <text x="465" y="18" text-anchor="middle" font-size="11" font-weight="600" fill="#444">Deep Learning</text>
@@ -209,7 +209,7 @@ For deep learning models, the loss is highly **non-convex**: riddled with local 
   <line x1="345" y1="185" x2="345" y2="30" stroke="#555" stroke-width="1.2" marker-end="url(#ax)"/>
   <text x="465" y="210" text-anchor="middle" font-size="9" fill="#666">parameter</text>
   <!-- Non-convex curve (smooth spline through exact waypoints; dots below sit on these anchors) -->
-  <path d="M 360.00,30.00 C 364.17,39.17 377.50,70.00 385.00,85.00 C 392.50,100.00 398.83,118.33 405.00,120.00 C 411.17,121.67 414.50,92.50 422.00,95.00 C 429.50,97.50 442.00,124.50 450.00,135.00 C 458.00,145.50 463.33,152.17 470.00,158.00 C 476.67,163.83 483.83,173.33 490.00,170.00 C 496.17,166.67 502.33,148.33 507.00,138.00 C 511.67,127.67 514.17,109.83 518.00,108.00 C 521.83,106.17 524.33,131.67 530.00,127.00 C 535.67,122.33 545.00,93.17 552.00,80.00 C 559.00,66.83 565.67,56.33 572.00,48.00 C 578.33,39.67 587.00,33.00 590.00,30.00" fill="none" stroke="#5c6bc0" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M 360.00,30.00 C 364.17,39.17 377.50,70.00 385.00,85.00 C 392.50,100.00 398.83,118.33 405.00,120.00 C 411.17,121.67 414.50,92.50 422.00,95.00 C 429.50,97.50 442.00,124.50 450.00,135.00 C 458.00,145.50 463.33,152.17 470.00,158.00 C 476.67,163.83 483.83,173.33 490.00,170.00 C 496.17,166.67 502.33,148.33 507.00,138.00 C 511.67,127.67 515.17,111.83 518.00,108.00 C 520.83,104.17 522.00,111.83 524.00,115.00 C 526.00,118.17 528.00,127.00 530.00,127.00 C 532.00,127.00 532.33,122.83 536.00,115.00 C 539.67,107.17 546.00,91.17 552.00,80.00 C 558.00,68.83 565.67,56.33 572.00,48.00 C 578.33,39.67 587.00,33.00 590.00,30.00" fill="none" stroke="#5c6bc0" stroke-width="2.2" stroke-linecap="round"/>
   <!-- Start dot -->
   <circle cx="590" cy="30" r="5" fill="#fbc02d"/>
   <!-- GD steps (middle points), stuck in a local optimum -->
@@ -221,13 +221,13 @@ For deep learning models, the loss is highly **non-convex**: riddled with local 
   <circle cx="490" cy="170" r="5" fill="#2e7d32"/>
   <text x="502" y="166" font-size="8" fill="#2e7d32">global optimum</text>
 
-  <!-- Legend -->
-  <circle cx="20" cy="220" r="4" fill="#fbc02d"/>
-  <text x="28" y="224" font-size="9" fill="#444">start</text>
-  <circle cx="90" cy="220" r="4" fill="#e53935"/>
-  <text x="98" y="224" font-size="9" fill="#444">gradient descent steps</text>
-  <circle cx="260" cy="220" r="4" fill="#2e7d32"/>
-  <text x="268" y="224" font-size="9" fill="#444">optimum found</text>
+  <!-- Legend (centered under the full figure) -->
+  <circle cx="183" cy="220" r="4" fill="#fbc02d"/>
+  <text x="191" y="224" font-size="9" fill="#444">start</text>
+  <circle cx="253" cy="220" r="4" fill="#e53935"/>
+  <text x="261" y="224" font-size="9" fill="#444">local optimum</text>
+  <circle cx="363" cy="220" r="4" fill="#2e7d32"/>
+  <text x="371" y="224" font-size="9" fill="#444">global optimum</text>
 </svg>
 </div>
 ```
@@ -265,7 +265,7 @@ Collect the features into $\bm{x} = [\text{age},\, \text{sqft},\, \text{nbr}]^\t
 $$\hat{y} = \bm{w}^\top \bm{x} + b$$
 :::
 
-The weights $\bm{w}$ and bias $b$ are the **parameters** of the model. Together we write them as $\bm{\theta} = (\bm{w}, b)$ — the values we will learn from data.
+The weights $\bm{w}$ and bias $b$ are the **parameters** of the model. Together we write them as $\bm{\theta} = (\bm{w}, b)$, the values we will learn from data.
 
 **Batched prediction.** In practice we process many examples simultaneously. Stacking $N$ examples row-wise into $\bm{X} \in \mathbb{R}^{N \times d}$:
 
@@ -273,14 +273,14 @@ $$\hat{\bm{y}} = \bm{X}\bm{w} + b, \qquad \hat{\bm{y}} \in \mathbb{R}^N, \quad \
 
 ### The loss function
 
-To fit the parameters we need a scalar measure of how well the model is doing. For regression we use the **squared error loss** for a single example $(\bm{x}, y)$:
+To fit the parameters we need a scalar measure of how well the model is doing. For regression, we use the **squared error loss** for a single example $(\bm{x}, y)$:
 
 $$\mathcal{L}(\hat{y}, y) = \frac{1}{2}(\hat{y} - y)^2$$
 
 The $\frac{1}{2}$ is a convenience: it cancels the exponent of 2 when we differentiate. The **goal** is to find $\bm{\theta}$ that minimizes $\mathcal{L}$ over the training set.
 
 ::: {.callout-note}
-**Closed form vs. gradient descent.** For linear regression a closed-form solution exists: $\bm{w}^* = (\bm{X}^\top \bm{X})^{-1}\bm{X}^\top \bm{y}$. We deliberately ignore it. In this course we always use gradient descent, because it generalizes to neural networks whereas a closed-form solution does not.
+**Closed form vs. gradient descent.** For linear regression a closed-form solution exists: $\bm{w}^* = (\bm{X}^\top \bm{X})^{-1}\bm{X}^\top \bm{y}$. We deliberately ignore it. In this course, we always use gradient descent, because it generalizes to neural networks whereas a closed-form solution does not.
 :::
 
 ### Gradient descent {#sec-gradient-descent}
@@ -298,9 +298,9 @@ $$\bm{\theta} \leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\mathcal{L}$$
 where $\eta > 0$ is the **learning rate** and $\nabla_{\bm{\theta}}\mathcal{L}$ is the gradient of the loss with respect to $\bm{\theta}$.
 :::
 
-**Stopping criteria** — in practice, training stops when one of these is triggered:
+**Stopping criteria**: in practice, training stops when one of these is triggered:
 
-- The loss reaches zero. *(Rare — only if the relationship is perfectly linear.)*
+- The loss reaches zero. *(Rare, only if the relationship is perfectly linear.)*
 - The loss stops decreasing.
 - Performance on held-out **validation data** stops improving.
 - We run out of compute budget or patience. *(Extremely common for large models.)*
@@ -388,7 +388,7 @@ html`${gdPlot}${gdStatus}`
 
 **Effect of the learning rate.** Try extreme values of $\eta$ above:
 
-- **Too small** ($\eta \ll 1$): slow convergence — many steps needed to reach the minimum.
+- **Too small** ($\eta \ll 1$): slow convergence, many steps needed to reach the minimum.
 - **Just right**: the loss decreases steadily to zero.
 - **Too large** ($\eta > 2$ for this loss): the updates *overshoot* and the loss **diverges**.
 
@@ -422,7 +422,7 @@ The gradient has a clean interpretation: the update for weight $w_i$ is the pred
 
 ### Mini-batch stochastic gradient descent
 
-So far we have computed the gradient for a single example. In practice we compute it over a **mini-batch** — a random subset of the training data of size $B$:
+So far, we have computed the gradient for a single example. In practice we compute it over a **mini-batch**, a random subset of the training data of size $B$:
 
 ::: {.boxed-eq}
 $$\bm{w} \leftarrow \bm{w} - \frac{\eta}{B} \sum_{i=1}^{B} \nabla_{\bm{w}} \mathcal{L}^{(i)}$$
@@ -432,9 +432,9 @@ $$\bm{w} \leftarrow \bm{w} - \frac{\eta}{B} \sum_{i=1}^{B} \nabla_{\bm{w}} \math
 |---|---|---|
 | Full dataset | $B = N$ | Gradient descent |
 | Single example | $B = 1$ | Stochastic gradient descent (SGD) |
-| Random subset | $1 < B < N$ | **Mini-batch SGD** ← standard in practice |
+| Random subset | $1 < B < N$ | **Mini-batch SGD** (standard in practice) |
 
-Using a mini-batch introduces noise into the gradient estimate. Somewhat counterintuitively, this noise often *helps* — it can prevent the optimizer from getting trapped in sharp local minima.
+Using a mini-batch introduces noise into the gradient estimate. Somewhat counterintuitively, this noise often *helps*: it can prevent the optimizer from getting trapped in sharp local minima.
 
 ### Hyperparameters
 
@@ -465,9 +465,15 @@ Linear regression predicts a continuous scalar. **Classification** is different:
 
 ### One-hot encoding
 
-We represent class labels as **one-hot vectors** — length-$K$ vectors with a 1 at the position of the correct class and 0s elsewhere:
+We represent class labels as **one-hot vectors**, length-$K$ vectors with a 1 at the position of the correct class and 0s elsewhere:
 
-$$\text{"below asking"} \;\to\; \bm{y} = [1,\, 0,\, 0]^\top \qquad \text{"above asking"} \;\to\; \bm{y} = [0,\, 1,\, 0]^\top \qquad \text{"not sold"} \;\to\; \bm{y} = [0,\, 0,\, 1]^\top$$
+$$
+\begin{aligned}
+\text{“below asking”} &\;\to\; \bm{y} = [1,\, 0,\, 0]^\top \\
+\text{“above asking”} &\;\to\; \bm{y} = [0,\, 1,\, 0]^\top \\
+\text{“not sold”} &\;\to\; \bm{y} = [0,\, 0,\, 1]^\top
+\end{aligned}
+$$
 
 The one-hot vector encodes the ground-truth probability distribution: probability 1 for the correct class, 0 for all others.
 
@@ -542,7 +548,7 @@ smPlot = Plot.plot({
 
 smNote = html`<div style="font-size:0.8rem;color:#666;margin-top:0.5rem;">
   Adjust the scores above to see how softmax maps arbitrary real values to probabilities.
-  Notice: only the <em>differences</em> between scores matter — adding a constant to all scores
+  Notice: only the <em>differences</em> between scores matter; adding a constant to all scores
   leaves probabilities unchanged.
 </div>`
 
@@ -554,7 +560,7 @@ html`${smPlot}${smNote}`
 ```
 
 ::: {.callout-warning}
-**Softmax is not "soft max".** The name is a misnomer — it should be called "soft argmax." What softmax computes is a *differentiable* approximation to the argmax: a probability distribution concentrated on the highest-scoring class. As scores become more extreme, the distribution sharpens toward a one-hot vector.
+**Softmax is not "soft max".** The name is a misnomer: it should be called "soft argmax." What softmax computes is a *differentiable* approximation to the argmax: a probability distribution concentrated on the highest-scoring class. As scores become more extreme, the distribution sharpens toward a one-hot vector.
 :::
 
 ---
@@ -573,7 +579,7 @@ Because log is monotone, maximizing the log-likelihood is equivalent. Negating c
 
 $$-\sum_{i=1}^{N} \log P(y^{(i)} \mid \bm{x}^{(i)}) = -\sum_{i=1}^{N} \sum_{j=1}^{K} y_j^{(i)} \log \hat{y}_j^{(i)}$$
 
-where $\hat{y}_j^{(i)} = \operatorname{softmax}(\bm{W}\bm{x}^{(i)} + \bm{b})_j$ and the inner sum collapses to just the true class term (since $\bm{y}^{(i)}$ is one-hot). This is the **cross-entropy loss** — it measures how "wrong" a predicted probability distribution is relative to the ground truth.
+where $\hat{y}_j^{(i)} = \operatorname{softmax}(\bm{W}\bm{x}^{(i)} + \bm{b})_j$ and the inner sum collapses to just the true class term (since $\bm{y}^{(i)}$ is one-hot). This is the **cross-entropy loss**: it measures how "wrong" a predicted probability distribution is relative to the ground truth.
 
 ### Single-example cross-entropy
 
@@ -591,7 +597,7 @@ The first term penalizes large scores everywhere; the second rewards a high scor
 
 ### Gradient of the cross-entropy loss
 
-To use gradient descent we need $\frac{d\mathcal{L}}{do_j}$ — the derivative with respect to each score. This is the only new ingredient in the chain rule compared to linear regression.
+To use gradient descent we need $\frac{d\mathcal{L}}{do_j}$, the derivative with respect to each score. This is the only new ingredient in the chain rule compared to linear regression.
 
 $$\frac{d\mathcal{L}}{do_j} = \frac{d}{do_j}\!\left[\log \sum_k \exp(o_k)\right] - y_j = \frac{\exp(o_j)}{\sum_k \exp(o_k)} - y_j$$
 
@@ -601,7 +607,7 @@ $$\frac{d\mathcal{L}}{do_j} = \underbrace{\operatorname{softmax}(\bm{o})_j}_{\ha
 
 In vector form: $\nabla_{\bm{o}} \mathcal{L} = \hat{\bm{y}} - \bm{y}$.
 
-This is a remarkably clean result: **the gradient is simply the prediction error** — the gap between the predicted probability and the true one-hot label. When the model is perfectly confident in the correct class, the gradient is zero; the further off the prediction, the larger the gradient signal.
+This is a remarkably clean result: **the gradient is simply the prediction error**, the gap between the predicted probability and the true one-hot label. When the model is perfectly confident in the correct class, the gradient is zero; the further off the prediction, the larger the gradient signal.
 
 ---
 
@@ -615,7 +621,7 @@ This is a remarkably clean result: **the gradient is simply the prediction error
 - **Gradient descent** repeatedly applies $\bm{\theta} \leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\mathcal{L}$. The learning rate $\eta$ and batch size are key hyperparameters.
 - Gradients for linear regression follow from the chain rule: $\nabla_{\bm{w}}\mathcal{L} = (\hat{y}-y)\bm{x}$ and $\frac{\partial\mathcal{L}}{\partial b} = \hat{y}-y$.
 - **Softmax regression** extends linear regression to $K$-class classification. Scores $\bm{o} = \bm{W}\bm{x} + \bm{b}$ are converted to probabilities via softmax. It remains a "linear" model because the scores are linear in $\bm{x}$.
-- **Cross-entropy** is the natural loss for classification. Its gradient w.r.t. scores is $\hat{\bm{y}} - \bm{y}$ — the prediction error.
+- **Cross-entropy** is the natural loss for classification. Its gradient w.r.t. scores is $\hat{\bm{y}} - \bm{y}$, the prediction error.
 :::
 
-**Next lecture:** Multi-layer perceptrons and backpropagation — why even the most clever stacking of linear models still yields a linear model, how adding nonlinearity overcomes this, and the algorithm that makes training deep networks efficient.
+**Next lecture:** Multi-layer perceptrons and backpropagation: why even the most clever stacking of linear models still yields a linear model, how adding nonlinearity overcomes this, and the algorithm that makes training deep networks efficient.
