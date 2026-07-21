@@ -11,7 +11,7 @@ bibliography: references.bib
 </div>
 ```
 
-**Recap.** In Lecture 2 we derived backpropagation: a base case at the output layer, a backward recursion through the weight transpose, and an outer product to recover weight gradients. In this lecture we ask what backprop *costs*, work through a full example that reveals why gradients can vanish or explode, use that insight to derive a principled way to initialize parameters, see how automatic differentiation turns backprop into a mechanical procedure a computer can run for us, and finally turn to *overfitting*: why models memorize training data, and the two regularizers — weight decay and dropout — used to stop them.
+**Recap.** In Lecture 2, we derived backpropagation: a base case at the output layer, a backward recursion through the weight transpose, and an outer product to recover weight gradients. In this lecture, we ask what backprop *costs*, work through a full example that reveals why gradients can vanish or explode, use that insight to derive a principled way to initialize parameters, see how automatic differentiation turns backprop into a mechanical procedure a computer can run for us, and finally, turn to *overfitting*: why models memorize training data, and the two regularizers (i.e., weight decay and dropout) used to stop them.
 
 ## Backpropagation, Continued {#sec-backprop-2}
 
@@ -27,9 +27,9 @@ $$\frac{\partial \mathcal{L}}{\partial W^m} = \frac{\partial \mathcal{L}}{\parti
 
 ### The Cost of Backpropagation
 
-Suppose the model is a stack of matrix multiplies and element-wise nonlinearities. Which is more expensive: a matrix multiply, or an element-wise nonlinearity? The matrix multiply — it does one multiply-add per *entry* of the weight matrix, and a weight matrix has far more entries than the layer has units. So the cost of a layer is dominated by its matrix multiply, and the **forward pass** costs roughly one multiply per parameter, summed over all layers: $O(|\theta|)$, where $|\theta|$ is the total number of parameters.
+Suppose the model is a stack of matrix multiplies and element-wise nonlinearities. Which is more expensive: a matrix multiply, or an element-wise nonlinearity? The matrix multiply. It does one multiply-add per *entry* of the weight matrix, and a weight matrix has far more entries than the layer has units. So the cost of a layer is dominated by its matrix multiply, and the **forward pass** costs roughly one multiply per parameter, summed over all layers: $O(|\theta|)$, where $|\theta|$ is the total number of parameters.
 
-Now look at the backward recursion above. It also does a matrix–vector product with $W^{m+1}$ at every layer — the same asymptotic cost as the forward pass. And the weight-gradient step is an outer product that produces an object as large as $W^m$ itself — again, the same cost. So:
+Now, look at the backward recursion above. It also does a matrix–vector product with $W^{m+1}$ at every layer. The same asymptotic cost as the forward pass and the weight-gradient step is an outer product that produces an object as large as $W^m$ itself, again, with the same cost. So:
 
 | Pass | What it computes | Cost |
 |---|---|---|
@@ -43,7 +43,7 @@ Now look at the backward recursion above. It also does a matrix–vector product
 
 ### Worked Example: A Sigmoid Network
 
-To see *why* initialization matters, let's push the recursion through a concrete network: sigmoid activations at **every** layer, including the output ($h^m = \operatorname{sigmoid}(a^m)$ for all $m$, including $m=L$), trained with the binary cross-entropy loss
+To see *why* initialization matters, let's push the recursion through a concrete network: sigmoid activations at **every** layer, including the output ($h^m = \operatorname{sigmoid}(a^m)$ for all $m$, including $m=L$), trained with the binary cross-entropy loss:
 
 $$\mathcal{L}(y, h^L) = (y-1)\log(1-h^L) - y\log(h^L)$$
 
@@ -61,7 +61,7 @@ and the corresponding weight gradient is $\frac{\partial \mathcal{L}}{\partial W
 
 ## Vanishing and Exploding Gradients {#sec-vanishing-exploding}
 
-Two repeated multiplications drive the recursion — and each can misbehave:
+Two repeated multiplications drive the recursion, and each can misbehave:
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -72,34 +72,68 @@ Two repeated multiplications drive the recursion — and each can misbehave:
     </marker>
   </defs>
 
-  <!-- LEFT: sigmoid(x) -->
+  <!-- LEFT: sigmoid(x), with labeled y-axis -->
   <text x="341" y="39.6" text-anchor="middle" font-size="24" font-weight="600" fill="#444">sigmoid(x)</text>
   <line x1="77" y1="407" x2="605" y2="407" stroke="#555" stroke-width="1.5" marker-end="url(#axSig)"/>
   <line x1="77" y1="407" x2="77" y2="66" stroke="#555" stroke-width="1.5" marker-end="url(#axSig)"/>
   <text x="341" y="462" text-anchor="middle" font-size="24" fill="#666">x</text>
+  <text x="14" y="237" text-anchor="middle" font-size="24" fill="#666" transform="rotate(-90,14,237)">sigmoid(x)</text>
+  <!-- y ticks -->
+  <line x1="72" y1="407" x2="82" y2="407" stroke="#555" stroke-width="1.5"/>
+  <text x="62" y="414" text-anchor="end" font-size="24" fill="#666">0</text>
+  <line x1="72" y1="236.5" x2="82" y2="236.5" stroke="#555" stroke-width="1.5"/>
+  <text x="62" y="243.5" text-anchor="end" font-size="24" fill="#666">0.5</text>
+  <line x1="72" y1="66" x2="82" y2="66" stroke="#555" stroke-width="1.5"/>
+  <text x="62" y="73" text-anchor="end" font-size="24" fill="#666">1</text>
+  <line x1="77" y1="236.5" x2="605" y2="236.5" stroke="#ccc" stroke-width="1" stroke-dasharray="4,4"/>
+
   <path d="M 77.00,406.16 C 80.67,406.07 91.67,405.85 99.00,405.61 C 106.33,405.37 113.67,405.11 121.00,404.72 C 128.33,404.33 135.67,403.89 143.00,403.25 C 150.33,402.61 157.67,401.91 165.00,400.87 C 172.33,399.83 179.67,398.67 187.00,397.00 C 194.33,395.33 201.67,393.47 209.00,390.83 C 216.33,388.19 223.67,385.21 231.00,381.13 C 238.33,377.05 245.67,372.41 253.00,366.35 C 260.33,360.29 267.67,353.30 275.00,344.79 C 282.33,336.28 289.67,326.38 297.00,315.29 C 304.33,304.20 311.67,291.39 319.00,278.26 C 326.33,265.13 333.67,250.42 341.00,236.50 C 348.33,222.58 355.67,207.87 363.00,194.74 C 370.33,181.61 377.67,168.80 385.00,157.71 C 392.33,146.62 399.67,136.72 407.00,128.21 C 414.33,119.70 421.67,112.71 429.00,106.65 C 436.33,100.59 443.67,95.95 451.00,91.87 C 458.33,87.79 465.67,84.81 473.00,82.17 C 480.33,79.53 487.67,77.67 495.00,76.00 C 502.33,74.33 509.67,73.17 517.00,72.13 C 524.33,71.09 531.67,70.39 539.00,69.75 C 546.33,69.11 553.67,68.67 561.00,68.28 C 568.33,67.89 575.67,67.63 583.00,67.39 C 590.33,67.15 601.33,66.93 605.00,66.84" fill="none" stroke="#5795C7" stroke-width="4" stroke-linecap="round"/>
   <circle cx="341" cy="236.5" r="8" fill="#2e7d32"/>
   <text x="357" y="228" font-size="24" fill="#2e7d32">1/2</text>
 
-  <!-- RIGHT: d/dx sigmoid(x) -->
-  <text x="1023" y="39.6" text-anchor="middle" font-size="24" font-weight="600" fill="#444">d/dx sigmoid(x)</text>
+  <!-- RIGHT: (1/4)^L bar chart — the gradient scale after L layers of sigmoid -->
+  <text x="1045" y="39.6" text-anchor="middle" font-size="24" font-weight="600" fill="#444">(1/4)^L vanishes with depth</text>
   <line x1="759" y1="407" x2="1331" y2="407" stroke="#555" stroke-width="1.5" marker-end="url(#axSig)"/>
   <line x1="759" y1="407" x2="759" y2="66" stroke="#555" stroke-width="1.5" marker-end="url(#axSig)"/>
-  <text x="1023" y="462" text-anchor="middle" font-size="24" fill="#666">x</text>
-  <path d="M 759.00,404.20 C 762.97,403.90 774.88,403.18 782.83,402.39 C 790.78,401.60 798.72,400.73 806.67,399.44 C 814.62,398.15 822.56,396.74 830.50,394.65 C 838.44,392.56 846.38,390.25 854.33,386.92 C 862.28,383.59 870.22,379.87 878.17,374.66 C 886.12,369.45 894.06,363.54 902.00,355.65 C 909.94,347.76 917.88,338.65 925.83,327.32 C 933.78,315.99 941.72,302.64 949.67,287.66 C 957.62,272.69 965.56,254.83 973.50,237.47 C 981.44,220.11 989.38,199.79 997.33,183.52 C 1005.28,167.25 1013.22,150.00 1021.17,139.88 C 1029.12,129.76 1037.06,122.83 1045.00,122.83 C 1052.94,122.83 1060.88,129.76 1068.83,139.88 C 1076.77,150.00 1084.73,167.25 1092.67,183.52 C 1100.62,199.79 1108.56,220.11 1116.50,237.47 C 1124.44,254.83 1132.38,272.69 1140.33,287.66 C 1148.27,302.64 1156.23,315.99 1164.17,327.32 C 1172.12,338.65 1180.06,347.76 1188.00,355.65 C 1195.94,363.54 1203.88,369.45 1211.83,374.66 C 1219.77,379.87 1227.73,383.59 1235.67,386.92 C 1243.62,390.25 1251.56,392.56 1259.50,394.65 C 1267.44,396.74 1275.38,398.15 1283.33,399.44 C 1291.27,400.73 1299.23,401.60 1307.17,402.39 C 1315.12,403.18 1327.03,403.90 1331.00,404.20" fill="none" stroke="#5795C7" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="1045" cy="122.83" r="8" fill="#2e7d32"/>
-  <text x="1061" y="114" font-size="24" fill="#2e7d32">1/4</text>
+  <text x="1045" y="462" text-anchor="middle" font-size="24" fill="#666">layers back (L)</text>
+  <text x="700" y="237" text-anchor="middle" font-size="24" fill="#666" transform="rotate(-90,700,237)">scale</text>
+  <line x1="754" y1="407" x2="764" y2="407" stroke="#555" stroke-width="1.5"/>
+  <text x="744" y="414" text-anchor="end" font-size="24" fill="#666">0</text>
+  <line x1="754" y1="66" x2="764" y2="66" stroke="#555" stroke-width="1.5"/>
+  <text x="744" y="73" text-anchor="end" font-size="24" fill="#666">0.25</text>
+
+  <rect x="778.1" y="66.0"  width="50" height="341.0" fill="#e53935" opacity="1"/>
+  <rect x="847.2" y="321.75" width="50" height="85.25" fill="#e53935" opacity="0.85"/>
+  <rect x="916.3" y="385.69" width="50" height="21.31" fill="#e53935" opacity="0.7"/>
+  <rect x="985.4" y="401.67" width="50" height="5.33"  fill="#e53935" opacity="0.55"/>
+  <rect x="1054.6" y="405.67" width="50" height="1.33"  fill="#e53935" opacity="0.4"/>
+  <rect x="1123.7" y="406.67" width="50" height="0.33"  fill="#e53935" opacity="0.3"/>
+  <rect x="1192.8" y="406.92" width="50" height="0.08"  fill="#e53935" opacity="0.25"/>
+  <rect x="1261.9" y="406.98" width="50" height="0.02"  fill="#e53935" opacity="0.2"/>
+
+  <text x="803.1"  y="432" text-anchor="middle" font-size="24" fill="#666">1</text>
+  <text x="872.2"  y="432" text-anchor="middle" font-size="24" fill="#666">2</text>
+  <text x="941.3"  y="432" text-anchor="middle" font-size="24" fill="#666">3</text>
+  <text x="1010.4" y="432" text-anchor="middle" font-size="24" fill="#666">4</text>
+  <text x="1079.6" y="432" text-anchor="middle" font-size="24" fill="#666">5</text>
+  <text x="1148.7" y="432" text-anchor="middle" font-size="24" fill="#666">6</text>
+  <text x="1217.8" y="432" text-anchor="middle" font-size="24" fill="#666">7</text>
+  <text x="1286.9" y="432" text-anchor="middle" font-size="24" fill="#666">8</text>
+
+  <text x="803.1" y="52" text-anchor="middle" font-size="24" fill="#e53935" font-weight="600">0.25</text>
+  <text x="1079.6" y="392" text-anchor="middle" font-size="24" fill="#e53935">≈0.001</text>
+  <text x="1286.9" y="393" text-anchor="middle" font-size="24" fill="#e53935">≈0.00002</text>
 </svg>
 </div>
 ```
 
-**The nonlinearity term.** The sigmoid's derivative is at most $\tfrac14$ (at $x=0$) and is otherwise smaller. Multiplying numbers between $0$ and $\tfrac14$ together, over and over, drives the product toward $0$ exponentially fast in the number of layers. Since this factor appears once per layer in the recursion, the gradient reaching the early layers of a deep sigmoid network is scaled by roughly $(\tfrac14)^L$ — it **vanishes**. And if $\frac{\partial \mathcal{L}}{\partial W^m} \approx 0$, the gradient-descent update $W^m \leftarrow W^m - \eta \frac{\partial \mathcal{L}}{\partial W^m}$ barely changes $W^m$ at all: the early layers simply stop learning.
+**The nonlinearity term.** The sigmoid's derivative is at most $\tfrac14$ (at $x=0$) and is otherwise smaller. Multiplying numbers between $0$ and $\tfrac14$ together, over and over, drives the product toward $0$ exponentially fast in the number of layers. Since this factor appears once per layer in the recursion, the gradient reaching the early layers of a deep sigmoid network is scaled by roughly $(\tfrac14)^L$ and it **vanishes**. And if $\frac{\partial \mathcal{L}}{\partial W^m} \approx 0$, the gradient-descent update $W^m \leftarrow W^m - \eta \frac{\partial \mathcal{L}}{\partial W^m}$ barely changes $W^m$ at all. The early layers simply stop learning.
 
 ::: {.callout-warning}
-**This is why sigmoid is rarely used as a hidden-layer activation.** ReLU's derivative is exactly $0$ or exactly $1$ — multiplying by $1$ repeatedly neither shrinks nor grows the gradient. This is one of the reasons ReLU made training much deeper networks practical.
+**This is why sigmoid is rarely used as a hidden-layer activation.** ReLU's derivative is exactly $0$ or exactly $1$. Multiplying by $1$ repeatedly neither shrinks nor grows the gradient. This is one of the reasons ReLU made training much deeper networks practical.
 :::
 
-**The weight-matrix term.** The recursion also repeatedly multiplies by $(W^{k})^\top$. What happens when you multiply a matrix by itself over and over depends on its eigenvalues: values consistently above 1 tend to blow the product up (**exploding** gradients); values consistently below 1 tend to shrink it to zero (vanishing again). Unlike the nonlinearity term, this direction of failure is entirely in our hands — it's set by how we choose the weight matrices *before training even starts*.
+**The weight-matrix term.** The recursion also repeatedly multiplies by $(W^{k})^\top$. What happens when you multiply a matrix by itself over and over depends on its eigenvalues: values consistently above 1 tend to blow the product up (**exploding** gradients); values consistently below 1 tend to shrink it to zero (vanishing again). Unlike the nonlinearity term, this direction of failure is entirely in our hands. It's set by how we choose the weight matrices *before training even starts*.
 
 ## Parameter Initialization {#sec-initialization}
 
@@ -167,42 +201,42 @@ Each line is one **op**: multiply, add, ReLU, multiply, add, subtract, power. Th
   <line x1="618" y1="750" x2="454" y2="750" stroke="#888" stroke-width="2" marker-end="url(#arrCG)"/>
   <line x1="618" y1="868" x2="454" y2="868" stroke="#888" stroke-width="2" marker-end="url(#arrCG)"/>
   <circle cx="420" cy="160" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
-  <text x="420" y="167" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">^2</text>
-  <text x="372" y="167" text-anchor="end" font-size="20" fill="#207965" font-style="italic">L</text>
+  <text x="420" y="167" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">^2</text>
+  <text x="372" y="167" text-anchor="end" font-size="24" fill="#207965" font-style="italic">L</text>
   <circle cx="420" cy="278" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
-  <text x="420" y="285" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">-</text>
-  <text x="372" y="285" text-anchor="end" font-size="20" fill="#207965" font-style="italic">e</text>
+  <text x="420" y="285" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">-</text>
+  <text x="372" y="285" text-anchor="end" font-size="24" fill="#207965" font-style="italic">e</text>
   <circle cx="420" cy="396" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
-  <text x="420" y="403" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">+</text>
-  <text x="372" y="403" text-anchor="end" font-size="20" fill="#207965" font-style="italic">o</text>
+  <text x="420" y="403" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">+</text>
+  <text x="372" y="403" text-anchor="end" font-size="24" fill="#207965" font-style="italic">o</text>
   <circle cx="420" cy="514" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
-  <text x="420" y="521" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">&#215;</text>
-  <text x="372" y="521" text-anchor="end" font-size="20" fill="#207965" font-style="italic">m_o</text>
+  <text x="420" y="521" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">&#215;</text>
+  <text x="372" y="521" text-anchor="end" font-size="24" fill="#207965" font-style="italic">m_o</text>
   <circle cx="420" cy="632" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
-  <text x="420" y="639" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">ReLU</text>
-  <text x="372" y="639" text-anchor="end" font-size="20" fill="#207965" font-style="italic">h</text>
+  <text x="420" y="639" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">ReLU</text>
+  <text x="372" y="639" text-anchor="end" font-size="24" fill="#207965" font-style="italic">h</text>
   <circle cx="420" cy="750" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
-  <text x="420" y="757" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">+</text>
-  <text x="372" y="757" text-anchor="end" font-size="20" fill="#207965" font-style="italic">a_h</text>
+  <text x="420" y="757" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">+</text>
+  <text x="372" y="757" text-anchor="end" font-size="24" fill="#207965" font-style="italic">a_h</text>
   <circle cx="420" cy="868" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
-  <text x="420" y="875" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">&#215;</text>
-  <text x="372" y="875" text-anchor="end" font-size="20" fill="#207965" font-style="italic">m_h</text>
+  <text x="420" y="875" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">&#215;</text>
+  <text x="372" y="875" text-anchor="end" font-size="24" fill="#207965" font-style="italic">m_h</text>
   <circle cx="650" cy="160" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="167" text-anchor="middle" font-size="20" fill="#205279">2</text>
+  <text x="650" y="167" text-anchor="middle" font-size="24" fill="#205279">2</text>
   <circle cx="650" cy="278" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="285" text-anchor="middle" font-size="20" fill="#205279">y</text>
+  <text x="650" y="285" text-anchor="middle" font-size="24" fill="#205279">y</text>
   <circle cx="650" cy="396" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="403" text-anchor="middle" font-size="20" fill="#205279">b_o</text>
+  <text x="650" y="403" text-anchor="middle" font-size="24" fill="#205279">b_o</text>
   <circle cx="650" cy="514" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="521" text-anchor="middle" font-size="20" fill="#205279">w_o</text>
+  <text x="650" y="521" text-anchor="middle" font-size="24" fill="#205279">w_o</text>
   <circle cx="650" cy="750" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="757" text-anchor="middle" font-size="20" fill="#205279">b_h</text>
+  <text x="650" y="757" text-anchor="middle" font-size="24" fill="#205279">b_h</text>
   <circle cx="650" cy="868" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="875" text-anchor="middle" font-size="20" fill="#205279">w_h</text>
+  <text x="650" y="875" text-anchor="middle" font-size="24" fill="#205279">w_h</text>
   <circle cx="420" cy="986" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="420" y="993" text-anchor="middle" font-size="20" fill="#205279">x</text>
-  <text x="722" y="514" font-size="22" fill="#666" text-anchor="start">leaf nodes</text>
-  <text x="722" y="542" font-size="22" fill="#666" text-anchor="start">(inputs &amp; params)</text>
+  <text x="420" y="993" text-anchor="middle" font-size="24" fill="#205279">x</text>
+  <text x="722" y="514" font-size="24" fill="#666" text-anchor="start">leaf nodes</text>
+  <text x="722" y="542" font-size="24" fill="#666" text-anchor="start">(inputs &amp; params)</text>
 </svg>
 </div>
 ```
@@ -231,7 +265,7 @@ This is exactly what Homework 3 asks you to build: an `Operation` class (with `a
 
 ## Overfitting and Regularization {#sec-overfitting}
 
-Recall the Universal Approximation Theorem (@sec-uat): a sufficiently wide network can fit *any* function — including simply memorizing a finite training set. So overfitting is a real risk, and it isn't specific to neural networks at all; the same ideas apply to any sufficiently flexible model.
+Recall the Universal Approximation Theorem (@sec-uat): a sufficiently wide network can fit *any* function, including simply memorizing a finite training set. So overfitting is a real risk, and it isn't specific to neural networks at all; the same ideas apply to any sufficiently flexible model.
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -250,10 +284,10 @@ Recall the Universal Approximation Theorem (@sec-uat): a sufficiently wide netwo
   <text x="30" y="237" text-anchor="middle" font-size="24" fill="#666" transform="rotate(-90,30,237)">loss</text>
 
   <path d="M 77.00,90.00 C 89.17,101.67 124.50,133.33 150.00,160.00 C 175.50,186.67 201.67,223.33 230.00,250.00 C 258.33,276.67 290.00,300.83 320.00,320.00 C 350.00,339.17 380.00,353.33 410.00,365.00 C 440.00,376.67 467.50,383.83 500.00,390.00 C 532.50,396.17 587.50,400.00 605.00,402.00" fill="none" stroke="#5795C7" stroke-width="4" stroke-linecap="round"/>
-  <text x="611" y="406" font-size="22" fill="#5795C7">train</text>
+  <text x="611" y="406" font-size="24" fill="#5795C7">train</text>
 
   <path d="M 77.00,90.00 C 89.17,103.33 124.50,141.67 150.00,170.00 C 175.50,198.33 203.33,235.00 230.00,260.00 C 256.67,285.00 286.67,306.67 310.00,320.00 C 333.33,333.33 350.00,340.00 370.00,340.00 C 390.00,340.00 408.33,331.67 430.00,320.00 C 451.67,308.33 470.83,291.67 500.00,270.00 C 529.17,248.33 587.50,203.33 605.00,190.00" fill="none" stroke="#C75794" stroke-width="4" stroke-linecap="round"/>
-  <text x="611" y="194" font-size="22" fill="#C75794">validation</text>
+  <text x="611" y="194" font-size="24" fill="#C75794">validation</text>
 
   <!-- RIGHT: fitting a function -->
   <text x="1023" y="39.6" text-anchor="middle" font-size="24" font-weight="600" fill="#444">Fitting a Function</text>
@@ -275,11 +309,11 @@ Recall the Universal Approximation Theorem (@sec-uat): a sufficiently wide netwo
 
   <!-- legend for right panel -->
   <line x1="800" y1="90" x2="840" y2="90" stroke="#888" stroke-width="3" stroke-dasharray="9,6"/>
-  <text x="848" y="96" font-size="22" fill="#666">true function</text>
+  <text x="848" y="96" font-size="24" fill="#666">true function</text>
   <circle cx="820" cy="130" r="7" fill="#333"/>
-  <text x="848" y="136" font-size="22" fill="#666">training data</text>
+  <text x="848" y="136" font-size="24" fill="#666">training data</text>
   <line x1="800" y1="170" x2="840" y2="170" stroke="#e53935" stroke-width="3"/>
-  <text x="848" y="176" font-size="22" fill="#e53935">overfit model</text>
+  <text x="848" y="176" font-size="24" fill="#e53935">overfit model</text>
 </svg>
 </div>
 ```
