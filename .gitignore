@@ -222,5 +222,7 @@ __marimo__/
 
 # Quarto build artifacts
 website/_site/
+
 website/.quarto/
 **/*.quarto_ipynb
+.claude
