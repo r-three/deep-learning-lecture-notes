@@ -86,43 +86,35 @@ Two repeated multiplications drive the recursion, and each can misbehave:
   <line x1="72" y1="66" x2="82" y2="66" stroke="#555" stroke-width="1.5"/>
   <text x="62" y="73" text-anchor="end" font-size="24" fill="#666">1</text>
   <line x1="77" y1="236.5" x2="605" y2="236.5" stroke="#ccc" stroke-width="1" stroke-dasharray="4,4"/>
+  <!-- x tick at x=0 -->
+  <line x1="341" y1="236.5" x2="341" y2="407" stroke="#ccc" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="341" y1="402" x2="341" y2="412" stroke="#555" stroke-width="1.5"/>
+  <text x="341" y="432" text-anchor="middle" font-size="24" fill="#666">0</text>
 
   <path d="M 77.00,406.16 C 80.67,406.07 91.67,405.85 99.00,405.61 C 106.33,405.37 113.67,405.11 121.00,404.72 C 128.33,404.33 135.67,403.89 143.00,403.25 C 150.33,402.61 157.67,401.91 165.00,400.87 C 172.33,399.83 179.67,398.67 187.00,397.00 C 194.33,395.33 201.67,393.47 209.00,390.83 C 216.33,388.19 223.67,385.21 231.00,381.13 C 238.33,377.05 245.67,372.41 253.00,366.35 C 260.33,360.29 267.67,353.30 275.00,344.79 C 282.33,336.28 289.67,326.38 297.00,315.29 C 304.33,304.20 311.67,291.39 319.00,278.26 C 326.33,265.13 333.67,250.42 341.00,236.50 C 348.33,222.58 355.67,207.87 363.00,194.74 C 370.33,181.61 377.67,168.80 385.00,157.71 C 392.33,146.62 399.67,136.72 407.00,128.21 C 414.33,119.70 421.67,112.71 429.00,106.65 C 436.33,100.59 443.67,95.95 451.00,91.87 C 458.33,87.79 465.67,84.81 473.00,82.17 C 480.33,79.53 487.67,77.67 495.00,76.00 C 502.33,74.33 509.67,73.17 517.00,72.13 C 524.33,71.09 531.67,70.39 539.00,69.75 C 546.33,69.11 553.67,68.67 561.00,68.28 C 568.33,67.89 575.67,67.63 583.00,67.39 C 590.33,67.15 601.33,66.93 605.00,66.84" fill="none" stroke="#5795C7" stroke-width="4" stroke-linecap="round"/>
   <circle cx="341" cy="236.5" r="8" fill="#2e7d32"/>
   <text x="357" y="228" font-size="24" fill="#2e7d32">1/2</text>
 
-  <!-- RIGHT: (1/4)^L bar chart — the gradient scale after L layers of sigmoid -->
-  <text x="1045" y="39.6" text-anchor="middle" font-size="24" font-weight="600" fill="#444">(1/4)^L vanishes with depth</text>
+  <!-- RIGHT: d/dx sigmoid(x), with labeled y-axis matching the left panel -->
+  <text x="1023" y="39.6" text-anchor="middle" font-size="24" font-weight="600" fill="#444">d/dx sigmoid(x)</text>
   <line x1="759" y1="407" x2="1331" y2="407" stroke="#555" stroke-width="1.5" marker-end="url(#axSig)"/>
   <line x1="759" y1="407" x2="759" y2="66" stroke="#555" stroke-width="1.5" marker-end="url(#axSig)"/>
-  <text x="1045" y="462" text-anchor="middle" font-size="24" fill="#666">layers back (L)</text>
-  <text x="700" y="237" text-anchor="middle" font-size="24" fill="#666" transform="rotate(-90,700,237)">scale</text>
+  <text x="1045" y="462" text-anchor="middle" font-size="24" fill="#666">x</text>
+  <text x="696" y="237" text-anchor="middle" font-size="24" fill="#666" transform="rotate(-90,696,237)">d/dx sigmoid(x)</text>
+  <!-- y ticks -->
   <line x1="754" y1="407" x2="764" y2="407" stroke="#555" stroke-width="1.5"/>
   <text x="744" y="414" text-anchor="end" font-size="24" fill="#666">0</text>
-  <line x1="754" y1="66" x2="764" y2="66" stroke="#555" stroke-width="1.5"/>
-  <text x="744" y="73" text-anchor="end" font-size="24" fill="#666">0.25</text>
+  <line x1="754" y1="122.83" x2="764" y2="122.83" stroke="#555" stroke-width="1.5"/>
+  <text x="744" y="129.83" text-anchor="end" font-size="24" fill="#666">0.25</text>
+  <line x1="759" y1="122.83" x2="1331" y2="122.83" stroke="#ccc" stroke-width="1" stroke-dasharray="4,4"/>
+  <!-- x tick at x=0 -->
+  <line x1="1045" y1="122.83" x2="1045" y2="407" stroke="#ccc" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="1045" y1="402" x2="1045" y2="412" stroke="#555" stroke-width="1.5"/>
+  <text x="1045" y="432" text-anchor="middle" font-size="24" fill="#666">0</text>
 
-  <rect x="778.1" y="66.0"  width="50" height="341.0" fill="#e53935" opacity="1"/>
-  <rect x="847.2" y="321.75" width="50" height="85.25" fill="#e53935" opacity="0.85"/>
-  <rect x="916.3" y="385.69" width="50" height="21.31" fill="#e53935" opacity="0.7"/>
-  <rect x="985.4" y="401.67" width="50" height="5.33"  fill="#e53935" opacity="0.55"/>
-  <rect x="1054.6" y="405.67" width="50" height="1.33"  fill="#e53935" opacity="0.4"/>
-  <rect x="1123.7" y="406.67" width="50" height="0.33"  fill="#e53935" opacity="0.3"/>
-  <rect x="1192.8" y="406.92" width="50" height="0.08"  fill="#e53935" opacity="0.25"/>
-  <rect x="1261.9" y="406.98" width="50" height="0.02"  fill="#e53935" opacity="0.2"/>
-
-  <text x="803.1"  y="432" text-anchor="middle" font-size="24" fill="#666">1</text>
-  <text x="872.2"  y="432" text-anchor="middle" font-size="24" fill="#666">2</text>
-  <text x="941.3"  y="432" text-anchor="middle" font-size="24" fill="#666">3</text>
-  <text x="1010.4" y="432" text-anchor="middle" font-size="24" fill="#666">4</text>
-  <text x="1079.6" y="432" text-anchor="middle" font-size="24" fill="#666">5</text>
-  <text x="1148.7" y="432" text-anchor="middle" font-size="24" fill="#666">6</text>
-  <text x="1217.8" y="432" text-anchor="middle" font-size="24" fill="#666">7</text>
-  <text x="1286.9" y="432" text-anchor="middle" font-size="24" fill="#666">8</text>
-
-  <text x="803.1" y="52" text-anchor="middle" font-size="24" fill="#e53935" font-weight="600">0.25</text>
-  <text x="1079.6" y="392" text-anchor="middle" font-size="24" fill="#e53935">≈0.001</text>
-  <text x="1286.9" y="393" text-anchor="middle" font-size="24" fill="#e53935">≈0.00002</text>
+  <path d="M 759.00,404.20 C 762.97,403.90 774.88,403.18 782.83,402.39 C 790.78,401.60 798.72,400.73 806.67,399.44 C 814.62,398.15 822.56,396.74 830.50,394.65 C 838.44,392.56 846.38,390.25 854.33,386.92 C 862.28,383.59 870.22,379.87 878.17,374.66 C 886.12,369.45 894.06,363.54 902.00,355.65 C 909.94,347.76 917.88,338.65 925.83,327.32 C 933.78,315.99 941.72,302.64 949.67,287.66 C 957.62,272.69 965.56,254.83 973.50,237.47 C 981.44,220.11 989.38,199.79 997.33,183.52 C 1005.28,167.25 1013.22,150.00 1021.17,139.88 C 1029.12,129.76 1037.06,122.83 1045.00,122.83 C 1052.94,122.83 1060.88,129.76 1068.83,139.88 C 1076.77,150.00 1084.73,167.25 1092.67,183.52 C 1100.62,199.79 1108.56,220.11 1116.50,237.47 C 1124.44,254.83 1132.38,272.69 1140.33,287.66 C 1148.27,302.64 1156.23,315.99 1164.17,327.32 C 1172.12,338.65 1180.06,347.76 1188.00,355.65 C 1195.94,363.54 1203.88,369.45 1211.83,374.66 C 1219.77,379.87 1227.73,383.59 1235.67,386.92 C 1243.62,390.25 1251.56,392.56 1259.50,394.65 C 1267.44,396.74 1275.38,398.15 1283.33,399.44 C 1291.27,400.73 1299.23,401.60 1307.17,402.39 C 1315.12,403.18 1327.03,403.90 1331.00,404.20" fill="none" stroke="#5795C7" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="1045" cy="122.83" r="8" fill="#2e7d32"/>
+  <text x="1061" y="114" font-size="24" fill="#2e7d32">1/4</text>
 </svg>
 </div>
 ```
