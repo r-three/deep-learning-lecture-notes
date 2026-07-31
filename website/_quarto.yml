@@ -19,6 +19,9 @@ book:
     - lectures/01-intro-regression.qmd
     - lectures/02-mlp-backprop.qmd
     - lectures/03-regularization.qmd
+    - lectures/04-gradient-descent-adaptive-gradient-methods.qmd
+    - lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.qmd
+    - lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.qmd
 
 format:
   html:

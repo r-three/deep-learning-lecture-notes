@@ -1,0 +1,438 @@
+---
+title: "Lecture 4: Gradient Descent, Adaptive Gradient Methods"
+description: "A closer look at why gradient descent works, the role of the learning rate, batch versus stochastic versus mini-batch training, learning rate schedules, and the adaptive gradient methods (momentum and Adam) used to train modern models."
+bibliography: references.bib
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 4: Gradient Descent, Adaptive Gradient Methods</h1>
+</div>
+```
+
+**Overview.** So far in this course we have used gradient descent to optimize our models without saying much about why it works. This lecture takes a closer look. We first justify the gradient descent update through a first-order Taylor expansion, which also explains the central role of the learning rate. We then move from optimizing the full training loss (batch gradient descent) to optimizing one example or a small mini-batch at a time (stochastic gradient descent), and we examine the consequences: noisier progress, the option of a learning rate schedule, and a trade-off between efficiency, noise, and parallelism. Finally, we motivate and define **adaptive gradient methods**, which give each parameter its own effective learning rate based on the history of its gradients. We build up to **Adam**, the optimizer used to train most modern neural networks.
+
+## Gradient Descent {#sec-gradient-descent}
+
+Before returning to machine learning, it helps to set neural networks aside and consider the more general problem of minimizing a function. Call the function $f(x)$. To *minimize* $f$ means to find values of $x$ that make $f$ as small as possible. In machine learning the function we minimize is usually the loss and the variable we adjust is usually the model's parameters, but for the moment we keep things generic.
+
+### Why gradient descent works {#sec-why-gd}
+
+To justify the gradient descent update, we start from a Taylor expansion of $f$. Writing it in one particular form, if $f$ is infinitely differentiable then its value at a point offset by $e$ from $x$ can be written as an infinite sum,
+
+$$f(x + e) = \sum_{n=0}^{\infty} \frac{e^n f^{(n)}(x)}{n!},$$
+
+where $f^{(n)}$ is the $n$th derivative of $f$. This decomposes the function's behavior near $x$ into contributions from its successive derivatives. If this specific form is unfamiliar, it is the same Taylor expansion seen elsewhere, just written as a single sum.
+
+Now set the offset to $\epsilon$, a placeholder for a small number, and expand. The $n=0$ term is $\epsilon^0 f(x)/0! = f(x)$. The $n=1$ term is $\epsilon^1 f'(x)/1! = \epsilon f'(x)$. Every remaining term carries a factor of $\epsilon^2$ or higher; because $\epsilon$ is small and we divide by $n!$, these terms are dominated by $\epsilon^2$, which is small. Collecting them into an error term,
+
+$$f(x + \epsilon) = f(x) + \epsilon f'(x) + \mathcal{O}(\epsilon^2).$$
+
+What this says is that, as long as we stay close enough to $x$, a good approximation of $f$ is a *linear* one: $f(x)$ is the value at the point, $f'(x)$ is the slope of the tangent line there, and $\epsilon f'(x)$ moves us along that tangent line. We would not expect a tangent line to approximate an arbitrary function well everywhere, but for small enough $\epsilon$ it is a good *local* approximation.
+
+Now comes the step that produces something familiar. Set $\epsilon = -\eta f'(x)$. We can treat this as small as long as the learning rate $\eta$ is small and the function is reasonably smooth, so that $f'(x)$ is not too large. Substituting into the first-order expansion,
+
+$$f\big(x - \eta f'(x)\big) = f(x) - \eta \big(f'(x)\big)^2 + \mathcal{O}\!\big(\eta^2 (f'(x))^2\big).$$
+
+The middle term on the right is subtracted and is non-negative: $\eta$ is positive and $(f'(x))^2$ is a square, so even when $f'(x)$ is negative the product is positive. Provided the error term is small enough to ignore, moving from $x$ to $x - \eta f'(x)$ therefore *decreases* $f$:
+
+::: {.boxed-eq}
+$$f\big(x - \eta f'(x)\big) \;\lesssim\; f(x) \qquad\Longrightarrow\qquad x \leftarrow x - \eta f'(x).$$
+:::
+
+The $\lesssim$ is approximate precisely because of the discarded error term. As long as that error is small, we can be reasonably confident the new value of $x$ produces a smaller $f$, which is exactly what minimization requires. Repeating the update drives $f$ steadily downward. Geometrically, we stand at $x$, follow the tangent line a small distance downhill to $x - \eta f'(x)$, and the gap between the function and the tangent line is the error we are neglecting.
+
+We will return to the question of what happens when that error is *not* small.
+
+### The learning rate {#sec-learning-rate}
+
+The size of the error term, and therefore whether the update actually decreases $f$, depends on the learning rate $\eta$. This gives three qualitatively different regimes.
+
+If we want to be sure the approximate inequality holds, we can make $\epsilon = -\eta f'(x)$ very small by making $\eta$ very small. This works, but each step then covers very little ground, so minimizing the function takes a great many iterations. In deep learning each iteration means a forward and backward pass through the model, and, as we saw when we covered backpropagation (Lecture 2), the backward pass roughly triples the cost of the forward pass. A very small learning rate multiplies an already expensive computation by the number of steps, and training may run out of time or budget before it converges.
+
+The opposite choice is a large $\eta$, to make faster progress. But when $\eta$ is too large the error term is no longer negligible, and the update can overshoot so badly that the new point is *worse* than where it started. Instead of decreasing, $f$ increases, and increases again on the next step. This is **divergence**: when training a model, we see the loss climbing rather than falling.
+
+The learning rate we want is somewhere between these, "just right": large enough to make steady progress, small enough not to diverge. In general the right value is hard to characterize in advance, because we do not have access to the function's curvature ahead of time and every problem differs. In practice we tune $\eta$ as a hyperparameter, adjusting it until we observe consistent, reasonably rapid decrease in the loss.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 650 608" width="100%" style="max-width:650px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+  <defs><marker id="lrArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+  <text x="40" y="26" font-size="24" font-weight="600" fill="#333">Choosing the learning rate η</text>
+  <g transform="translate(40,44)">
+    <line x1="0" y1="145.3" x2="460" y2="145.3" stroke="#ccc" stroke-width="1"/>
+    <path d="M 7.7,3.4 L 11.5,8.2 L 15.3,13.0 L 19.2,17.7 L 23.0,22.3 L 26.8,26.8 L 30.7,31.2 L 34.5,35.6 L 38.3,39.8 L 42.2,44.0 L 46.0,48.1 L 49.8,52.1 L 53.7,56.0 L 57.5,59.9 L 61.3,63.6 L 65.2,67.3 L 69.0,70.9 L 72.8,74.4 L 76.7,77.8 L 80.5,81.1 L 84.3,84.4 L 88.2,87.6 L 92.0,90.6 L 95.8,93.6 L 99.7,96.5 L 103.5,99.4 L 107.3,102.1 L 111.2,104.8 L 115.0,107.3 L 118.8,109.8 L 122.7,112.2 L 126.5,114.6 L 130.3,116.8 L 134.2,118.9 L 138.0,121.0 L 141.8,123.0 L 145.7,124.9 L 149.5,126.7 L 153.3,128.4 L 157.2,130.1 L 161.0,131.6 L 164.8,133.1 L 168.7,134.5 L 172.5,135.8 L 176.3,137.0 L 180.2,138.2 L 184.0,139.2 L 187.8,140.2 L 191.7,141.1 L 195.5,141.9 L 199.3,142.6 L 203.2,143.2 L 207.0,143.8 L 210.8,144.3 L 214.7,144.6 L 218.5,144.9 L 222.3,145.1 L 226.2,145.3 L 230.0,145.3 L 233.8,145.3 L 237.7,145.1 L 241.5,144.9 L 245.3,144.6 L 249.2,144.3 L 253.0,143.8 L 256.8,143.2 L 260.7,142.6 L 264.5,141.9 L 268.3,141.1 L 272.2,140.2 L 276.0,139.2 L 279.8,138.2 L 283.7,137.0 L 287.5,135.8 L 291.3,134.5 L 295.2,133.1 L 299.0,131.6 L 302.8,130.1 L 306.7,128.4 L 310.5,126.7 L 314.3,124.9 L 318.2,123.0 L 322.0,121.0 L 325.8,118.9 L 329.7,116.8 L 333.5,114.6 L 337.3,112.2 L 341.2,109.8 L 345.0,107.3 L 348.8,104.8 L 352.7,102.1 L 356.5,99.4 L 360.3,96.5 L 364.2,93.6 L 368.0,90.6 L 371.8,87.6 L 375.7,84.4 L 379.5,81.1 L 383.3,77.8 L 387.2,74.4 L 391.0,70.9 L 394.8,67.3 L 398.7,63.6 L 402.5,59.9 L 406.3,56.0 L 410.2,52.1 L 414.0,48.1 L 417.8,44.0 L 421.7,39.8 L 425.5,35.6 L 429.3,31.2 L 433.2,26.8 L 437.0,22.3 L 440.8,17.7 L 444.7,13.0 L 448.5,8.2 L 452.3,3.4" fill="none" stroke="#5795C7" stroke-width="2.5"/>
+    <path d="M 402.5,59.9 L 381.8,79.2 L 363.6,94.1 L 347.6,105.6 L 333.4,114.6 L 321.0,121.5 L 310.1,126.9 L 300.5,131.0 L 292.0,134.3 L 284.6,136.8 L 278.0,138.7 L 272.3,140.2 L 267.2,141.3 L 262.7,142.2 L 258.8,142.9" fill="none" stroke="#e53935" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <circle cx="402.5" cy="59.9" r="6" fill="#2e7d32"/>
+    <circle cx="381.8" cy="79.2" r="3.5" fill="#e53935"/>
+    <circle cx="363.6" cy="94.1" r="3.5" fill="#e53935"/>
+    <circle cx="347.6" cy="105.6" r="3.5" fill="#e53935"/>
+    <circle cx="333.4" cy="114.6" r="3.5" fill="#e53935"/>
+    <circle cx="321.0" cy="121.5" r="3.5" fill="#e53935"/>
+    <circle cx="310.1" cy="126.9" r="3.5" fill="#e53935"/>
+    <circle cx="300.5" cy="131.0" r="3.5" fill="#e53935"/>
+    <circle cx="292.0" cy="134.3" r="3.5" fill="#e53935"/>
+    <circle cx="284.6" cy="136.8" r="3.5" fill="#e53935"/>
+    <circle cx="278.0" cy="138.7" r="3.5" fill="#e53935"/>
+    <circle cx="272.3" cy="140.2" r="3.5" fill="#e53935"/>
+    <circle cx="267.2" cy="141.3" r="3.5" fill="#e53935"/>
+    <circle cx="262.7" cy="142.2" r="3.5" fill="#e53935"/>
+    <circle cx="258.8" cy="142.9" r="3.5" fill="#e53935"/>
+    <text x="476" y="71" font-size="16" font-weight="600" fill="#333">small η</text>
+    <text x="476" y="91" font-size="14" fill="#666">slow: many tiny steps</text>
+  </g>
+  <g transform="translate(40,246)">
+    <line x1="0" y1="145.3" x2="460" y2="145.3" stroke="#ccc" stroke-width="1"/>
+    <path d="M 7.7,3.4 L 11.5,8.2 L 15.3,13.0 L 19.2,17.7 L 23.0,22.3 L 26.8,26.8 L 30.7,31.2 L 34.5,35.6 L 38.3,39.8 L 42.2,44.0 L 46.0,48.1 L 49.8,52.1 L 53.7,56.0 L 57.5,59.9 L 61.3,63.6 L 65.2,67.3 L 69.0,70.9 L 72.8,74.4 L 76.7,77.8 L 80.5,81.1 L 84.3,84.4 L 88.2,87.6 L 92.0,90.6 L 95.8,93.6 L 99.7,96.5 L 103.5,99.4 L 107.3,102.1 L 111.2,104.8 L 115.0,107.3 L 118.8,109.8 L 122.7,112.2 L 126.5,114.6 L 130.3,116.8 L 134.2,118.9 L 138.0,121.0 L 141.8,123.0 L 145.7,124.9 L 149.5,126.7 L 153.3,128.4 L 157.2,130.1 L 161.0,131.6 L 164.8,133.1 L 168.7,134.5 L 172.5,135.8 L 176.3,137.0 L 180.2,138.2 L 184.0,139.2 L 187.8,140.2 L 191.7,141.1 L 195.5,141.9 L 199.3,142.6 L 203.2,143.2 L 207.0,143.8 L 210.8,144.3 L 214.7,144.6 L 218.5,144.9 L 222.3,145.1 L 226.2,145.3 L 230.0,145.3 L 233.8,145.3 L 237.7,145.1 L 241.5,144.9 L 245.3,144.6 L 249.2,144.3 L 253.0,143.8 L 256.8,143.2 L 260.7,142.6 L 264.5,141.9 L 268.3,141.1 L 272.2,140.2 L 276.0,139.2 L 279.8,138.2 L 283.7,137.0 L 287.5,135.8 L 291.3,134.5 L 295.2,133.1 L 299.0,131.6 L 302.8,130.1 L 306.7,128.4 L 310.5,126.7 L 314.3,124.9 L 318.2,123.0 L 322.0,121.0 L 325.8,118.9 L 329.7,116.8 L 333.5,114.6 L 337.3,112.2 L 341.2,109.8 L 345.0,107.3 L 348.8,104.8 L 352.7,102.1 L 356.5,99.4 L 360.3,96.5 L 364.2,93.6 L 368.0,90.6 L 371.8,87.6 L 375.7,84.4 L 379.5,81.1 L 383.3,77.8 L 387.2,74.4 L 391.0,70.9 L 394.8,67.3 L 398.7,63.6 L 402.5,59.9 L 406.3,56.0 L 410.2,52.1 L 414.0,48.1 L 417.8,44.0 L 421.7,39.8 L 425.5,35.6 L 429.3,31.2 L 433.2,26.8 L 437.0,22.3 L 440.8,17.7 L 444.7,13.0 L 448.5,8.2 L 452.3,3.4" fill="none" stroke="#5795C7" stroke-width="2.5"/>
+    <path d="M 370.6,88.6 L 78.2,79.2 L 393.9,68.1 L 52.9,55.3 L 421.2,40.3 L 23.5,22.9 L 453.0,2.5" fill="none" stroke="#e53935" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <circle cx="370.6" cy="88.6" r="6" fill="#2e7d32"/>
+    <circle cx="78.2" cy="79.2" r="3.5" fill="#e53935"/>
+    <circle cx="393.9" cy="68.1" r="3.5" fill="#e53935"/>
+    <circle cx="52.9" cy="55.3" r="3.5" fill="#e53935"/>
+    <circle cx="421.2" cy="40.3" r="3.5" fill="#e53935"/>
+    <circle cx="23.5" cy="22.9" r="3.5" fill="#e53935"/>
+    <circle cx="453.0" cy="2.5" r="3.5" fill="#e53935"/>
+    <text x="476" y="71" font-size="16" font-weight="600" fill="#333">large η</text>
+    <text x="476" y="91" font-size="14" fill="#666">diverges: steps overshoot</text>
+  </g>
+  <g transform="translate(40,448)">
+    <line x1="0" y1="145.3" x2="460" y2="145.3" stroke="#ccc" stroke-width="1"/>
+    <path d="M 7.7,3.4 L 11.5,8.2 L 15.3,13.0 L 19.2,17.7 L 23.0,22.3 L 26.8,26.8 L 30.7,31.2 L 34.5,35.6 L 38.3,39.8 L 42.2,44.0 L 46.0,48.1 L 49.8,52.1 L 53.7,56.0 L 57.5,59.9 L 61.3,63.6 L 65.2,67.3 L 69.0,70.9 L 72.8,74.4 L 76.7,77.8 L 80.5,81.1 L 84.3,84.4 L 88.2,87.6 L 92.0,90.6 L 95.8,93.6 L 99.7,96.5 L 103.5,99.4 L 107.3,102.1 L 111.2,104.8 L 115.0,107.3 L 118.8,109.8 L 122.7,112.2 L 126.5,114.6 L 130.3,116.8 L 134.2,118.9 L 138.0,121.0 L 141.8,123.0 L 145.7,124.9 L 149.5,126.7 L 153.3,128.4 L 157.2,130.1 L 161.0,131.6 L 164.8,133.1 L 168.7,134.5 L 172.5,135.8 L 176.3,137.0 L 180.2,138.2 L 184.0,139.2 L 187.8,140.2 L 191.7,141.1 L 195.5,141.9 L 199.3,142.6 L 203.2,143.2 L 207.0,143.8 L 210.8,144.3 L 214.7,144.6 L 218.5,144.9 L 222.3,145.1 L 226.2,145.3 L 230.0,145.3 L 233.8,145.3 L 237.7,145.1 L 241.5,144.9 L 245.3,144.6 L 249.2,144.3 L 253.0,143.8 L 256.8,143.2 L 260.7,142.6 L 264.5,141.9 L 268.3,141.1 L 272.2,140.2 L 276.0,139.2 L 279.8,138.2 L 283.7,137.0 L 287.5,135.8 L 291.3,134.5 L 295.2,133.1 L 299.0,131.6 L 302.8,130.1 L 306.7,128.4 L 310.5,126.7 L 314.3,124.9 L 318.2,123.0 L 322.0,121.0 L 325.8,118.9 L 329.7,116.8 L 333.5,114.6 L 337.3,112.2 L 341.2,109.8 L 345.0,107.3 L 348.8,104.8 L 352.7,102.1 L 356.5,99.4 L 360.3,96.5 L 364.2,93.6 L 368.0,90.6 L 371.8,87.6 L 375.7,84.4 L 379.5,81.1 L 383.3,77.8 L 387.2,74.4 L 391.0,70.9 L 394.8,67.3 L 398.7,63.6 L 402.5,59.9 L 406.3,56.0 L 410.2,52.1 L 414.0,48.1 L 417.8,44.0 L 421.7,39.8 L 425.5,35.6 L 429.3,31.2 L 433.2,26.8 L 437.0,22.3 L 440.8,17.7 L 444.7,13.0 L 448.5,8.2 L 452.3,3.4" fill="none" stroke="#5795C7" stroke-width="2.5"/>
+    <path d="M 402.5,59.9 L 295.6,133.0 L 254.9,143.5 L 239.5,145.1 L 233.6,145.3 L 231.4,145.3 L 230.5,145.3 L 230.2,145.3" fill="none" stroke="#e53935" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <circle cx="402.5" cy="59.9" r="6" fill="#2e7d32"/>
+    <circle cx="295.6" cy="133.0" r="3.5" fill="#e53935"/>
+    <circle cx="254.9" cy="143.5" r="3.5" fill="#e53935"/>
+    <circle cx="239.5" cy="145.1" r="3.5" fill="#e53935"/>
+    <circle cx="233.6" cy="145.3" r="3.5" fill="#e53935"/>
+    <circle cx="231.4" cy="145.3" r="3.5" fill="#e53935"/>
+    <circle cx="230.5" cy="145.3" r="3.5" fill="#e53935"/>
+    <circle cx="230.2" cy="145.3" r="3.5" fill="#e53935"/>
+    <text x="476" y="71" font-size="16" font-weight="600" fill="#333">“just right” η</text>
+    <text x="476" y="91" font-size="14" fill="#666">steady, rapid progress</text>
+  </g>
+</svg>
+</div>
+```
+
+### The multivariate case {#sec-multivariate}
+
+The same derivation carries over to functions of many variables, which is the case that matters for us since models have many parameters. For a scalar-valued function of a vector $\bm{x}$, the gradient is the vector of partial derivatives,
+
+$$\nabla_{\bm{x}} f(\bm{x}) = \left[\frac{\partial f(\bm{x})}{\partial x_1},\; \frac{\partial f(\bm{x})}{\partial x_2},\; \dots\right]^\top,$$
+
+each entry taken with respect to one component of $\bm{x}$. The first-order Taylor expansion now uses a vector offset $\bm{\epsilon}$ with small norm,
+
+$$f(\bm{x} + \bm{\epsilon}) = f(\bm{x}) + \bm{\epsilon}^\top \nabla_{\bm{x}} f(\bm{x}) + \mathcal{O}\big(\|\bm{\epsilon}\|^2\big).$$
+
+Setting $\bm{\epsilon} = -\eta\, \nabla_{\bm{x}} f(\bm{x})$ with a single scalar learning rate $\eta > 0$,
+
+$$f\big(\bm{x} - \eta \nabla_{\bm{x}} f(\bm{x})\big) = f(\bm{x}) - \eta\, \nabla_{\bm{x}} f(\bm{x})^\top \nabla_{\bm{x}} f(\bm{x}) + \mathcal{O}(\cdots) \;\lesssim\; f(\bm{x}).$$
+
+The subtracted term is again non-negative, since it is the inner product of a vector with itself scaled by a positive $\eta$. The idea is identical to the single-variable case. It is worth noting that $\eta$ remains a single scalar: we do *not* use a different learning rate for each component of $\bm{x}$. The implications of that choice will occupy the second half of this lecture.
+
+---
+
+## From Batch to Stochastic Gradient Descent {#sec-sgd}
+
+Returning to machine learning, the function we minimize is the loss. For a single training example the loss depends on an input, a target, and the parameters. Using the $(i)$ superscript to index the $i$th example of the training set, we write
+
+$$\mathcal{L}\big(\bm{y}^{(i)}, \bm{x}^{(i)}, \bm{\theta}\big) = \mathcal{L}_i(\bm{\theta}).$$
+
+The abbreviation $\mathcal{L}_i(\bm{\theta})$ reflects that, although the loss takes three arguments, the one we differentiate with respect to is $\bm{\theta}$; for a fixed example the input and target are constants. We will return shortly to the fact that $\mathcal{L}_i$ is a *different function* for each example.
+
+We want to minimize the loss across the whole training set by changing $\bm{\theta}$. Define the full training loss as the average of the per-example losses over a training set of size $N$,
+
+$$\mathcal{L}(\bm{\theta}) = \frac{1}{N} \sum_{i=1}^{N} \mathcal{L}_i(\bm{\theta}).$$
+
+By linearity of the gradient, the gradient of the average is the average of the gradients,
+
+$$\nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta}) = \frac{1}{N} \sum_{i=1}^{N} \nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta}),$$
+
+so each gradient descent step uses the average gradient over the entire dataset:
+
+$$\bm{\theta} \leftarrow \bm{\theta} - \eta\, \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta}).$$
+
+This is **batch gradient descent** — "batch" here meaning the full dataset, not a mini-batch in the sense the word usually carries today.
+
+### Stochastic gradient descent {#sec-stochastic}
+
+Batch gradient descent is not what we have actually been doing in this course. Instead, in the most extreme case, we compute each update from the gradient of a *single* per-example loss, where the example is drawn uniformly at random,
+
+$$\bm{\theta} \leftarrow \bm{\theta} - \eta\, \nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta}), \qquad i \sim \operatorname{Uniform}\{1, \dots, N\}.$$
+
+We might feel comfortable with this because in expectation the single-example update matches the batch update. Since each index has probability $1/N$,
+
+$$\mathbb{E}\big[\nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta})\big] = \frac{1}{N} \sum_{i=1}^{N} \nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta}) = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta}).$$
+
+::: {.definition-block}
+**Definition.** *Stochastic gradient descent* (SGD) updates the parameters using the gradient of the loss on a single randomly drawn example. In expectation this update equals the full-batch update, but any individual update uses only one example. In common usage "SGD" usually refers to the mini-batch version introduced below rather than this single-example form.
+:::
+
+There is an important distinction hiding behind the notation. As $i$ changes, $\mathcal{L}_i$ is not merely evaluated at a different point — it is a *different function*. The loss encodes how changing the parameters changes the loss for a particular input–target pair, and changing the pair changes that relationship. If we were to minimize $\mathcal{L}_i$ for a single fixed $i$, we would drive the loss on that one example toward zero, potentially overfitting it, with no expectation that the minimizer of one example's loss is the minimizer of another's.
+
+### SGD optimizes a different function each iteration {#sec-different-function}
+
+This is worth picturing. When we justified gradient descent at the start of the lecture, we assumed $f$ was a single, fixed function. In SGD we instead draw a different function from a pool at every iteration. If we plot the loss against the parameters, the full-batch loss $\mathcal{L}(\bm{\theta})$ is one curve, while the per-example losses $\mathcal{L}_i(\bm{\theta})$ scatter around it — each pointing us in a somewhat different direction.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="26" font-size="16" font-weight="600" fill="#333">A different function each iteration</text>
+<line x1="20" y1="250" x2="320" y2="250" stroke="#888" stroke-width="1.2"/>
+<line x1="20" y1="36" x2="20" y2="250" stroke="#888" stroke-width="1.2"/>
+<text x="314" y="268" font-size="14" fill="#666" text-anchor="end">θ</text>
+<path d="M 20.0,194.3 L 25.0,192.5 L 30.0,190.4 L 35.0,188.2 L 40.0,185.9 L 45.0,183.4 L 50.0,180.7 L 55.0,178.0 L 60.0,175.1 L 65.0,172.1 L 70.0,169.1 L 75.0,166.1 L 80.0,163.0 L 85.0,160.0 L 90.0,157.0 L 95.0,154.0 L 100.0,151.0 L 105.0,148.2 L 110.0,145.4 L 115.0,142.8 L 120.0,140.3 L 125.0,137.9 L 130.0,135.8 L 135.0,133.8 L 140.0,131.9 L 145.0,130.3 L 150.0,128.9 L 155.0,127.8 L 160.0,126.8 L 165.0,126.1 L 170.0,125.6 L 175.0,125.3 L 180.0,125.2 L 185.0,125.4 L 190.0,125.8 L 195.0,126.4 L 200.0,127.2 L 205.0,128.2 L 210.0,129.3 L 215.0,130.7 L 220.0,132.1 L 225.0,133.8 L 230.0,135.5 L 235.0,137.3 L 240.0,139.2 L 245.0,141.1 L 250.0,143.1 L 255.0,145.1 L 260.0,147.2 L 265.0,149.1 L 270.0,151.1 L 275.0,153.0 L 280.0,154.7 L 285.0,156.4 L 290.0,158.0 L 295.0,159.4 L 300.0,160.7 L 305.0,161.8 L 310.0,162.8 L 315.0,163.5 L 320.0,164.1" fill="none" stroke="#9db8cf" stroke-width="1.2" opacity="0.9"/>
+<path d="M 20.0,216.7 L 25.0,215.5 L 30.0,214.1 L 35.0,212.3 L 40.0,210.3 L 45.0,208.0 L 50.0,205.5 L 55.0,202.7 L 60.0,199.7 L 65.0,196.5 L 70.0,193.2 L 75.0,189.6 L 80.0,186.0 L 85.0,182.2 L 90.0,178.4 L 95.0,174.5 L 100.0,170.6 L 105.0,166.7 L 110.0,162.8 L 115.0,159.0 L 120.0,155.3 L 125.0,151.6 L 130.0,148.2 L 135.0,144.8 L 140.0,141.7 L 145.0,138.8 L 150.0,136.0 L 155.0,133.6 L 160.0,131.3 L 165.0,129.4 L 170.0,127.7 L 175.0,126.4 L 180.0,125.3 L 185.0,124.5 L 190.0,124.0 L 195.0,123.9 L 200.0,124.0 L 205.0,124.4 L 210.0,125.2 L 215.0,126.2 L 220.0,127.4 L 225.0,128.9 L 230.0,130.7 L 235.0,132.7 L 240.0,134.8 L 245.0,137.1 L 250.0,139.6 L 255.0,142.2 L 260.0,145.0 L 265.0,147.8 L 270.0,150.6 L 275.0,153.5 L 280.0,156.3 L 285.0,159.1 L 290.0,161.9 L 295.0,164.6 L 300.0,167.1 L 305.0,169.5 L 310.0,171.8 L 315.0,173.9 L 320.0,175.7" fill="none" stroke="#9db8cf" stroke-width="1.2" opacity="0.9"/>
+<path d="M 20.0,227.6 L 25.0,226.5 L 30.0,225.1 L 35.0,223.5 L 40.0,221.5 L 45.0,219.4 L 50.0,216.9 L 55.0,214.2 L 60.0,211.3 L 65.0,208.2 L 70.0,204.9 L 75.0,201.5 L 80.0,197.9 L 85.0,194.2 L 90.0,190.5 L 95.0,186.7 L 100.0,182.8 L 105.0,179.0 L 110.0,175.2 L 115.0,171.4 L 120.0,167.7 L 125.0,164.1 L 130.0,160.7 L 135.0,157.3 L 140.0,154.2 L 145.0,151.3 L 150.0,148.5 L 155.0,146.0 L 160.0,143.8 L 165.0,141.8 L 170.0,140.1 L 175.0,138.7 L 180.0,137.6 L 185.0,136.7 L 190.0,136.2 L 195.0,135.9 L 200.0,136.0 L 205.0,136.4 L 210.0,137.0 L 215.0,137.9 L 220.0,139.1 L 225.0,140.5 L 230.0,142.1 L 235.0,144.0 L 240.0,146.1 L 245.0,148.3 L 250.0,150.7 L 255.0,153.3 L 260.0,155.9 L 265.0,158.6 L 270.0,161.4 L 275.0,164.2 L 280.0,167.0 L 285.0,169.7 L 290.0,172.5 L 295.0,175.1 L 300.0,177.6 L 305.0,180.0 L 310.0,182.3 L 315.0,184.3 L 320.0,186.2" fill="none" stroke="#9db8cf" stroke-width="1.2" opacity="0.9"/>
+<path d="M 20.0,210.0 L 25.0,207.9 L 30.0,205.7 L 35.0,203.4 L 40.0,200.9 L 45.0,198.4 L 50.0,195.7 L 55.0,192.9 L 60.0,190.1 L 65.0,187.3 L 70.0,184.4 L 75.0,181.5 L 80.0,178.7 L 85.0,175.8 L 90.0,173.0 L 95.0,170.3 L 100.0,167.7 L 105.0,165.2 L 110.0,162.8 L 115.0,160.5 L 120.0,158.4 L 125.0,156.5 L 130.0,154.7 L 135.0,153.1 L 140.0,151.7 L 145.0,150.5 L 150.0,149.5 L 155.0,148.7 L 160.0,148.2 L 165.0,147.8 L 170.0,147.7 L 175.0,147.7 L 180.0,148.0 L 185.0,148.5 L 190.0,149.1 L 195.0,149.9 L 200.0,150.9 L 205.0,152.1 L 210.0,153.4 L 215.0,154.8 L 220.0,156.4 L 225.0,158.0 L 230.0,159.7 L 235.0,161.5 L 240.0,163.3 L 245.0,165.1 L 250.0,166.9 L 255.0,168.7 L 260.0,170.5 L 265.0,172.2 L 270.0,173.9 L 275.0,175.5 L 280.0,176.9 L 285.0,178.3 L 290.0,179.5 L 295.0,180.5 L 300.0,181.4 L 305.0,182.1 L 310.0,182.6 L 315.0,182.9 L 320.0,183.1" fill="none" stroke="#9db8cf" stroke-width="1.2" opacity="0.9"/>
+<path d="M 20.0,223.9 L 25.0,220.9 L 30.0,217.5 L 35.0,214.0 L 40.0,210.2 L 45.0,206.2 L 50.0,202.0 L 55.0,197.7 L 60.0,193.3 L 65.0,188.8 L 70.0,184.2 L 75.0,179.7 L 80.0,175.1 L 85.0,170.7 L 90.0,166.3 L 95.0,162.0 L 100.0,157.9 L 105.0,153.9 L 110.0,150.1 L 115.0,146.6 L 120.0,143.3 L 125.0,140.4 L 130.0,137.7 L 135.0,135.3 L 140.0,133.2 L 145.0,131.5 L 150.0,130.1 L 155.0,129.1 L 160.0,128.5 L 165.0,128.2 L 170.0,128.3 L 175.0,128.7 L 180.0,129.5 L 185.0,130.6 L 190.0,132.0 L 195.0,133.8 L 200.0,135.8 L 205.0,138.1 L 210.0,140.7 L 215.0,143.4 L 220.0,146.4 L 225.0,149.5 L 230.0,152.8 L 235.0,156.2 L 240.0,159.6 L 245.0,163.1 L 250.0,166.6 L 255.0,170.1 L 260.0,173.5 L 265.0,176.8 L 270.0,180.1 L 275.0,183.1 L 280.0,186.0 L 285.0,188.7 L 290.0,191.2 L 295.0,193.4 L 300.0,195.3 L 305.0,196.9 L 310.0,198.2 L 315.0,199.2 L 320.0,199.8" fill="none" stroke="#9db8cf" stroke-width="1.2" opacity="0.9"/>
+<path d="M 20.0,196.5 L 25.0,194.6 L 30.0,192.3 L 35.0,189.9 L 40.0,187.1 L 45.0,184.1 L 50.0,180.9 L 55.0,177.5 L 60.0,173.9 L 65.0,170.1 L 70.0,166.2 L 75.0,162.3 L 80.0,158.2 L 85.0,154.1 L 90.0,150.0 L 95.0,145.9 L 100.0,141.8 L 105.0,137.9 L 110.0,134.0 L 115.0,130.2 L 120.0,126.6 L 125.0,123.2 L 130.0,120.0 L 135.0,117.0 L 140.0,114.2 L 145.0,111.7 L 150.0,109.5 L 155.0,107.6 L 160.0,105.9 L 165.0,104.6 L 170.0,103.6 L 175.0,102.9 L 180.0,102.6 L 185.0,102.5 L 190.0,102.8 L 195.0,103.4 L 200.0,104.3 L 205.0,105.5 L 210.0,107.0 L 215.0,108.7 L 220.0,110.7 L 225.0,112.8 L 230.0,115.2 L 235.0,117.8 L 240.0,120.5 L 245.0,123.4 L 250.0,126.3 L 255.0,129.3 L 260.0,132.4 L 265.0,135.4 L 270.0,138.5 L 275.0,141.5 L 280.0,144.4 L 285.0,147.2 L 290.0,149.9 L 295.0,152.4 L 300.0,154.8 L 305.0,157.0 L 310.0,158.9 L 315.0,160.6 L 320.0,162.0" fill="none" stroke="#9db8cf" stroke-width="1.2" opacity="0.9"/>
+<path d="M 20.0,223.8 L 25.0,219.0 L 30.0,213.9 L 35.0,208.5 L 40.0,202.7 L 45.0,196.7 L 50.0,190.6 L 55.0,184.2 L 60.0,177.8 L 65.0,171.3 L 70.0,164.8 L 75.0,158.3 L 80.0,151.9 L 85.0,145.7 L 90.0,139.6 L 95.0,133.8 L 100.0,128.2 L 105.0,122.9 L 110.0,118.0 L 115.0,113.5 L 120.0,109.4 L 125.0,105.7 L 130.0,102.5 L 135.0,99.8 L 140.0,97.6 L 145.0,95.9 L 150.0,94.7 L 155.0,94.1 L 160.0,94.0 L 165.0,94.5 L 170.0,95.5 L 175.0,97.0 L 180.0,99.0 L 185.0,101.4 L 190.0,104.4 L 195.0,107.7 L 200.0,111.5 L 205.0,115.6 L 210.0,120.0 L 215.0,124.7 L 220.0,129.7 L 225.0,134.8 L 230.0,140.1 L 235.0,145.5 L 240.0,150.9 L 245.0,156.4 L 250.0,161.8 L 255.0,167.1 L 260.0,172.3 L 265.0,177.3 L 270.0,182.1 L 275.0,186.6 L 280.0,190.8 L 285.0,194.6 L 290.0,198.0 L 295.0,201.1 L 300.0,203.7 L 305.0,205.8 L 310.0,207.4 L 315.0,208.5 L 320.0,209.1" fill="none" stroke="#205279" stroke-width="3"/>
+<text x="285" y="187" font-size="14" fill="#9db8cf">𝓛ᵢ(θ)</text>
+<text x="205" y="136" font-size="14" font-weight="600" fill="#205279">𝓛(θ)</text>
+<text x="380" y="26" font-size="16" font-weight="600" fill="#333">Training loss stalls near a minimum</text>
+<line x1="380" y1="250" x2="660" y2="250" stroke="#888" stroke-width="1.2"/>
+<line x1="380" y1="36" x2="380" y2="250" stroke="#888" stroke-width="1.2"/>
+<text x="656" y="268" font-size="14" fill="#666" text-anchor="end">iteration</text>
+<text x="386" y="46" font-size="14" fill="#666">𝓛(θ)</text>
+<path d="M 380.0,44.2 L 382.8,44.2 L 385.6,47.1 L 388.4,60.3 L 391.2,61.2 L 394.0,71.6 L 396.8,78.8 L 399.6,84.9 L 402.4,89.1 L 405.2,90.4 L 408.0,100.8 L 410.8,102.4 L 413.6,106.6 L 416.4,113.6 L 419.2,116.4 L 422.0,125.2 L 424.8,129.4 L 427.6,132.0 L 430.4,131.0 L 433.2,137.2 L 436.0,141.8 L 438.8,142.3 L 441.6,146.9 L 444.4,151.7 L 447.2,149.1 L 450.0,153.0 L 452.8,161.0 L 455.6,159.7 L 458.4,162.8 L 461.2,160.9 L 464.0,165.0 L 466.8,172.8 L 469.6,166.0 L 472.4,179.4 L 475.2,177.4 L 478.0,174.7 L 480.8,184.8 L 483.6,181.9 L 486.4,190.0 L 489.2,182.6 L 492.0,182.8 L 494.8,187.0 L 497.6,183.9 L 500.4,193.8 L 503.2,189.2 L 506.0,192.1 L 508.8,193.5 L 511.6,196.7 L 514.4,191.5 L 517.2,190.8 L 520.0,199.7 L 522.8,197.4 L 525.6,208.8 L 528.4,198.6 L 531.2,200.4 L 534.0,195.1 L 536.8,198.9 L 539.6,209.4 L 542.4,208.3 L 545.2,203.8 L 548.0,216.7 L 550.8,209.1 L 553.6,215.4 L 556.4,217.1 L 559.2,218.9 L 562.0,205.4 L 564.8,218.8 L 567.6,217.0 L 570.4,214.6 L 573.2,205.1 L 576.0,222.1 L 578.8,214.8 L 581.6,213.1 L 584.4,206.3 L 587.2,208.0 L 590.0,207.4 L 592.8,220.7 L 595.6,218.0 L 598.4,219.7 L 601.2,208.0 L 604.0,206.5 L 606.8,225.5 L 609.6,225.3 L 612.4,224.3 L 615.2,224.6 L 618.0,218.9 L 620.8,216.6 L 623.6,224.8 L 626.4,231.5 L 629.2,221.5 L 632.0,222.9 L 634.8,218.2 L 637.6,208.4 L 640.4,215.3 L 643.2,220.0 L 646.0,217.5 L 648.8,216.1 L 651.6,232.8 L 654.4,210.3 L 657.2,213.6 L 660.0,211.1" fill="none" stroke="#C75794" stroke-width="1.8"/>
+</svg>
+</div>
+```
+
+At each iteration we descend a different one of these per-example curves. The direction that decreases the sampled $\mathcal{L}_i$ need not decrease another, so successive steps can partly work against one another. Far from a minimum this tends not to matter: the per-example losses mostly agree on the direction to move. Near a minimum, though, they increasingly disagree, and rather than settling, the parameters bounce around. The training loss reflects this — it falls reliably at first and then grows noisy and plateaus as we approach the minimum, because the function being sampled changes from step to step.
+
+### Learning rate schedules {#sec-schedules}
+
+One widespread response to this stalling is a **learning rate schedule**: rather than holding $\eta$ fixed, use a different value $\eta(t)$ at each iteration $t$. Several common choices are
+
+$$\eta(t) = \eta \quad \text{(constant)}, \qquad \eta(t) = \eta_i \;\text{ if } t_i \le t \le t_{i+1} \quad \text{(piecewise constant)}, \qquad \eta(t) = \eta_0\, e^{-\lambda t} \quad \text{(exponential)}.$$
+
+The constant schedule is what we have used so far. A piecewise-constant schedule holds the learning rate at a sensible value for most of training and then drops it in the late phase, when SGD's progress would otherwise stall, so that smaller steps can make further progress; the intervals $t_i$ and rates $\eta_i$ are hyperparameters. A common variant is to not fix the intervals in advance but instead drop the rate — say by a factor of ten — whenever progress stalls, an adaptive rather than predefined schedule. The exponential schedule decays the rate continuously at a speed set by $\lambda$. Another popular choice, which we will not write out, is the **cosine schedule**, which decays the rate from its initial value to near zero over a fixed training duration $T$ following the shape of a cosine curve. The shared intuition is that early in training the per-example losses agree and a larger rate is safe, while later a smaller rate makes less noisy progress toward the minimum.
+
+### Mini-batch SGD {#sec-minibatch}
+
+The other main response, and the one used in practice, is to sample not a single example but a **mini-batch** of $B$ examples at each iteration and use their average gradient,
+
+::: {.boxed-eq}
+$$\bm{\theta} \leftarrow \bm{\theta} - \eta\, \frac{1}{B} \sum_{i=1}^{B} \nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta}).$$
+:::
+
+This looks like the batch update but averages over $B$ randomly sampled examples rather than all $N$. This is **mini-batch stochastic gradient descent**, and it is what "SGD" usually means in practice. To see why an intermediate $B$ is attractive, it helps to note three properties.
+
+**SGD can be more efficient than batch gradient descent.** Imagine a training set built by duplicating a single example $N$ times. Every per-example gradient would be identical, so batch gradient descent would compute the same expensive gradient $N$ times, average them, and arrive at exactly what one computation would have given. More generally, when the per-example gradient $\nabla_{\bm{\theta}} \mathcal{L}_i$ is generally aligned with the full-batch gradient $\nabla_{\bm{\theta}} \mathcal{L}$ — that is, when a single example or a small batch approximates the full-batch update well — we get essentially the same update for much less work. When the dataset carries a lot of redundancy this is the case, and in practice it often is.
+
+**SGD can be noisy.** Because the sampled loss, and therefore the update, changes at every iteration, progress is less reliable than with the full-batch gradient, as the previous figure showed.
+
+**SGD is less parallelizable.** Suppose we had $N$ accelerators. Batch gradient descent could compute all $N$ per-example gradients at once, so a full step would take about as long as a single gradient. SGD cannot do this: the update at iteration $t$ depends on the parameters produced at iteration $t-1$, so its steps are inherently serial.
+
+Taken together, these explain why mini-batch SGD is the standard choice. Batch gradient descent wastes computation on redundant data; pure single-example SGD is noisy and serial. A mini-batch size $B$ offers a middle ground — reasonably reliable gradients, some parallelism across the $B$ examples, and far less wasted work than the full batch.
+
+---
+
+## Adaptive Gradient Methods {#sec-adaptive}
+
+We now address something set aside earlier: in the updates so far, $\eta$ is a single scalar, so every parameter shares one learning rate. We will see why that can be a poor choice, and what to do instead.
+
+### Why one learning rate for all parameters is a problem {#sec-why-adaptive}
+
+Following the approach we have used before, consider the simplest case: linear regression. Predict $\hat{y} = \bm{w}^\top \bm{x}$ and measure error with the squared error loss $\mathcal{L}(y, \hat{y}) = \tfrac{1}{2}\|y - \hat{y}\|^2$. As a reminder,
+
+$$\frac{d\mathcal{L}}{d\hat{y}} = \hat{y} - y, \qquad \frac{d\mathcal{L}}{d\bm{w}} = (\hat{y} - y)\,\bm{x}.$$
+
+The update to $\bm{w}$ is the error $\hat{y} - y$ times the input $\bm{x}$: a larger error means a larger update, and its sign sets the direction. Because $\nabla_{\bm{w}}\mathcal{L}$ is scaled entrywise by $\bm{x}$, each weight's update is scaled by the corresponding input feature. The magnitudes of the features therefore control how much each weight moves.
+
+Now suppose one feature tends to be much larger in magnitude than another, $|x_i| \gg |x_j|$. For instance, if the features are drawn from zero-mean normal distributions with different variances,
+
+$$x_i \sim \mathcal{N}(0, \sigma_i^2), \qquad x_j \sim \mathcal{N}(0, \sigma_j^2), \qquad \sigma_i \gg \sigma_j,$$
+
+then $x_i$ ranges over much larger values than $x_j$, and consequently
+
+$$\left|\frac{d\mathcal{L}}{dw_i}\right| \gg \left|\frac{d\mathcal{L}}{dw_j}\right|$$
+
+will often hold. In this simple case, inputs on different scales produce gradients on different scales for different weights. The same situation arises throughout a neural network: wherever we take the dot product of a weight vector with input activations, if one activation tends to be much larger than another, the corresponding weights receive gradients of very different magnitude.
+
+::: {.callout-note}
+**Why not just standardize the inputs?** For the linear model this problem has a simple fix familiar from introductory machine learning: compute each feature's variance over the training set and divide it out so that all features share a common scale. For a neural network we cannot do this as directly, because we do not control the intermediate activation values — one of them may simply grow over the course of training. Methods that approximately normalize activations do exist, namely batch normalization and layer normalization, which we will cover later. Until then, this issue can arise inside a network, and we need an optimizer that copes with it.
+:::
+
+### Descending in a valley {#sec-valley}
+
+A picture helps convey why a single learning rate struggles here. Suppose the loss has very different curvature in different directions — small in one, large in another. This is like descending into a canyon carved by a river: the floor descends gradually along the river's direction, while the walls fall away steeply to either side. Walking along the floor, we descend slowly; stepping toward a wall, we descend quickly.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="30" y="28" font-size="16" font-weight="600" fill="#333">Descending in a valley: one learning rate, two curvatures</text>
+<ellipse cx="380" cy="150" rx="300" ry="70" fill="none" stroke="#57C7AE" stroke-width="1.5" opacity="0.40"/>
+<ellipse cx="380" cy="150" rx="234" ry="55" fill="none" stroke="#57C7AE" stroke-width="1.5" opacity="0.51"/>
+<ellipse cx="380" cy="150" rx="168" ry="39" fill="none" stroke="#57C7AE" stroke-width="1.5" opacity="0.62"/>
+<ellipse cx="380" cy="150" rx="102" ry="24" fill="none" stroke="#57C7AE" stroke-width="1.5" opacity="0.73"/>
+<circle cx="380" cy="150" r="4" fill="#207965"/>
+<path d="M 94.8,87.3 L 110.2,183.2 L 124.8,132.4 L 138.6,159.3 L 151.6,145.1 L 163.9,152.6 L 175.6,148.6 L 186.6,150.7 L 197.1,149.6 L 207.0,150.2 L 216.3,149.9 L 225.1,150.1" fill="none" stroke="#e53935" stroke-width="1.6"/>
+<circle cx="94.8" cy="87.3" r="5" fill="#2e7d32"/>
+<circle cx="110.2" cy="183.2" r="3" fill="#e53935"/>
+<circle cx="124.8" cy="132.4" r="3" fill="#e53935"/>
+<circle cx="138.6" cy="159.3" r="3" fill="#e53935"/>
+<circle cx="151.6" cy="145.1" r="3" fill="#e53935"/>
+<circle cx="163.9" cy="152.6" r="3" fill="#e53935"/>
+<circle cx="175.6" cy="148.6" r="3" fill="#e53935"/>
+<circle cx="186.6" cy="150.7" r="3" fill="#e53935"/>
+<circle cx="197.1" cy="149.6" r="3" fill="#e53935"/>
+<circle cx="207.0" cy="150.2" r="3" fill="#e53935"/>
+<circle cx="216.3" cy="149.9" r="3" fill="#e53935"/>
+<circle cx="225.1" cy="150.1" r="3" fill="#e53935"/>
+<text x="380" y="258" font-size="14" fill="#666" text-anchor="middle">low curvature (gentle floor)</text>
+<line x1="530" y1="58" x2="530" y2="92" stroke="#888" stroke-width="1.2" marker-end="url(#vArr)"/>
+<defs><marker id="vArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="538" y="52" font-size="14" fill="#666">high curvature (steep walls)</text>
+</svg>
+</div>
+```
+
+With one learning rate for both directions, a value large enough to make progress along the gentle floor is far too large for the steep walls, so the parameters bounce back and forth across the valley — possibly diverging, as we saw earlier — while creeping only slowly toward the minimum. In effect, the appropriate learning rate depends on the magnitude of the gradients, so when different parameters have very different gradient magnitudes it is hard to find one rate that suits them all.
+
+$$\text{To avoid divergence in the steep directions, use a small } \eta; \quad \text{but then progress is slow in the gradual directions.}$$
+
+### A per-parameter effective learning rate {#sec-per-parameter}
+
+The natural response is to give each parameter its own learning rate. But we cannot set these by hand: we generally do not know in advance which parameters will have the largest gradients, and even if we had some intuition, tuning a separate rate for each of a billion parameters by trial and error is out of the question.
+
+What we *can* do is observe the gradients as training proceeds and use their history to set a different *effective* learning rate for each parameter automatically. If a parameter's gradients are consistently large, or consistently point the same way, or fluctuate, that tells us something about how large its steps should be. An optimizer that adjusts the effective learning rate this way is called an **adaptive gradient method**.
+
+### Momentum {#sec-momentum}
+
+The simplest adaptive gradient method that sees real use is **momentum**. Let $g_t = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta})$ denote the gradient at iteration $t$, and introduce a *gradient accumulator* $v_t$. If $\bm{\theta} \in \mathbb{R}^d$ then $v_t \in \mathbb{R}^d$ as well, so there is one accumulator entry per parameter.
+
+::: {.algorithm}
+#### Momentum
+
+$$v_t \leftarrow \beta\, v_{t-1} + g_t$$
+$$\bm{\theta}_t \leftarrow \bm{\theta}_{t-1} - \eta\, v_t$$
+
+where $\beta \in (0, 1)$ is the **momentum hyperparameter**.
+:::
+
+Setting $\beta = 0$ gives $v_t = g_t$, which recovers plain gradient descent, so for momentum to do anything we take $\beta > 0$. The accumulator $v_t$ changes more slowly than $g_t$: the raw gradient can swing freely from iteration to iteration, but $v_t$ carries history through its dependence on $v_{t-1}$. This produces the behavior we wanted. If the gradient for a parameter is *consistent*, pointing the same way across iterations, $v_t$ grows in that direction and the effective step size increases. If the gradient is *inconsistent*, reversing direction from one step to the next, the contributions partly cancel and the step shrinks. Because $v_t$ has one entry per parameter, this correction is different for every parameter.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 250" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<g transform="translate(20,40)">
+<text x="150" y="-14" font-size="15" font-weight="600" fill="#333" text-anchor="middle">Consistent gradients → larger steps</text>
+<line x1="0" y1="145.3" x2="300" y2="145.3" stroke="#ccc" stroke-width="1"/>
+<path d="M 0.0,1.8 L 2.5,6.5 L 5.0,11.2 L 7.5,15.8 L 10.0,20.3 L 12.5,24.7 L 15.0,29.0 L 17.5,33.3 L 20.0,37.5 L 22.5,41.6 L 25.0,45.6 L 27.5,49.6 L 30.0,53.4 L 32.5,57.2 L 35.0,60.9 L 37.5,64.6 L 40.0,68.1 L 42.5,71.6 L 45.0,75.0 L 47.5,78.3 L 50.0,81.5 L 52.5,84.7 L 55.0,87.7 L 57.5,90.7 L 60.0,93.6 L 62.5,96.5 L 65.0,99.2 L 67.5,101.9 L 70.0,104.5 L 72.5,107.0 L 75.0,109.4 L 77.5,111.8 L 80.0,114.0 L 82.5,116.2 L 85.0,118.4 L 87.5,120.4 L 90.0,122.3 L 92.5,124.2 L 95.0,126.0 L 97.5,127.7 L 100.0,129.4 L 102.5,130.9 L 105.0,132.4 L 107.5,133.8 L 110.0,135.1 L 112.5,136.3 L 115.0,137.5 L 117.5,138.6 L 120.0,139.6 L 122.5,140.5 L 125.0,141.3 L 127.5,142.1 L 130.0,142.8 L 132.5,143.4 L 135.0,143.9 L 137.5,144.3 L 140.0,144.7 L 142.5,145.0 L 145.0,145.2 L 147.5,145.3 L 150.0,145.3 L 152.5,145.3 L 155.0,145.2 L 157.5,145.0 L 160.0,144.7 L 162.5,144.3 L 165.0,143.9 L 167.5,143.4 L 170.0,142.8 L 172.5,142.1 L 175.0,141.3 L 177.5,140.5 L 180.0,139.6 L 182.5,138.6 L 185.0,137.5 L 187.5,136.3 L 190.0,135.1 L 192.5,133.8 L 195.0,132.4 L 197.5,130.9 L 200.0,129.4 L 202.5,127.7 L 205.0,126.0 L 207.5,124.2 L 210.0,122.3 L 212.5,120.4 L 215.0,118.4 L 217.5,116.2 L 220.0,114.0 L 222.5,111.8 L 225.0,109.4 L 227.5,107.0 L 230.0,104.5 L 232.5,101.9 L 235.0,99.2 L 237.5,96.5 L 240.0,93.6 L 242.5,90.7 L 245.0,87.7 L 247.5,84.7 L 250.0,81.5 L 252.5,78.3 L 255.0,75.0 L 257.5,71.6 L 260.0,68.1 L 262.5,64.6 L 265.0,60.9 L 267.5,57.2 L 270.0,53.4 L 272.5,49.6 L 275.0,45.6 L 277.5,41.6 L 280.0,37.5 L 282.5,33.3 L 285.0,29.0 L 287.5,24.7 L 290.0,20.3 L 292.5,15.8 L 295.0,11.2 L 297.5,6.5 L 300.0,1.8" fill="none" stroke="#8457C7" stroke-width="2.5"/>
+<path d="M 265.7,59.9 L 259.9,68.2 L 249.2,82.5 L 234.6,99.6 L 217.3,116.4 L 198.3,130.4 L 178.8,140.0 L 159.8,144.7 L 142.2,144.9 L 126.8,141.9" fill="none" stroke="#442079" stroke-width="1.5" stroke-dasharray="4,3"/>
+<circle cx="265.7" cy="59.9" r="6" fill="#2e7d32"/>
+<circle cx="259.9" cy="68.2" r="3.3" fill="#442079"/>
+<circle cx="249.2" cy="82.5" r="3.3" fill="#442079"/>
+<circle cx="234.6" cy="99.6" r="3.3" fill="#442079"/>
+<circle cx="217.3" cy="116.4" r="3.3" fill="#442079"/>
+<circle cx="198.3" cy="130.4" r="3.3" fill="#442079"/>
+<circle cx="178.8" cy="140.0" r="3.3" fill="#442079"/>
+<circle cx="159.8" cy="144.7" r="3.3" fill="#442079"/>
+<circle cx="142.2" cy="144.9" r="3.3" fill="#442079"/>
+<circle cx="126.8" cy="141.9" r="3.3" fill="#442079"/>
+</g>
+<g transform="translate(380,40)">
+<text x="150" y="-14" font-size="15" font-weight="600" fill="#333" text-anchor="middle">Inconsistent gradients → smaller steps</text>
+<line x1="0" y1="145.3" x2="300" y2="145.3" stroke="#ccc" stroke-width="1"/>
+<path d="M 0.0,1.8 L 2.5,6.5 L 5.0,11.2 L 7.5,15.8 L 10.0,20.3 L 12.5,24.7 L 15.0,29.0 L 17.5,33.3 L 20.0,37.5 L 22.5,41.6 L 25.0,45.6 L 27.5,49.6 L 30.0,53.4 L 32.5,57.2 L 35.0,60.9 L 37.5,64.6 L 40.0,68.1 L 42.5,71.6 L 45.0,75.0 L 47.5,78.3 L 50.0,81.5 L 52.5,84.7 L 55.0,87.7 L 57.5,90.7 L 60.0,93.6 L 62.5,96.5 L 65.0,99.2 L 67.5,101.9 L 70.0,104.5 L 72.5,107.0 L 75.0,109.4 L 77.5,111.8 L 80.0,114.0 L 82.5,116.2 L 85.0,118.4 L 87.5,120.4 L 90.0,122.3 L 92.5,124.2 L 95.0,126.0 L 97.5,127.7 L 100.0,129.4 L 102.5,130.9 L 105.0,132.4 L 107.5,133.8 L 110.0,135.1 L 112.5,136.3 L 115.0,137.5 L 117.5,138.6 L 120.0,139.6 L 122.5,140.5 L 125.0,141.3 L 127.5,142.1 L 130.0,142.8 L 132.5,143.4 L 135.0,143.9 L 137.5,144.3 L 140.0,144.7 L 142.5,145.0 L 145.0,145.2 L 147.5,145.3 L 150.0,145.3 L 152.5,145.3 L 155.0,145.2 L 157.5,145.0 L 160.0,144.7 L 162.5,144.3 L 165.0,143.9 L 167.5,143.4 L 170.0,142.8 L 172.5,142.1 L 175.0,141.3 L 177.5,140.5 L 180.0,139.6 L 182.5,138.6 L 185.0,137.5 L 187.5,136.3 L 190.0,135.1 L 192.5,133.8 L 195.0,132.4 L 197.5,130.9 L 200.0,129.4 L 202.5,127.7 L 205.0,126.0 L 207.5,124.2 L 210.0,122.3 L 212.5,120.4 L 215.0,118.4 L 217.5,116.2 L 220.0,114.0 L 222.5,111.8 L 225.0,109.4 L 227.5,107.0 L 230.0,104.5 L 232.5,101.9 L 235.0,99.2 L 237.5,96.5 L 240.0,93.6 L 242.5,90.7 L 245.0,87.7 L 247.5,84.7 L 250.0,81.5 L 252.5,78.3 L 255.0,75.0 L 257.5,71.6 L 260.0,68.1 L 262.5,64.6 L 265.0,60.9 L 267.5,57.2 L 270.0,53.4 L 272.5,49.6 L 275.0,45.6 L 277.5,41.6 L 280.0,37.5 L 282.5,33.3 L 285.0,29.0 L 287.5,24.7 L 290.0,20.3 L 292.5,15.8 L 295.0,11.2 L 297.5,6.5 L 300.0,1.8" fill="none" stroke="#8457C7" stroke-width="2.5"/>
+<path d="M 274.3,46.8 L 246.9,85.4 L 201.0,128.7 L 148.4,145.3 L 101.5,130.3 L 69.9,104.4 L 59.1,92.6 L 69.4,103.8 L 96.3,126.9 L 132.4,143.3 L 168.8,143.1" fill="none" stroke="#442079" stroke-width="1.5" stroke-dasharray="4,3"/>
+<circle cx="274.3" cy="46.8" r="6" fill="#2e7d32"/>
+<circle cx="246.9" cy="85.4" r="3.3" fill="#442079"/>
+<circle cx="201.0" cy="128.7" r="3.3" fill="#442079"/>
+<circle cx="148.4" cy="145.3" r="3.3" fill="#442079"/>
+<circle cx="101.5" cy="130.3" r="3.3" fill="#442079"/>
+<circle cx="69.9" cy="104.4" r="3.3" fill="#442079"/>
+<circle cx="59.1" cy="92.6" r="3.3" fill="#442079"/>
+<circle cx="69.4" cy="103.8" r="3.3" fill="#442079"/>
+<circle cx="96.3" cy="126.9" r="3.3" fill="#442079"/>
+<circle cx="132.4" cy="143.3" r="3.3" fill="#442079"/>
+<circle cx="168.8" cy="143.1" r="3.3" fill="#442079"/>
+</g>
+</svg>
+</div>
+```
+
+A typical value is $\beta = 0.9$, close to one so that $v_t$ reflects a long history. The two panels above show the effect. When the gradients agree, the steps accelerate down toward the minimum. When the learning rate is much too large and a step overshoots to the far side, momentum does not simply take another giant step; the reversed gradient cancels against the accumulated direction, so the step is smaller and the oscillation is damped. Momentum can thus partly compensate for a learning rate that is poorly suited to a given parameter.
+
+### Adam {#sec-adam}
+
+The adaptive gradient method used to train essentially all modern neural networks is **Adam** [@kingma2015adam]. Historically, early attempts to train neural networks with plain gradient descent were hampered by the difficulty of finding one learning rate that worked for every parameter, with results depending heavily on initialization. Momentum helped somewhat, various adaptive methods were proposed, and eventually Adam was introduced and worked well enough that it became the default. It was developed by two graduate students, one at the University of Toronto and one at the University of Amsterdam; it retains a connection to Toronto on that account.
+
+Adam keeps *two* gradient accumulators. The first, $v_t$, resembles the momentum accumulator but is written as a moving average through the extra factor $1 - \beta_1$,
+
+$$v_t \leftarrow \beta_1\, v_{t-1} + (1 - \beta_1)\, g_t \qquad \text{(first moment estimate)}.$$
+
+Because $\beta_1 + (1 - \beta_1) = 1$, this is exactly a moving average of the old value and the incoming gradient. It is not the same as explicitly averaging every gradient seen so far, but it approximates that average without storing the whole history, and it estimates the first moment (the mean) of the gradients. The second accumulator uses its own hyperparameter $\beta_2$ and averages the *squared* gradient,
+
+$$s_t \leftarrow \beta_2\, s_{t-1} + (1 - \beta_2)\, g_t^2 \qquad \text{(second moment estimate)},$$
+
+which estimates the second moment (roughly, the uncentered variance) of the gradients.
+
+The point of the two averages is as follows. Using the moving-average gradient $v_t$ instead of the raw gradient smooths the update, following the same intuition as momentum: gradients that agree accumulate, while gradients that disagree average toward something smaller. The squared-gradient average $s_t$ lets us normalize magnitude: dividing by its square root puts each parameter's gradient onto a comparable scale. Combining the two gives the update
+
+$$g_t' = \frac{\eta\, v_t}{\sqrt{s_t} + \epsilon}, \qquad \bm{\theta}_t = \bm{\theta}_{t-1} - g_t',$$
+
+where $\epsilon$ is a small constant, around $10^{-8}$. Its role is purely numerical: when $s_t$ is very small, dividing by $\sqrt{s_t}$ alone could blow up, and adding $\epsilon$ prevents that. (This $\epsilon$ is unrelated to the $\epsilon$ from the Taylor expansion at the start of the lecture.)
+
+::: {.callout-warning}
+**This is not yet Adam.** The update above is missing one step. Because both accumulators are initialized to zero, $v_0 = s_0 = 0$, they are biased toward zero early in training, and Adam corrects for this bias before using them.
+:::
+
+**The bias and its correction.** To see the bias, track the total rescaling applied to the gradients as the moving average unrolls. With $v_0 = 0$,
+
+$$v_1 = \beta_1 v_0 + (1 - \beta_1) g_1 = (1 - \beta_1) g_1,$$
+$$v_2 = \beta_1 v_1 + (1 - \beta_1) g_2 = \beta_1 (1 - \beta_1) g_1 + (1 - \beta_1) g_2.$$
+
+The total weight on the gradients in $v_2$ — the coefficient of $g_1$ plus the coefficient of $g_2$ — is $\beta_1(1 - \beta_1) + (1 - \beta_1) = 1 - \beta_1^2$. Carrying the same expansion one step further gives a total rescaling of $1 - \beta_1^3$ for $v_3$, and in general
+
+$$\text{total gradient rescaling at iteration } t \;=\; 1 - \beta_1^t.$$
+
+Typically $\beta_1$ and $\beta_2$ are close to one, so that the moving average reflects a long history. But then $1 - \beta_1^t$ and $1 - \beta_2^t$ start near zero and grow only slowly, which means $v_t$ and $s_t$ are biased toward zero early in training — at the first step, $v_1 = (1 - \beta_1) g_1$ is nearly zero rather than $g_1$. The simplest correction is to divide out exactly this factor:
+
+$$\hat{v}_t = \frac{v_t}{1 - \beta_1^t}, \qquad \hat{s}_t = \frac{s_t}{1 - \beta_2^t}.$$
+
+Putting the moment estimates, the bias correction, the normalization, and the update together gives Adam in full.
+
+::: {.algorithm}
+#### Adam
+
+At iteration $t$, with gradient $g_t = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta})$:
+
+$$v_t \leftarrow \beta_1\, v_{t-1} + (1 - \beta_1)\, g_t \qquad\qquad \hat{v}_t = \frac{v_t}{1 - \beta_1^t}$$
+$$s_t \leftarrow \beta_2\, s_{t-1} + (1 - \beta_2)\, g_t^2 \qquad\qquad \hat{s}_t = \frac{s_t}{1 - \beta_2^t}$$
+$$g_t' = \frac{\eta\, \hat{v}_t}{\sqrt{\hat{s}_t} + \epsilon} \qquad\qquad \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} - g_t'$$
+:::
+
+Compared to plain gradient descent, Adam uses a moving average of the gradients in place of the raw gradient, which smooths the update much as momentum does; it divides by the square root of the second-moment estimate, which normalizes the parameters' gradients toward a common magnitude; and it corrects the early-training bias, so that updates are not effectively scaled down at the start.
+
+**Why Adam became the default.** If the normalization works as intended, then across problems — different architectures, datasets, and loss functions — the gradients Adam produces have roughly the same magnitude. Since the appropriate learning rate is tied to the gradient magnitude, this means one learning rate tends to work across many problems, which reduces the hyperparameter tuning that is otherwise expensive and tedious. In practice this largely holds. The values proposed in the Adam paper,
+
+$$\beta_1 = 0.9, \qquad \beta_2 = 0.999, \qquad \eta = 0.001, \qquad \epsilon = 10^{-8},$$
+
+are sensible defaults that work acceptably on most problems, even if they are not optimal for the fastest convergence on any particular one. There is no comparable default learning rate for plain SGD, because a different initialization, loss, or dataset can put the gradients on a completely different scale; Adam rescales them to a common scale, so one set of hyperparameters can be pulled off the shelf and applied broadly. That convenience, more than anything, is why Adam is so widely used.
+
+::: {.callout-note}
+**The cost.** Adam has to store both accumulators $v_t$ and $s_t$, each with one entry per parameter. Together with the parameters themselves, that is three copies of everything, so Adam roughly triples the optimizer's memory footprint relative to the model's parameters — usually an acceptable price for reliable convergence.
+:::
+
+---
+
+## Summary {#sec-summary}
+
+::: {.callout-note}
+**Key takeaways from Lecture 4:**
+
+- A first-order **Taylor expansion** justifies gradient descent: setting the offset to $-\eta f'(x)$ gives $f(x - \eta f'(x)) \lesssim f(x)$, so long as the neglected error term is small.
+- The **learning rate** $\eta$ controls that error. Too small wastes computation on tiny steps; too large diverges; a "just right" value is tuned to give steady, rapid decrease.
+- **Batch gradient descent** uses the full-dataset gradient. **Stochastic gradient descent** uses one example's gradient, which equals the batch gradient in expectation but optimizes a different function each iteration, making progress noisy near a minimum.
+- **Learning rate schedules** (piecewise-constant, exponential, cosine, or adaptive drops) and **mini-batch SGD** address this. Mini-batches balance efficiency, noise, and parallelism.
+- A single learning rate suits all parameters poorly when their gradients have very different magnitudes, as in a valley with mismatched curvatures. **Adaptive gradient methods** give each parameter an effective learning rate from its gradient history.
+- **Momentum** accumulates $v_t \leftarrow \beta v_{t-1} + g_t$, growing steps where gradients agree and shrinking them where they disagree.
+- **Adam** keeps moving averages of the gradient ($v_t$) and the squared gradient ($s_t$), applies bias correction, and updates with $g_t' = \eta \hat{v}_t / (\sqrt{\hat{s}_t} + \epsilon)$. By normalizing gradient magnitudes it lets one set of default hyperparameters work across many problems, at the cost of roughly tripling optimizer memory.
+:::
+
+**Next lecture:** Normalization methods - batch normalization and layer normalization, which were foreshadowed here: rather than adapting the optimizer to gradients on different scales, they normalize a network's intermediate activations directly so that the scales stay consistent during training.

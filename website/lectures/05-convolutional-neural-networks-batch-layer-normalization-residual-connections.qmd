@@ -1,0 +1,502 @@
+---
+title: "Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections"
+description: "Architectures with a good inductive bias for images: the convolution layer derived from a dense layer, padding, stride, channels, and pooling; batch normalization; residual connections; and how they combine into the modern ResNet."
+bibliography: references.bib
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</h1>
+</div>
+```
+
+**Overview.** So far the course has treated generic neural networks that can be applied to any problem. From here on we study architectures tailored to data that has structure. This lecture concerns images, which have a natural spatial structure, and the convolution layer that exploits it. We derive the convolution by starting from a dense layer and imposing two assumptions — translation invariance and locality — and then work through the practical ingredients of a convolutional network: padding, stride, channels, and pooling. With those we build a simple convolutional network. We then cover two architectural additions that make deeper networks easier to train, batch normalization and residual connections, and close by combining everything into the modern convolutional network, the ResNet.
+
+## Convolutional Neural Networks {#sec-cnn}
+
+A dense neural network makes no assumptions about the structure of its input. It takes a collection of features and produces a prediction, and it treats those features as an unordered set. Many kinds of data, however, do have structure. An image is a natural example: on a computer it is a two-dimensional grid of pixels, so its dimensions have an order that matches something in the world — things on the right of the grid appear on the right of the image, and nearby pixels tend to be correlated. When we design an architecture whose assumptions match the structure of the data, we tend to get models that reach good solutions from less data. We say such an architecture has a good **inductive bias**.
+
+Convolutional neural networks are frequently motivated in terms of images, though they apply more broadly. Suppose we have an image — say, a cat sitting on a dresser next to a lamp — and we want a network to answer a question like "does this image contain a cat?" We can make some assumptions about what kind of processing is useful for this question, write those assumptions down, and encode them into the design of the model. What we are really motivating is not a full architecture but a single layer, the convolution layer.
+
+The first assumption is **translation invariance**: the operation should respond similarly everywhere in the image. The second is **locality**: the operation should only consider a small region at a time. Together they describe an operation that looks at a small window of the input and applies the same processing to that window regardless of where in the input it sits.
+
+### From a dense layer to a convolution {#sec-derive-conv}
+
+To see how these assumptions shape a layer, we start from a dense layer and modify it until it meets them. Write a dense layer as
+
+$$\bm{h} = \bm{u} + \bm{W}\bm{x},$$
+
+with hidden activations $\bm{h}$, a weight matrix $\bm{W}$, an input vector $\bm{x}$, and a bias $\bm{u}$. We write the bias as $\bm{u}$ rather than $\bm{b}$ so that its two-dimensional form below can be a capital $\bm{U}$. Expanding the matrix–vector product, the $m$th entry of $\bm{h}$ is
+
+$$h_m = u_m + \sum_n \bm{W}_{m,n}\, x_n.$$
+
+An image differs from a vector in that we usually represent it as a two-dimensional grid. We can make the two equivalent by stacking the rows of an image into a vector, and unstacking them to recover the image — a reshape. If we unflatten in this way, the single index $m$ over outputs becomes a pair $(i,j)$, and the single index $n$ over inputs becomes a pair $(k,l)$. The dense layer becomes
+
+$$\bm{H}_{i,j} = \bm{U}_{i,j} + \sum_k \sum_l \bm{W}_{i,j,k,l}\, \bm{X}_{k,l},$$
+
+where $\bm{H}$ is now a two-dimensional activation, $\bm{X}$ is the input image, and $\bm{W}$ has become a four-dimensional array of weights. This is the same computation as before, only with each dimension split in two.
+
+Next we reindex the sum using offsets. Instead of summing over absolute positions $k$ and $l$, we sum over offsets $a$ and $b$ relative to the output position $(i,j)$, and rename the weights $\bm{V}$ to signal the different indexing:
+
+$$\bm{H}_{i,j} = \bm{U}_{i,j} + \sum_a \sum_b \bm{V}_{i,j,a,b}\, \bm{X}_{i+a,\, j+b}.$$
+
+The offsets $a$ and $b$ can be positive or negative so that, as they range over all their values, $\bm{X}_{i+a,j+b}$ covers every pixel of the input. As written, each entry of $\bm{H}$ still depends on every entry of $\bm{X}$, and there is a separate bias $\bm{U}_{i,j}$ and a separate set of weights $\bm{V}_{i,j,\cdot,\cdot}$ for every output position. This is exactly what translation invariance and locality tell us to change.
+
+**Translation invariance** asks that we apply the same operation regardless of the output position. The simplest way to enforce it is to drop the dependence of the bias and weights on $(i,j)$ — use one shared bias $\bm{U}$ and one shared set of weights $\bm{V}_{a,b}$ for every output position:
+
+$$\bm{H}_{i,j} = \bm{U} + \sum_a \sum_b \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.$$
+
+**Locality** asks that each output depend only on a small region of the input. Instead of summing over offsets that cover the whole image, we sum over a small window, from $-\Delta$ to $\Delta$ in each direction:
+
+::: {.boxed-eq}
+$$\bm{H}_{i,j} = \bm{U} + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.$$
+:::
+
+This is the **convolution**.
+
+::: {.definition-block}
+**Definition.** A *convolution* layer computes each output entry by centering a shared **kernel** (or **filter**) $\bm{V}$ — here $2\Delta+1$ by $2\Delta+1$ — at the corresponding input position and taking the dot product of the kernel with the local window it covers. Sharing the kernel across all positions gives translation invariance; restricting it to a small window gives locality.
+:::
+
+To compute the output at $(i,j)$, we center the kernel at $(i,j)$ in the input, multiply each kernel value by the corresponding input value, and sum. That dot product measures how much the kernel's template agrees with the input around position $(i,j)$ — informally, how much of $\bm{V}$ is present there.
+
+::: {.callout-note}
+**Parameter sharing.** Translation invariance is what lets a single kernel replace a separate weight matrix per output position. Without sharing, a $200\times200$ output would need $200\times200$ distinct weight matrices, an enormous number of parameters. Sharing collapses these to one kernel, which shrinks the model. If translation invariance is a good assumption for the problem — if we genuinely want the same operation applied everywhere — then a model without sharing would, in the best case, just learn the same filter at every position anyway. Sharing removes those redundant parameters while keeping the good solutions in reach.
+:::
+
+::: {.callout-note}
+**Convolution or cross-correlation?** In signal processing, the operation just described is usually called a *cross-correlation*; a true convolution additionally flips the kernel. In deep learning we call it a convolution regardless. The distinction does not matter here, since the kernel is learned either way.
+:::
+
+### A worked example {#sec-conv-example}
+
+It is easier to see what a convolution does with actual arithmetic. Take a $3\times3$ input image $\bm{X}$ with entries $0$ through $8$, and convolve it with a $2\times2$ kernel $\bm{V}$ with entries $0,1,2,3$. We can place the kernel at every valid location — every position where it fits entirely inside the input — and compute a dot product at each. There are four such positions, so the output has four entries. For the top-left position,
+
+$$0\cdot0 + 1\cdot1 + 2\cdot3 + 3\cdot4 = 17.$$
+
+Sliding the window one pixel right, down, and down-right gives $25$, $37$, and $43$.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 660 250" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="cArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="30" y="30" font-size="24" font-weight="600" fill="#333">Convolution: a worked example</text>
+<rect x="30" y="70" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="53" y="100" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">0</text>
+<rect x="76" y="70" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="99" y="100" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">1</text>
+<rect x="122" y="70" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="145" y="100" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">2</text>
+<rect x="30" y="116" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="53" y="146" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">3</text>
+<rect x="76" y="116" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="99" y="146" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">4</text>
+<rect x="122" y="116" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="145" y="146" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">5</text>
+<rect x="30" y="162" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="53" y="192" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">6</text>
+<rect x="76" y="162" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="99" y="192" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">7</text>
+<rect x="122" y="162" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="145" y="192" text-anchor="middle" font-size="20" font-weight="600" fill="#205279">8</text>
+<text x="99" y="230" text-anchor="middle" font-size="15" fill="#666">input X (3×3)</text>
+<rect x="30" y="70" width="92" height="92" fill="none" stroke="#e53935" stroke-width="2.5"/>
+<text x="190" y="145" text-anchor="middle" font-size="26" fill="#555">✳</text>
+<rect x="212" y="93.0" width="46" height="46" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="235" y="123" text-anchor="middle" font-size="20" font-weight="600" fill="#442079">0</text>
+<rect x="258" y="93.0" width="46" height="46" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="281" y="123" text-anchor="middle" font-size="20" font-weight="600" fill="#442079">1</text>
+<rect x="212" y="139.0" width="46" height="46" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="235" y="169" text-anchor="middle" font-size="20" font-weight="600" fill="#442079">2</text>
+<rect x="258" y="139.0" width="46" height="46" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="281" y="169" text-anchor="middle" font-size="20" font-weight="600" fill="#442079">3</text>
+<text x="258" y="207" text-anchor="middle" font-size="15" fill="#666">kernel V (2×2)</text>
+<text x="324" y="147" text-anchor="middle" font-size="26" fill="#555">=</text>
+<rect x="350" y="93.0" width="46" height="46" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="373" y="123" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">17</text>
+<rect x="396" y="93.0" width="46" height="46" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="419" y="123" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">25</text>
+<rect x="350" y="139.0" width="46" height="46" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="373" y="169" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">37</text>
+<rect x="396" y="139.0" width="46" height="46" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="419" y="169" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">43</text>
+<text x="396" y="207" text-anchor="middle" font-size="15" fill="#666">output H (2×2)</text>
+<rect x="350" y="93.0" width="46" height="46" fill="none" stroke="#e53935" stroke-width="2.5"/>
+<text x="30" y="230" font-size="16" fill="#792051">Top-left entry:  0·0 + 1·1 + 2·3 + 3·4 = 17</text>
+</svg></div>
+```
+
+Two observations follow. First, **the output is smaller than the input**, because the kernel can only be placed where it overlaps the input entirely. For an input of height $n_h$ and width $n_w$ and a kernel of height $k_h$ and width $k_w$, the output size is
+
+$$(n_h - k_h + 1) \times (n_w - k_w + 1).$$
+
+Here $3 - 2 + 1 = 2$ along each axis, so the output is $2\times2$, as computed. Second, each output entry depends only on a small region of the input — a consequence of locality.
+
+::: {.definition-block}
+**Definition.** The *receptive field* of an output entry is the region of the input that it depends on.
+:::
+
+For a single convolution the receptive field has the size of the kernel, but the notion extends to a stack of convolutional layers or a whole network, where receptive fields grow with depth.
+
+### Padding {#sec-padding}
+
+That the output shrinks is inconvenient. The standard remedy is **padding**: add a border of zeros around the input before convolving, chosen so that the output has the same height and width as the input.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 560 240" width="100%" style="max-width:560px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Padding preserves the output size</text>
+<rect x="30" y="60" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="50" y="87" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="70" y="60" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="90" y="87" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="110" y="60" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="130" y="87" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="150" y="60" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="170" y="87" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="190" y="60" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="210" y="87" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="30" y="100" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="50" y="127" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="70" y="100" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="90" y="127" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">0</text>
+<rect x="110" y="100" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="130" y="127" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">1</text>
+<rect x="150" y="100" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="170" y="127" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">2</text>
+<rect x="190" y="100" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="210" y="127" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="30" y="140" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="50" y="167" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="70" y="140" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="90" y="167" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">3</text>
+<rect x="110" y="140" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="130" y="167" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">4</text>
+<rect x="150" y="140" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="170" y="167" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">5</text>
+<rect x="190" y="140" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="210" y="167" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="30" y="180" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="50" y="207" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="70" y="180" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="90" y="207" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">6</text>
+<rect x="110" y="180" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="130" y="207" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">7</text>
+<rect x="150" y="180" width="40" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<text x="170" y="207" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">8</text>
+<rect x="190" y="180" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="210" y="207" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="30" y="220" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="50" y="247" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="70" y="220" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="90" y="247" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="110" y="220" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="130" y="247" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="150" y="220" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="170" y="247" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<rect x="190" y="220" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
+<text x="210" y="247" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
+<text x="130" y="280" text-anchor="middle" font-size="15" fill="#666">3×3 input with a border of zeros</text>
+<text x="260" y="130" font-size="16" fill="#333">Total padding per axis: K − 1</text>
+<text x="260" y="156" font-size="16" fill="#333">Each edge: (K − 1)/2 zeros</text>
+<text x="260" y="182" font-size="14" fill="#666">(K odd, e.g. 3×3 → 1 per edge)</text>
+</svg></div>
+```
+
+Working out how much to add is easier when the kernel size $K$ is odd, which is why odd kernels are the usual convention: the window spans $2\Delta+1$ pixels, which is always odd. For a $K\times K$ kernel, the total padding needed along an axis is $K-1$, split evenly so that each edge receives
+
+$$\frac{K-1}{2} \text{ rows or columns of zeros.}$$
+
+If $K$ were even, $K-1$ would be odd and we could not split it evenly between the two edges. Two conventions are now in place: kernels are almost always odd, and we almost always zero-pad so the output matches the input. Neither is mandatory — padding a different amount produces an output that is larger or smaller — but they are the standard choices.
+
+### Stride {#sec-stride}
+
+A less universal option is **striding**. Ordinarily we move the kernel one pixel at a time; with a stride we move by more than one. A stride of $2\times3$, for instance, moves the window two pixels horizontally and three pixels vertically between output entries. Striding has two effects. The output gets smaller, since we skip positions we could have computed — a form of downsampling. And the computation is cheaper, since the cost of a convolution is essentially the number of output positions times the size of the kernel, and we are computing fewer output positions. Striding tends to be reasonable when the input is redundant, so that nearby positions would produce nearly the same output; skipping some of them then loses little.
+
+### Channels {#sec-channels}
+
+In practice, images are not bare two-dimensional grids but grids with one or more **channels**. A color image has red, green, and blue channels, each a grid of brightness values; a single-channel image is grayscale. The convolution's outputs, the feature maps, have channels too, and their number is a hyperparameter much like the width of a dense layer.
+
+With channels, the output at spatial position $(i,j)$ and output channel $d$ is
+
+::: {.boxed-eq}
+$$\bm{H}_{i,j,d} = \bm{U}_d + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \sum_c \bm{V}_{a,b,c,d}\, \bm{X}_{i+a,\, j+b,\, c},$$
+:::
+
+where $c$ indexes input channels and $d$ indexes output channels. There is a separate bias per output channel — a per-position bias would break translation invariance — and, importantly, a separate kernel for each input–output channel pair. With $10$ output channels and $20$ input channels there are $200$ kernels. We compute each output channel by convolving every input channel with its corresponding kernel and summing the results over the input channels. This mirrors the dense layer, where a weight connects each input feature to each output feature; here, a kernel connects each input channel to each output channel, mixing the channels while convolving spatially.
+
+### Pooling {#sec-pooling}
+
+The last ingredient of a simple convolutional network is **pooling**, a way of aggregating spatial information through a transformation with no parameters — like a nonlinearity, but aggregating rather than acting elementwise. Pooling looks at a small region of the input and applies a reduction, an operation that maps a set of values to a single value.
+
+The most common form is **max pooling**, whose reduction is the maximum. Applying a $2\times2$ max pooling to our $0$-through-$8$ input, and sliding the window, takes the maximum of each $2\times2$ region.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 620 220" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="pArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="30" y="30" font-size="24" font-weight="600" fill="#333">Max pooling (2×2)</text>
+<rect x="30" y="64" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="52" y="93" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">0</text>
+<rect x="74" y="64" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="96" y="93" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">1</text>
+<rect x="118" y="64" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="140" y="93" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">2</text>
+<rect x="30" y="108" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="52" y="137" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">3</text>
+<rect x="74" y="108" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="96" y="137" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">4</text>
+<rect x="118" y="108" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="140" y="137" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">5</text>
+<rect x="30" y="152" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="52" y="181" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">6</text>
+<rect x="74" y="152" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="96" y="181" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">7</text>
+<rect x="118" y="152" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="140" y="181" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">8</text>
+<text x="96" y="216" text-anchor="middle" font-size="15" fill="#666">input activation (3×3)</text>
+<line x1="178" y1="130.0" x2="298" y2="130.0" stroke="#888" stroke-width="1.5" marker-end="url(#pArr)"/>
+<text x="238" y="116" text-anchor="middle" font-size="15" fill="#333">2×2 max</text>
+<text x="238" y="164" text-anchor="middle" font-size="13" fill="#666">(stride 1)</text>
+<rect x="316" y="86.0" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="338" y="115" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">4</text>
+<rect x="360" y="86.0" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="382" y="115" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">5</text>
+<rect x="316" y="130.0" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="338" y="159" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">7</text>
+<rect x="360" y="130.0" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="382" y="159" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">8</text>
+<text x="360" y="194" text-anchor="middle" font-size="15" fill="#666">output (2×2)</text>
+<text x="30" y="205" font-size="14" fill="#666">Each output entry is the maximum of the corresponding 2×2 window.</text>
+</svg></div>
+```
+
+Unlike the convolution example, pooling is almost always applied with a stride equal to the pooling window size, so the windows do not overlap and the spatial dimensions shrink by that factor. Max pooling is by far the most common choice; average pooling, whose reduction is the mean, is also seen. The intuition for max pooling on our cat-detection question is that if a filter responds to a cat's face, we care most about the strongest response in a region — how much cat-face was found nearby — rather than its precise location. Pooling also makes the model cheaper by downsampling, so fewer convolutions follow.
+
+### Building a simple convolutional network {#sec-simple-convnet}
+
+With convolution and pooling, and the dense layers from earlier lectures, we can assemble a simple convolutional network, of the kind sometimes called a LeNet after Yann LeCun, an early proponent of these models [@lecun1998gradient]. The basic block applies a convolution, then an elementwise nonlinearity (nonlinearities do not care about the shape of their input; they act on each entry independently), then pooling. This block repeats several times.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 720 270" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="fArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="28" font-size="24" font-weight="600" fill="#333">A simple convolutional network</text>
+<rect x="20" y="74" width="96" height="54" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="68" y="106" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">convolution</text>
+<line x1="116" y1="101.0" x2="144" y2="101.0" stroke="#888" stroke-width="1.5" marker-end="url(#fArr)"/>
+<rect x="144" y="74" width="98" height="54" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="193" y="106" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">nonlinearity</text>
+<line x1="242" y1="101.0" x2="270" y2="101.0" stroke="#888" stroke-width="1.5" marker-end="url(#fArr)"/>
+<rect x="270" y="74" width="80" height="54" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="310" y="106" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">pooling</text>
+<path d="M20,136 L20,146 L350,146 L350,136" fill="none" stroke="#888" stroke-width="1.3"/>
+<text x="185" y="166" text-anchor="middle" font-size="15" fill="#666">repeat</text>
+<line x1="350" y1="101.0" x2="382" y2="101.0" stroke="#888" stroke-width="1.5" marker-end="url(#fArr)"/>
+<rect x="382" y="74" width="76" height="54" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="420" y="106" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">flatten</text>
+<line x1="458" y1="101.0" x2="486" y2="101.0" stroke="#888" stroke-width="1.5" marker-end="url(#fArr)"/>
+<rect x="486" y="74" width="122" height="54" rx="7" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="547" y="98" text-anchor="middle" font-size="14" font-weight="600" fill="#792051">dense +</text>
+<text x="547" y="116" text-anchor="middle" font-size="14" font-weight="600" fill="#792051">softmax</text>
+</svg></div>
+```
+
+If the pooling stride equals the pooling window size, each block shrinks the spatial dimensions. A common convention is to increase the number of channels as the spatial dimensions shrink, so that the cost and parameter count of each layer stay roughly fixed.
+
+Eventually we want to produce a prediction. Suppose we want to classify an image into ten classes, but the network has produced an activation volume of some height, width, and number of channels — say $7\times7\times100$ — over which we have little direct control. To turn a three-dimensional volume into a vector, we **flatten** it: a $7\times7\times100$ volume becomes a vector of $4900$ entries (a `reshape(-1)` in NumPy terms). We then apply one or more dense layers, ending in a softmax classifier, exactly as for a multilayer perceptron. The order in which we flatten does not matter, because a dense layer has no notion of order among its inputs — permuting the inputs and the corresponding weights leaves the output unchanged. That absence of order is precisely why we introduced convolutions: images have an order that dense layers ignore.
+
+This simple network is enough to do image classification. Several later architectural innovations, though, make convolutional networks easier to train, and we cover two of them next: batch normalization and residual connections.
+
+---
+
+## Batch Normalization {#sec-batchnorm}
+
+Recall from the previous lecture that when input features have different scales, the gradients for their corresponding weights have different scales, which makes a single learning rate hard to choose. For a linear model we could fix this by standardizing the inputs, but inside a neural network we do not directly control the intermediate activations. **Batch normalization** is a layer that normalizes activations using statistics computed over the current batch. We describe how it works, then why it might help.
+
+::: {.definition-block}
+**Definition.** *Batch normalization* is a layer that standardizes each activation using the mean and variance computed over the current batch, and then applies a learned scale $\bm{\gamma}$ and shift $\bm{\beta}$.
+:::
+
+### How it works {#sec-batchnorm-how}
+
+Assume for the moment that activations are vectors, so the notation is less cluttered. Given a batch $B$ of activations, batch normalization first computes the batch's mean activation and variance:
+
+$$\mu_B = \frac{1}{|B|} \sum_{\bm{x}\in B} \bm{x}, \qquad \sigma_B^2 = \frac{1}{|B|} \sum_{\bm{x}\in B} (\bm{x} - \mu_B)^2.$$
+
+For an activation $\bm{x}\in\mathbb{R}^d$, both $\mu_B$ and $\sigma_B^2$ are $d$-dimensional. To normalize an activation, it subtracts the mean, divides by the standard deviation, and then applies a learned scale and shift:
+
+::: {.boxed-eq}
+$$\operatorname{BN}(\bm{x}) = \bm{\gamma} \odot \frac{\bm{x} - \mu_B}{\sigma_B + \epsilon} + \bm{\beta},$$
+:::
+
+where $\odot$ is the elementwise product, $\epsilon$ is a small constant that prevents numerical trouble when $\sigma_B$ is small, and $\bm{\gamma}, \bm{\beta}\in\mathbb{R}^d$ are learned parameters, playing the roles of a weight and a bias. Subtracting the mean and dividing by the standard deviation performs the normalization that we might expect to be helpful. But it is not obvious that we want every activation everywhere in the model to have zero mean and unit variance, so $\bm{\gamma}$ and $\bm{\beta}$ let the model learn to rescale and shift the normalized activation as it sees fit.
+
+At inference time we may not have a batch to compute statistics over. The standard approach is to keep an exponential moving average of the $\mu_B$ and $\sigma_B$ observed during training, and use that average at inference.
+
+For images, the activation is a volume rather than a vector — a batch is $B\times H\times W\times C$ — and we normalize per channel, computing the statistics not just over the batch dimension but also over the spatial dimensions:
+
+$$\mu_B = \operatorname{mean}\big(\bm{X},\ \text{axis}=(0,1,2)\big) \in \mathbb{R}^C,$$
+
+and similarly for $\sigma_B$. Each channel is normalized by statistics gathered over the batch and over all spatial positions.
+
+### Why it might help {#sec-batchnorm-why}
+
+Batch normalization is a good example of how many methods in deep learning are developed: a combination of intuition and empirical results, rather than a theoretical guarantee. Several reasons have been offered for why it helps.
+
+The original one, from the paper that introduced it, is that it **reduces internal covariate shift** [@ioffe2015batch] — the idea that as activations propagate through the model, their mean and variance drift from layer to layer, and normalization counteracts this. Subsequent work has shown that in practice batch normalization does not necessarily reduce internal covariate shift, so this explanation is on uncertain ground.
+
+One thing it can do is **move activations toward the non-saturated region of the nonlinearity**. Recall that a ReLU outputs zero for negative inputs; if a layer's activations drift negative, its outputs become zero and it produces no gradient. Shifting activations back toward zero, and then possibly adjusting them through $\bm{\beta}$, keeps them in a region where the nonlinearity passes a gradient. The same holds for a sigmoid, which saturates for large-magnitude inputs; keeping activations near zero avoids saturating it. The batch normalization paper showed, for instance, that a network with sigmoid nonlinearities could still be trained when batch normalization was included.
+
+Two further effects have been observed in practice, though neither is guaranteed. Batch normalization can **smooth the optimization landscape**, so that the loss as a function of the parameters is less jagged and easier to optimize. And it can have an **unintended regularization effect**, because the mean and variance are noisy estimates computed from a batch. As is common in deep learning, these observations came from trying the method, finding it helped, and then studying why.
+
+### The trouble with batch normalization {#sec-batchnorm-trouble}
+
+Batch normalization has an uncomfortable property. Our usual mental model of batching is that the model's output for one example does not depend on the other examples in the batch: we compute outputs in parallel, and a given input always yields the same output regardless of what else is in the batch or how large the batch is. Batch normalization breaks this, because the mean and variance are computed across the batch. Changing the batch's contents, or even its size, changes the activations and therefore the output for every example.
+
+If the batch is large this effect may be small, but if the batch is small, or contains an outlier, the predictions for the other examples can be thrown off. This dependence made many practitioners uneasy, and batch normalization is now rarely used. Instead, models tend to use **layer normalization**, which normalizes across the features of a single example rather than across the batch, and which we will cover soon.
+
+---
+
+## Residual Connections {#sec-residual}
+
+The second addition, **residual connections**, also follows the pattern of intuition, then empirical benefit. Suppose we have a model that already works well and we want to add a layer. We would like to add it without distorting what the previous layers could learn. Another way to say this: the effectiveness of training a given layer depends on how well gradients propagate back to it, and we want to be able to add a layer while still propagating gradients as if it were not there.
+
+To see why this matters, consider adding a layer that always outputs zeros. The gradient of that layer's output with respect to its input is zero everywhere, so every preceding layer receives a zero gradient and stops learning. Adding a layer this way is catastrophic. We would like to add layers and remain confident that earlier layers still receive a learning signal.
+
+The simplest way to do so is the residual connection.
+
+::: {.definition-block}
+**Definition.** A *residual connection* adds a layer's input back to its output: for a layer $f$ with input $\bm{x}$, the output is $f(\bm{x}) + \bm{x}$ rather than $f(\bm{x})$. This leaves a path along which the input, and gradients, pass through unchanged.
+:::
+
+Let $\bm{x}$ be the input to a new layer $f$. Rather than making the new output $f(\bm{x})$, we make it
+
+::: {.boxed-eq}
+$$\bm{y} = f(\bm{x}) + \bm{x}.$$
+:::
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 520 210" width="100%" style="max-width:520px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="rArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Residual connection</text>
+<text x="30" y="113" font-size="18" font-weight="600" fill="#205279">x</text>
+<line x1="46" y1="107.0" x2="120" y2="107.0" stroke="#888" stroke-width="1.5" marker-end="url(#rArr)"/>
+<rect x="120" y="80" width="120" height="54" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="180" y="112" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">layer f</text>
+<line x1="240" y1="107.0" x2="300" y2="107.0" stroke="#888" stroke-width="1.5" marker-end="url(#rArr)"/>
+<circle cx="316" cy="107.0" r="16" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="316" y="114" text-anchor="middle" font-size="20" font-weight="600" fill="#794520">+</text>
+<line x1="332" y1="107.0" x2="396" y2="107.0" stroke="#888" stroke-width="1.5" marker-end="url(#rArr)"/>
+<text x="406" y="113" font-size="18" font-weight="600" fill="#794520">y = f(x) + x</text>
+<path d="M66,107.0 L66,159.0 L316,159.0 L316,123.0" fill="none" stroke="#8457C7" stroke-width="1.8" marker-end="url(#rArr)"/>
+<text x="191" y="179" text-anchor="middle" font-size="14" fill="#442079">identity skip connection</text>
+</svg></div>
+```
+
+Return to the extreme example where $f$ always outputs zeros. With a residual connection, the input passes through unaffected, since $f(\bm{x}) + \bm{x} = \bm{x}$. More generally, when the network has one path through the layer and one path that skips it, and the two are summed, the gradients split into one path through the layer and one path through the skip connection, and those are summed during backpropagation. Because there is a path through which gradients flow unperturbed, they propagate regardless of what $f$ is.
+
+The empirical finding is that residual connections help, and in particular that they allow training much deeper models, which tend to work well — plausibly because gradients propagate well through the residual paths, and because the addition can smooth the optimization landscape. Residual connections were introduced to make deep convolutional networks trainable, but they are used throughout modern architectures, including the transformer. One way to think about a network with residual connections is that instead of replacing its input with a new representation at each layer, it starts from the input and incrementally adds to it; the sequence of residual paths is sometimes called a **residual stream**.
+
+### Matching shapes {#sec-residual-shapes}
+
+There is a complication. Many layers change the shape of their input: a dense layer maps some number of input features to a different number of output features, and a convolution may change the spatial dimensions or the number of channels. When $f$ changes the shape, $f(\bm{x})$ and $\bm{x}$ cannot be added directly. In that case we apply a simple transformation along the residual path to match the shapes.
+
+For a dense layer mapping $16$ features to $32$, the simplest such transformation is a linear projection from $16$ to $32$. For convolutional networks the relevant example is a **$1\times1$ convolution** — a convolution with a $1\times1$ kernel. It does nothing spatially, since it looks at a single position, but it can change the number of channels, because a convolution can have any number of output channels, and it can downsample by using a stride. A $1\times1$ convolution on the residual path can therefore match both the channel count and the spatial size that the main path produced. When the main path does not change the shape at all — as in a transformer, whose residual path is typically uninterrupted — the residual connection is simply $f(\bm{x}) + \bm{x}$. A $1\times1$ convolution is a small linear transformation, so gradients still propagate through it without much trouble.
+
+---
+
+## Modern ConvNets: The ResNet {#sec-resnet}
+
+With convolution, nonlinearities, pooling, batch normalization, and residual connections in hand, we can describe the modern convolutional network: the residual network, or **ResNet** [@he2016deep]. As with the simple convolutional network, we build it by defining a block and repeating it.
+
+A ResNet block usually applies a $3\times3$ convolution, batch normalization, a nonlinearity, another $3\times3$ convolution, and another batch normalization; a residual connection is added around that whole sequence, and a final nonlinearity is applied after the addition. Because the $3\times3$ convolutions can change the number of channels (and the spatial size if strided), the residual path sometimes includes a $1\times1$ convolution to match the shape.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 760 400" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="nArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">ResNet block</text>
+<rect x="20" y="52" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="52" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">3×3</text>
+<text x="52" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text>
+<line x1="84" y1="75.0" x2="106" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="106" y="52" width="64" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="138" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">batch</text>
+<text x="138" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">norm</text>
+<line x1="170" y1="75.0" x2="192" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="192" y="52" width="54" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="219" y="80" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">ReLU</text>
+<line x1="246" y1="75.0" x2="268" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="268" y="52" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="300" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">3×3</text>
+<text x="300" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text>
+<line x1="332" y1="75.0" x2="354" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="354" y="52" width="64" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="386" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">batch</text>
+<text x="386" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">norm</text>
+<line x1="418" y1="75.0" x2="428" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<circle cx="444" cy="75.0" r="15" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="444" y="81" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">+</text>
+<line x1="459" y1="75.0" x2="481" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="481" y="52" width="54" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="508" y="80" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">ReLU</text>
+<line x1="535" y1="75.0" x2="557" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<path d="M24,75.0 L24,132 L444,132 L444,90.0" fill="none" stroke="#8457C7" stroke-width="1.8" marker-end="url(#nArr)"/>
+<rect x="187.0" y="116" width="90" height="32" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="232" y="137" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">1×1 conv</text>
+<text x="454" y="136" font-size="12" fill="#666">(sometimes, to match shape)</text>
+<text x="20" y="248" font-size="22" font-weight="600" fill="#333">ResNet</text>
+<rect x="20" y="272" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="52" y="292" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">7×7</text>
+<text x="52" y="310" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text>
+<line x1="84" y1="295.0" x2="106" y2="295.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="106" y="272" width="64" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="138" y="292" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">batch</text>
+<text x="138" y="310" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">norm</text>
+<line x1="170" y1="295.0" x2="192" y2="295.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="192" y="272" width="58" height="46" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="221" y="292" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">max</text>
+<text x="221" y="310" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">pool</text>
+<line x1="250" y1="295.0" x2="272" y2="295.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="278" y="266" width="124" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<rect x="275" y="269" width="124" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<rect x="272" y="272" width="124" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="334" y="292" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">many ResNet</text>
+<text x="334" y="310" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">blocks</text>
+<line x1="402" y1="295.0" x2="424" y2="295.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="424" y="272" width="86" height="46" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="467" y="292" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">global</text>
+<text x="467" y="310" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">avg pool</text>
+<line x1="510" y1="295.0" x2="532" y2="295.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="532" y="272" width="74" height="46" rx="7" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="569" y="300" text-anchor="middle" font-size="14" font-weight="600" fill="#792051">classify</text>
+<text x="20" y="356" font-size="14" fill="#666">Global average pooling averages each channel over height and width.</text>
+</svg></div>
+```
+
+To build a ResNet, we stack many such blocks. It is common to begin with a larger convolution on the input — a $7\times7$ rather than $3\times3$. The reason is that a $3\times3$ region of a raw, high-resolution image contains very little; capturing meaningful structure would require downsampling the image so far that much information is lost. A larger convolution, applied once on the input where it is affordable, lets the input keep a higher resolution. This is typically followed by max pooling to bring the resolution down, then many ResNet blocks.
+
+To produce a prediction we again need a vector. Rather than flattening, ResNets commonly use **global average pooling**, which averages each channel over the entire height and width, turning a $7\times7\times100$ volume into a vector of $100$ entries. This vector feeds a small classifier — a dense layer and a softmax. That is the ResNet: a large input convolution, pooling, a stack of residual blocks, global average pooling, and a classifier.
+
+Convolutional networks remain interesting and useful for some problems, but they have largely been replaced by the transformer, which is effective for images as well as for sequences and other kinds of data. We will turn to sequences next, and to the transformer over several lectures after that.
+
+---
+
+## Summary {#sec-summary}
+
+::: {.callout-note}
+**Key takeaways from Lecture 5:**
+
+- Architectures with a good **inductive bias** for structured data reach good solutions from less data. For images, the **convolution** layer follows from a dense layer plus two assumptions: **translation invariance** (apply the same operation everywhere, via shared weights) and **locality** (each output depends only on a small window).
+- A convolution slides a **kernel** over the input and computes a dot product at each position. The output has size $(n_h - k_h + 1)\times(n_w - k_w + 1)$; the region an output entry depends on is its **receptive field**. **Padding** with $\tfrac{K-1}{2}$ zeros per edge keeps the output the same size; **striding** downsamples and saves computation.
+- Images and activations have **channels**; a convolution uses a separate kernel per input–output channel pair and sums over input channels. **Pooling** aggregates spatial information with no parameters, most commonly max pooling.
+- A simple convolutional network repeats convolution, nonlinearity, and pooling, then flattens and applies dense layers to classify.
+- **Batch normalization** normalizes activations using batch statistics, with learned scale $\bm{\gamma}$ and shift $\bm{\beta}$, and moving-average statistics at inference. It can help by keeping activations in the non-saturated region of the nonlinearity, smoothing the landscape, and regularizing, but its output depends on the batch — which is why **layer normalization** is now preferred.
+- A **residual connection** computes $f(\bm{x}) + \bm{x}$, providing a path through which gradients propagate as if the layer were absent, which enables training deeper models; a $1\times1$ convolution on the residual path matches shapes when needed.
+- The modern convolutional network, the **ResNet**, stacks residual blocks (convolution, batch normalization, nonlinearity) between a large input convolution and a global-average-pooling classifier.
+:::
+
+**Next lecture:** Recurrent neural networks - architectures with an inductive bias for sequential data, where the structure to exploit is order in time rather than space.

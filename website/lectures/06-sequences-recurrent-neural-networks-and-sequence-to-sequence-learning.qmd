@@ -1,0 +1,448 @@
+---
+title: "Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning"
+description: "Modeling sequential data: the chain-rule decomposition and autoregressive sampling, representing text with embeddings, the vanilla recurrent neural network and backpropagation through time, the LSTM, and encoder–decoder models for sequence-to-sequence problems."
+bibliography: references.bib
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</h1>
+</div>
+```
+
+**Overview.** So far every architecture in this course has been designed to predict an output from a single input. This lecture turns to data with a different structure: sequences, whose elements come in an order. We first describe what a sequence is, how the chain rule of probability decomposes the joint distribution over a sequence, and how a single model that predicts the next element from a variable-length prefix lets us both score and generate sequences. We then represent text with embeddings, build the vanilla recurrent neural network as the smallest change to a one-hidden-layer network that can process a sequence, and work through backpropagation through time, which exposes why recurrent networks are hard to train. That difficulty motivates the LSTM, and we close with two uses of sequence models — language modeling and sequence classification — and with encoder–decoder models for sequence-to-sequence problems such as machine translation. Recurrent networks are no longer common in practice, having largely been replaced by attention-based models, so this treatment is brief.
+
+## Sequences {#sec-sequences}
+
+Almost every problem we have discussed fits one paradigm: predicting the probability of an output $\bm{y}$ given an input $\bm{x}$, where $\bm{y}$ is often a class and $\bm{x}$ is some features or an image. Many kinds of data fit this paradigm, but some data has other structure. One notable case is when the input is a **sequence**.
+
+::: {.definition-block}
+**Definition.** A *sequence* is a series of random variables $\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T$ that have an *order* — an ordering that dictates a dependency between the elements. Here $T$ denotes the length of the sequence.
+:::
+
+By *order* we mean that there is a natural way to decompose the joint distribution over the sequence into a set of dependencies, and that any other order feels unnatural. A clear example is a sequence whose elements are measurements taken at successive points in time: time itself induces the order, because whether something happened earlier or later is a fact we cannot rearrange. If we took a series of measurements over time and then shuffled or reversed them, they would be in the wrong order.
+
+Why does the order matter? Beyond letting us write the sequence down, it lets us use the **chain rule of probability** to express the joint probability of the whole sequence as a product of conditional probabilities:
+
+::: {.boxed-eq}
+$$p(\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T) = p(\bm{x}_1)\, p(\bm{x}_2 \mid \bm{x}_1)\, p(\bm{x}_3 \mid \bm{x}_2, \bm{x}_1) \cdots$$
+:::
+
+Any set of random variables can be decomposed this way; nothing about it is special to sequences. But because a sequence has a natural order, this particular decomposition makes sense: if the first element we observe is $\bm{x}_1$, we can express $p(\bm{x}_1)$; if the next is $\bm{x}_2$, we can ask for its probability given $\bm{x}_1$; and so on. Asking instead for the probability of $\bm{x}_3$ given $\bm{x}_{10}$ would be awkward, because we would be conditioning on something we have not observed yet. Text is the main example we will use, but there are many others — a spectrogram is a sequence of spectra over time, a video is a sequence of images.
+
+### Autoregressive sampling {#sec-autoregressive}
+
+Why model the joint probability of a sequence at all? Each factor in the decomposition — $p(\bm{x}_1)$, $p(\bm{x}_2 \mid \bm{x}_1)$, $p(\bm{x}_3 \mid \bm{x}_2, \bm{x}_1)$ — is a conditional probability of something given something else, which looks like the classifiers we have already built. If we have a model that estimates these probabilities, we can do something a classifier cannot: **sample** from the distributions to generate sequences.
+
+We sample **autoregressively**. First draw $\bm{x}_1 \sim p(\bm{x}_1)$. Then draw $\bm{x}_2 \sim p(\bm{x}_2 \mid \bm{x}_1)$, using the $\bm{x}_1$ we just sampled. Then feed both back in to get a distribution over $\bm{x}_3$, and continue until a full sequence is produced. This is the first generative model we have seen: rather than predicting $\bm{y}$ given $\bm{x}$, it learns a distribution over sequences, and one thing that allows is sampling new ones. Given a distribution over natural text we can generate text; given a distribution over images we can generate images.
+
+For this to be practical we do not want a separate model for each factor — one model for $p(\bm{x}_1)$, another for $p(\bm{x}_2 \mid \bm{x}_1)$, and so on. Instead we want a single model that, given a variable-length prefix of everything that came before, predicts what comes next:
+
+::: {.boxed-eq}
+$$p(\bm{x}_t \mid \bm{x}_{t-1}, \bm{x}_{t-2}, \dots, \bm{x}_1).$$
+:::
+
+Such a model produces every term in the chain-rule decomposition and lets us sample autoregressively. Recurrent neural networks give us this, and later transformers will too.
+
+---
+
+## Representing Text {#sec-text}
+
+Text is a sequence of words (or characters, or something else). Take the sentence "the cat sat," so that $\bm{x}_1 = \text{the}$, $\bm{x}_2 = \text{cat}$, $\bm{x}_3 = \text{sat}$. Its probability decomposes as
+
+$$p(\text{the cat sat}) = p(\text{the})\, p(\text{cat} \mid \text{the})\, p(\text{sat} \mid \text{the, cat}),$$
+
+which respects the natural left-to-right order in which we read and write English.
+
+There is a problem: a word is a string, and we cannot multiply a string by a weight matrix. We need a way to represent words as numbers to feed into a network. Mapping text to something a network can ingest is one of the many subproblems of natural language processing; since this is not a natural language processing course, we treat it only briefly.
+
+The standard approach is a **tokenizer**, which begins by defining a **vocabulary** $V$. For a word-level vocabulary, this is a set of words we will treat as tokens. Ideally we would have an entry for every word in the language, which is not quite possible — people invent and misspell words constantly — but suppose we have a large vocabulary of the words we care about. We associate each word with an integer index, its **token**: perhaps "the" is $1$, "a" is $2$, "dog" is $3$, "cat" is $4$, "sat" is $395$, "box" is $2973$, and so on. The particular index does not matter.
+
+Feeding these indices in directly would be odd. If "the" is $1$ and "a" is $2$, then multiplying each by a weight matrix produces the same result for "a" as for "the," only scaled by two — as if "a" were twice as large as "the." Words have no such relative size or natural order. We faced the same issue with class labels, and the remedy is the same: represent each token as a **one-hot vector**. One-hot vectors impose no order — no one-hot vector is larger than another, they all have the same norm, and they are all equidistant. The dimension of these vectors is the size of the vocabulary $|V|$, so a vocabulary of $100{,}000$ words gives $100{,}000$-dimensional one-hot vectors.
+
+Now consider what happens when a one-hot vector meets the first weight matrix $\bm{W}$ of the model. Every entry of the product is zero except the one corresponding to the token's index, so the product simply selects one column of $\bm{W}$.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 660 300" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="eA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="24" y="30" font-size="24" font-weight="600" fill="#333">Word embeddings: a one-hot indexes a column</text>
+<text x="40" y="66" font-size="16" fill="#205279" font-weight="600">"cat"</text>
+<line x1="78" y1="61" x2="110" y2="61" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"/>
+<text x="120" y="66" font-size="16" fill="#205279" font-weight="600">index 4</text>
+<line x1="196" y1="61" x2="228" y2="61" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"/>
+<text x="238" y="66" font-size="16" fill="#205279" font-weight="600">one-hot</text>
+<rect x="40" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="74" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="108" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="142" y="100" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
+<rect x="176" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="210" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="40" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="74" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="108" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="142" y="134" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
+<rect x="176" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="210" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="40" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="74" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="108" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="142" y="168" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
+<rect x="176" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="210" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="40" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="74" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="108" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="142" y="202" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
+<rect x="176" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="210" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
+<rect x="142" y="100" width="34" height="136" fill="none" stroke="#e53935" stroke-width="2.5"/>
+<text x="142" y="258" text-anchor="middle" font-size="14" fill="#666">embedding matrix W  (d × |V|, learned)</text>
+<text x="270" y="174" text-anchor="middle" font-size="24" fill="#555">×</text>
+<rect x="292" y="66" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="309" y="83" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="94" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="309" y="112" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="122" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="309" y="140" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="151" width="34" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
+<text x="309" y="168" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">1</text>
+<rect x="292" y="179" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="309" y="196" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="207" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="309" y="225" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<text x="309" y="253" text-anchor="middle" font-size="14" fill="#666">one-hot (|V|)</text>
+<text x="350" y="174" text-anchor="middle" font-size="24" fill="#555">=</text>
+<rect x="372" y="100" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<rect x="372" y="134" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<rect x="372" y="168" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<rect x="372" y="202" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<rect x="372" y="100" width="34" height="136" fill="none" stroke="#e53935" stroke-width="2.5"/>
+<text x="389" y="258" text-anchor="middle" font-size="14" fill="#207965" font-weight="600">word embedding</text>
+<text x="24" y="288" font-size="14" fill="#666">The product selects the column of W indexed by the token — its learned word embedding.</text>
+</svg></div>
+```
+
+Multiplying a weight matrix by a one-hot vector indexes out a column of that matrix. The matrix $\bm{W}$ has as many columns as there are vocabulary entries, and it is learned by gradient descent like any other weight matrix. The selected column is the **word embedding** (or **token embedding**) of that word, and $\bm{W}$ is the **embedding matrix**.
+
+::: {.callout-note}
+**Why embeddings are useful.** Because embeddings are vectors, they can have rich relationships. If two words have identical embeddings, the model is fed the same vector for both, so they are interchangeable to it; if two embeddings are close, the words are treated similarly. Relationships that resemble arithmetic can also emerge — for example, the embedding of "king" minus "man" plus "woman" landing near "queen" [@mikolov2013distributed]. These relationships are not hand-specified; they arise through learning, because they happen to help the model process text.
+:::
+
+We have gone from words, which we cannot feed into a model, to a learned vector for each word. Returning to our goal of modeling $p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1)$: since each element is a token drawn from the vocabulary, this conditional distribution is just **$|V|$-way classification** — classification over as many classes as there are vocabulary entries. We know how to do classification: a softmax output trained with cross-entropy. There is one important difference, though — the input has **variable length**.
+
+A plain multilayer perceptron cannot handle that. Its first weight matrix accepts a fixed input dimensionality. If we concatenate the sequence elements, the concatenated vector's size varies with the sequence length; if we feed them in independently, we lose the conditioning on the past. We need an architecture that can ingest a variable-length prefix, which motivates the recurrent neural network.
+
+---
+
+## The Vanilla Recurrent Neural Network {#sec-vanilla-rnn}
+
+The first recurrent architecture we study is the **vanilla recurrent neural network**. The name is retrospective: it was not called "vanilla" when introduced, but once fancier variants appeared, this plainest one took the plainest flavor's name. We build it by taking the simplest nonlinear model we have — a multilayer perceptron with one hidden layer — and making the smallest change that lets it process a variable-length sequence.
+
+Recall the one-hidden-layer network, written with a small change of notation ($\bm{W}_x$ for the input weights, to distinguish it from the recurrent weights we are about to add):
+
+$$\bm{h} = \sigma(\bm{W}_x \bm{x} + \bm{b}_h), \qquad \bm{o} = \bm{W}_o \bm{h} + \bm{b}_o.$$
+
+To process a sequence rather than a single input, we make the hidden state a sequence too, and add a **recurrent connection** so that the hidden state at step $t$ depends on the hidden state at the previous step:
+
+::: {.boxed-eq}
+$$\bm{h}_t = \sigma(\bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h), \qquad \bm{o}_t = \bm{W}_o \bm{h}_t + \bm{b}_o.$$
+:::
+
+The only structural change is the term $\bm{W}_h \bm{h}_{t-1}$, a recurrent connection from $\bm{h}_{t-1}$ to $\bm{h}_t$ through a learned weight matrix $\bm{W}_h$. To use the model, we feed in $\bm{x}_1$ to get $\bm{h}_1$, use $\bm{h}_1$ to produce $\bm{o}_1$ and hence a distribution over $\bm{x}_2$; then feed in $\bm{x}_2$ together with the retained $\bm{h}_1$ to get $\bm{h}_2$ and a distribution over $\bm{x}_3$; and so on. We carry the hidden state from one step to the next.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 620 300" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="rA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="24" y="30" font-size="24" font-weight="600" fill="#333">The vanilla RNN, unrolled</text>
+<text x="60" y="169" font-size="15" fill="#207965" font-weight="600">h₀</text>
+<line x1="80" y1="164.0" x2="120" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<rect x="120" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="155" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₁</text>
+<rect x="120" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="155" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₁</text>
+<line x1="155.0" y1="236" x2="155.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<rect x="120" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="155" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₁</text>
+<line x1="155.0" y1="140" x2="155.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<line x1="190" y1="164.0" x2="300" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<rect x="300" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="335" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₂</text>
+<rect x="300" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="335" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₂</text>
+<line x1="335.0" y1="236" x2="335.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<rect x="300" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="335" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₂</text>
+<line x1="335.0" y1="140" x2="335.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<line x1="370" y1="164.0" x2="480" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<rect x="480" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="515" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₃</text>
+<rect x="480" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="515" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₃</text>
+<line x1="515.0" y1="236" x2="515.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<rect x="480" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="515" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₃</text>
+<line x1="515.0" y1="140" x2="515.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="245" y="156" text-anchor="middle" font-size="13" fill="#666">W_h</text>
+<text x="169" y="216" font-size="13" fill="#666">W_x</text>
+<text x="169" y="100" font-size="13" fill="#666">W_o</text>
+<text x="24" y="286" font-size="14" fill="#666">The same weights W_x, W_h, W_o are reused at every step; hₜ summarizes the sequence up to step t.</text>
+</svg></div>
+```
+
+Because $\bm{h}_t$ is computed from $\bm{x}_t$ and $\bm{h}_{t-1}$, and $\bm{h}_{t-1}$ from $\bm{x}_{t-1}$ and $\bm{h}_{t-2}$, and so on, $\bm{h}_t$ depends on every past input. We can think of $\bm{h}_t$ as **summarizing** the sequence up to step $t$ — not in any literal sense, but in that it carries information about all the inputs so far.
+
+Two properties are worth stating. The model can process an input of any length: to handle a longer sequence, we keep feeding in elements, updating $\bm{h}_t$, and producing $\bm{o}_t$ where we want predictions. And the number of parameters does not change with the sequence length. As with a convolutional network, we reuse the same template everywhere — always $\bm{W}_x$ for the current input and always $\bm{W}_h$ for the previous hidden state — so whether $T$ grows or shrinks, the parameters remain $\bm{W}_x$, $\bm{W}_h$, $\bm{b}_h$, $\bm{W}_o$, and $\bm{b}_o$. (The vocabulary size, by contrast, is fixed once chosen: $\bm{x}_t$ has dimension $|V|$, so $\bm{W}_x$ has a matching dimension, and changing the vocabulary would require altering the weight matrix.)
+
+One note on the outputs: as written, we produce an $\bm{o}_t$ at every step, which is what we want for predicting the next element. But we could instead feed in the whole sequence and produce a single output $\bm{o}_T$ from the final hidden state $\bm{h}_T$, for example to classify a sequence — a case we return to below.
+
+The tools for training this model are the ones we already have. A recurrent network introduces no new operations: only nonlinearities, additions of bias vectors, and multiplications by weight matrices. As long as we can differentiate each operation and specify the computational graph, automatic differentiation and backpropagation compute the gradients, and gradient descent trains the model, exactly as before. There is, however, a conceptual tweak worth working through, because it reveals what makes recurrent networks hard to train.
+
+---
+
+## Backpropagation Through Time {#sec-bptt}
+
+One way to picture backpropagation in a recurrent network is to **unroll** it: apply the same layer over and over, feeding in $\bm{x}_t$ at each step to update $\bm{h}_t$, and then backpropagate from the outputs back to the inputs. To keep the notation manageable, write the hidden-state update as a function $f$ and the output as a function $g$:
+
+$$\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h), \qquad \bm{o}_t = g(\bm{h}_t, \bm{W}_o).$$
+
+We focus on $\bm{W}_h$, the recurrent weights, since they are what make this case different. Suppose we incur a loss at every step, averaging a per-step loss $\ell$ between the target $\bm{y}_t$ and the output $\bm{o}_t$:
+
+$$\mathcal{L} = \frac{1}{T} \sum_{t=1}^{T} \ell(\bm{y}_t, \bm{o}_t).$$
+
+By linearity of the derivative and then the chain rule,
+
+$$\frac{d\mathcal{L}}{d\bm{W}_h} = \frac{1}{T} \sum_{t=1}^{T} \frac{d\ell(\bm{y}_t, \bm{o}_t)}{d\bm{W}_h} = \frac{1}{T} \sum_{t=1}^{T} \frac{d\ell(\bm{y}_t, \bm{o}_t)}{d\bm{o}_t}\, \frac{d\bm{o}_t}{d\bm{h}_t}\, \frac{d\bm{h}_t}{d\bm{W}_h}.$$
+
+The first factor is the gradient of a softmax cross-entropy loss, which we have handled before. The second, $d\bm{o}_t / d\bm{h}_t$, is $\bm{W}_o$, since $g$ is a dense layer. The third factor, $d\bm{h}_t / d\bm{W}_h$, is the hard one.
+
+### The recurrent term {#sec-bptt-term}
+
+What makes $d\bm{h}_t / d\bm{W}_h$ hard is that $\bm{W}_h$ affects $\bm{h}_t$ through two paths. It contributes **directly**, because $\bm{h}_t$ is computed using $\bm{W}_h$; and it contributes **indirectly**, because $\bm{h}_t$ depends on $\bm{h}_{t-1}$, which itself depends on $\bm{W}_h$, which depends on $\bm{h}_{t-2}$, and so on back to the start. When a variable reaches another through two paths, we sum the derivative along each:
+
+$$\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h} + \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{h}_{t-1}}\, \frac{d\bm{h}_{t-1}}{d\bm{W}_h}.$$
+
+The final factor $d\bm{h}_{t-1}/d\bm{W}_h$ has the same form as the term we started with, one step earlier — a recursion. To see its solution, abbreviate
+
+$$a_t = \frac{d\bm{h}_t}{d\bm{W}_h}, \qquad b_t = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h}, \qquad c_t = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{h}_{t-1}},$$
+
+so that the recursion is $a_t = b_t + c_t\, a_{t-1}$. Since there is no $\bm{h}_{-1}$ to depend on, $a_0 = 0$. Unrolling,
+
+$$a_1 = b_1, \quad a_2 = b_2 + c_2 b_1, \quad a_3 = b_3 + c_3 b_2 + c_3 c_2 b_1, \quad a_4 = b_4 + c_4 b_3 + c_4 c_3 b_2 + c_4 c_3 c_2 b_1.$$
+
+The pattern is an always-present $b_t$ plus a sum of terms, each a product of $c$'s counting down to a $b_i$:
+
+$$a_t = b_t + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} c_j \right) b_i.$$
+
+Substituting the definitions back in gives the recurrent term in full:
+
+::: {.boxed-eq}
+$$\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h} + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} \frac{d f(\bm{x}_j, \bm{h}_{j-1}, \bm{W}_h)}{d\bm{h}_{j-1}} \right) \frac{d f(\bm{x}_i, \bm{h}_{i-1}, \bm{W}_h)}{d\bm{W}_h}.$$
+:::
+
+### Why recurrent networks are hard to train {#sec-exploding-vanishing}
+
+To see what this means, take a linear vanilla RNN, where $f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h) = \bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h$. Then the direct term is $\bm{h}_{i-1}$ and each factor $d f / d\bm{h}_{j-1}$ is $\bm{W}_h$, so
+
+$$\frac{d\bm{h}_t}{d\bm{W}_h} = \bm{h}_{t-1} + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} \bm{W}_h \right) \bm{h}_{i-1}.$$
+
+Everything here is mild except the product $\prod_{j=i+1}^{t} \bm{W}_h$, which is the same matrix $\bm{W}_h$ multiplied by itself over and over. As we saw earlier in the course with exploding and vanishing gradients, a chain of weight-matrix multiplications can grow without bound or shrink toward zero depending on the eigenvalues of the matrix — and here the matrices are not merely similar but identical. As a result, $d\bm{h}_t / d\bm{W}_h$ can **explode or vanish**. Viewing a recurrent network as a deep network whose layers all share one weight matrix, backpropagation produces exactly these repeated multiplications by the same matrix, which makes exploding and vanishing gradients especially severe for recurrent networks.
+
+---
+
+## Long Short-Term Memory {#sec-lstm}
+
+How do we deal with this? The main historical response, for those who still wanted to use recurrent networks, was to design variants less sensitive to exploding and vanishing gradients. One reason the vanilla network is so sensitive to $\bm{W}_h$ is that how much it remembers from the past, and how strongly, depends entirely on that one weight matrix. The more effective variants add explicit mechanisms for remembering and forgetting information in the hidden state. The most prominent is the **long short-term memory** network, or **LSTM** [@hochreiter1997long].
+
+Concretely, we want explicit mechanisms to remember or ignore the previous state, to update or not update the state based on the new input, and to forget the past completely. In a vanilla network all of this is controlled only by $\bm{W}_h$ and how it interacts with the state, which is a coarse instrument. The LSTM adds a **cell**, a separate recurrent state, with explicit mechanisms for reading, writing, and updating it. These mechanisms are governed by **gates** — values that would ideally be binary (read or not, write or not), and which we make soft by computing them with a sigmoid nonlinearity so they lie between $0$ and $1$.
+
+There are three gates, each computed like a dense layer with a sigmoid, plus a candidate cell update computed with a $\tanh$ (it is not a gate, so it need not lie in $[0,1]$):
+
+::: {.algorithm}
+#### LSTM cell
+
+$$\bm{i}_t = \sigma(\bm{W}_{xi} \bm{x}_t + \bm{W}_{hi} \bm{h}_{t-1} + \bm{b}_i) \qquad \text{(input gate)}$$
+$$\bm{f}_t = \sigma(\bm{W}_{xf} \bm{x}_t + \bm{W}_{hf} \bm{h}_{t-1} + \bm{b}_f) \qquad \text{(forget gate)}$$
+$$\bm{o}_t = \sigma(\bm{W}_{xo} \bm{x}_t + \bm{W}_{ho} \bm{h}_{t-1} + \bm{b}_o) \qquad \text{(output gate)}$$
+$$\tilde{\bm{c}}_t = \tanh(\bm{W}_{xc} \bm{x}_t + \bm{W}_{hc} \bm{h}_{t-1} + \bm{b}_c) \qquad \text{(candidate cell)}$$
+$$\bm{c}_t = \bm{f}_t \odot \bm{c}_{t-1} + \bm{i}_t \odot \tilde{\bm{c}}_t$$
+$$\bm{h}_t = \bm{o}_t \odot \tanh(\bm{c}_t)$$
+:::
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 660 320" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="lA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="24" y="30" font-size="24" font-weight="600" fill="#333">LSTM cell: gated read / write / forget</text>
+<rect x="40" y="88" width="86" height="44" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="83" y="115" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">cₜ₋₁</text>
+<circle cx="210" cy="110" r="16" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="210" y="116" text-anchor="middle" font-size="18" font-weight="600" fill="#792051">×</text>
+<line x1="126" y1="110" x2="194" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<circle cx="350" cy="110" r="16" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="350" y="116" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">+</text>
+<line x1="226" y1="110" x2="334" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="390" y="88" width="80" height="44" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="430" y="115" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">cₜ</text>
+<line x1="366" y1="110" x2="390" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="168" y="176" width="84" height="34" rx="7" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="210" y="197" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">forget fₜ</text>
+<line x1="210" y1="176" x2="210" y2="126" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="294" y="176" width="112" height="34" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="350" y="197" text-anchor="middle" font-size="13" font-weight="600" fill="#207965">iₜ × c̃ₜ</text>
+<line x1="350" y1="176" x2="350" y2="126" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<text x="430" y="76" text-anchor="middle" font-size="13" fill="#666">tanh, × oₜ</text>
+<line x1="430" y1="88" x2="430" y2="40" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="390" y="-8" width="80" height="44" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="430" y="19" text-anchor="middle" font-size="16" font-weight="600" fill="#207965">hₜ</text>
+<text x="24" y="250" font-size="14" fill="#666">Gates iₜ, fₜ, oₜ = σ(W·xₜ + W·hₜ₋₁ + b) are computed from the input xₜ and previous state hₜ₋₁;</text>
+<text x="24" y="272" font-size="14" fill="#666">the candidate cell c̃ₜ uses tanh. The cell cₜ carries information across time with gated updates.</text>
+</svg></div>
+```
+
+Reading the cell update: the **forget gate** $\bm{f}_t$ multiplies the old cell $\bm{c}_{t-1}$, determining how much of the previous cell is kept; the **input gate** $\bm{i}_t$ multiplies the candidate cell $\tilde{\bm{c}}_t$, determining how much of the new information is written in (the candidate cell is what ingests the current input, which $\bm{c}_{t-1}$ knows nothing about). Finally the **output gate** $\bm{o}_t$ determines how much of the updated cell is read out to form the hidden state $\bm{h}_t$. The weight matrices $\bm{W}_{xi}, \bm{W}_{hi}, \bm{W}_{xf}, \dots$ are all separate.
+
+Why this specific design — these gates, the separate cell, the $\tanh$ on the candidate — rather than some other? As with much of deep learning, it was motivated heuristically by the goal above, validated empirically by finding that such models train more effectively, and then studied: the gradient dynamics of an LSTM do not suffer from exploding and vanishing gradients in the same way. If you wanted to train a recurrent network today, an LSTM would give you a considerably easier time than a vanilla one.
+
+---
+
+## Deep and Bidirectional RNNs {#sec-deep-bidirectional}
+
+Two extensions are worth noting.
+
+First, we can have **deep RNNs**. Rather than a single hidden layer, we stack layers: the first computes a hidden state from the input, and each subsequent layer takes as input the hidden state of the layer below it (at the same step) together with its own previous hidden state:
+
+$$\bm{h}_t^{(1)} = f^{(1)}\!\big(\bm{x}_t, \bm{h}_{t-1}^{(1)}\big), \qquad \bm{h}_t^{(2)} = f^{(2)}\!\big(\bm{h}_t^{(1)}, \bm{h}_{t-1}^{(2)}\big), \quad \dots$$
+
+Just as we stack layers in a feedforward network, we can stack them in a recurrent one; there are simply more indices.
+
+Second, we can have **bidirectional RNNs**. So far we have processed the sequence from left to right, but we can process it in any order, and a common choice is to run two layers in parallel with separate parameters — one forward and one backward:
+
+$$\overrightarrow{\bm{h}}_t = \overrightarrow{f}\!\big(\bm{x}_t, \overrightarrow{\bm{h}}_{t-1}\big), \qquad \overleftarrow{\bm{h}}_t = \overleftarrow{f}\!\big(\bm{x}_{T-t}, \overleftarrow{\bm{h}}_{t-1}\big).$$
+
+Concatenating the forward and backward states at a step gives a representation with information about the full past and the full future. This would not make sense for predicting the next element — we cannot look ahead at what we are trying to predict — but it does make sense when we already have the whole input sequence and want to, for example, classify it.
+
+---
+
+## Uses of Sequence Models {#sec-uses}
+
+### Language modeling {#sec-language-modeling}
+
+The task we have been describing — predicting $p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1)$ — is called **language modeling**, and a model trained to do it is a **language model**. To train one, we collect sequences and use **teacher forcing**.
+
+::: {.definition-block}
+**Definition.** *Teacher forcing* trains a sequence model by always conditioning on the ground-truth prefix. To predict $\bm{x}_t$, we feed in the true sequence up to $\bm{x}_{t-1}$ — regardless of what the model predicted for earlier elements — and train it to predict the true $\bm{x}_t$.
+:::
+
+A language model is useful in two ways. Because it gives the probability of the next element given the history, we can sample new sequences from scratch, as described earlier; and we can take an existing sequence and ask how probable it is under the model — whether it looks like a normal sequence.
+
+### Sequence classification {#sec-sequence-classification}
+
+A different use is **sequence classification**: predicting a single class from a full input sequence, $p(\bm{y} \mid \bm{x}_1, \dots, \bm{x}_T)$. Here we do not care about predicting each element; we take the whole sequence and make one prediction. We iterate the recurrent update to the end and feed the final hidden state through a single dense layer to get the scores:
+
+$$\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1}), \qquad \bm{o} = \bm{W}_o \bm{h}_T + \bm{b}_o.$$
+
+Since we have the full sequence when making the prediction, a bidirectional RNN can make sense here. The final hidden state $\bm{h}_T$ should carry information about the entire input. Sequence classification covers tasks such as predicting the topic of a document, whether a movie review is positive or negative, or whether an email — a sequence of words fed through the RNN, with the final state passed to a classifier — is spam.
+
+---
+
+## Sequence-to-Sequence Learning {#sec-seq2seq}
+
+A further class of problems is **sequence-to-sequence** (or "seq2seq"): given an input sequence, generate a related output sequence. We predict elements of the output sequence autoregressively, but conditioned on both the past output elements and the full input sequence. Writing output indices as $t'$ to keep them distinct from the input indices,
+
+::: {.boxed-eq}
+$$p(\bm{y}_{t'} \mid \bm{y}_{t'-1}, \bm{y}_{t'-2}, \dots, \bm{y}_1, \; \bm{x}_T, \bm{x}_{T-1}, \dots, \bm{x}_1).$$
+:::
+
+The standard example is **machine translation**: $\bm{x}$ is an English sentence and $\bm{y}$ is its French translation. We already have the tools we need. We build a seq2seq model from two RNNs [@sutskever2014sequence]:
+
+1. An **encoder** RNN reads the input sequence, $\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1})$, producing a sequence of hidden states.
+2. The **context** is the encoder's final hidden state, $\bm{c} = \bm{h}_T$, which summarizes the whole input.
+3. A **decoder** RNN generates the output, $\bm{s}_{t'} = g(\bm{y}_{t'-1}, \bm{s}_{t'-1}, \bm{c})$, using the previous output element, its own previous state, and the context; its state is used to predict $\bm{y}_{t'}$.
+
+How do we make the decoder $g$ a function of the context $\bm{c}$? There are several options. One is to concatenate $\bm{c}$ with the embedding of the previous output element at every step, $\operatorname{concat}(\operatorname{embed}(\bm{y}_{t'-1}), \bm{c})$, injecting the context throughout. Another is to set the decoder's initial hidden state to the context, $\bm{s}_0 = \bm{c}$. (This raises a question we had not addressed: what to initialize a hidden state to. The usual choices are all zeros, or a learned vector treated as a parameter; in a seq2seq model, the decoder can instead be initialized to the context.)
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 720 320" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="sA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Sequence-to-sequence: encoder → context → decoder</text>
+<rect x="40" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="66" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₁</text>
+<rect x="40" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="66" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₁</text>
+<line x1="66.0" y1="230" x2="66.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<line x1="92" y1="171.0" x2="120" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="120" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="146" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₂</text>
+<rect x="120" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="146" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₂</text>
+<line x1="146.0" y1="230" x2="146.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<line x1="172" y1="171.0" x2="200" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="200" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="226" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₃</text>
+<rect x="200" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="226" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₃</text>
+<line x1="226.0" y1="230" x2="226.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<line x1="252" y1="171.0" x2="280" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="280" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="306" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₄</text>
+<rect x="280" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="306" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₄</text>
+<line x1="306.0" y1="230" x2="306.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<text x="186" y="136" text-anchor="middle" font-size="14" fill="#666">encoder</text>
+<text x="186" y="266" text-anchor="middle" font-size="14" fill="#666">input sequence</text>
+<line x1="332" y1="171.0" x2="420" y2="171.0" stroke="#8457C7" stroke-width="2" marker-end="url(#sA)"/>
+<text x="376" y="163" text-anchor="middle" font-size="15" fill="#442079" font-weight="600">c</text>
+<rect x="420" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="446" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">s₁</text>
+<rect x="414" y="230" width="64" height="42" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="446" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#796020">&lt;bos&gt;</text>
+<line x1="446.0" y1="230" x2="446.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="414" y="78" width="64" height="42" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="446" y="103" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">y₁</text>
+<line x1="446.0" y1="150" x2="446.0" y2="120" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<line x1="472" y1="171.0" x2="510" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="510" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="536" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">s₂</text>
+<rect x="504" y="230" width="64" height="42" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="536" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#796020">y₁</text>
+<line x1="536.0" y1="230" x2="536.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="504" y="78" width="64" height="42" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="536" y="103" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">y₂</text>
+<line x1="536.0" y1="150" x2="536.0" y2="120" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<line x1="562" y1="171.0" x2="600" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="600" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="626" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">s₃</text>
+<rect x="594" y="230" width="64" height="42" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="626" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#796020">y₂</text>
+<line x1="626.0" y1="230" x2="626.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<rect x="594" y="78" width="64" height="42" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="626" y="103" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">&lt;eos&gt;</text>
+<line x1="626.0" y1="150" x2="626.0" y2="120" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"/>
+<text x="536" y="92" text-anchor="middle" font-size="14" fill="#666">output sequence</text>
+<text x="536" y="266" text-anchor="middle" font-size="14" fill="#666">decoder (autoregressive)</text>
+</svg></div>
+```
+
+The diagram shows the full model. The encoder ingests the input sequence $\bm{x}_1, \dots, \bm{x}_4$, updating its state at each step; its final state $\bm{h}_4$ becomes the context $\bm{c}$, which initializes the decoder. The encoder can be bidirectional, since the whole input is available. The decoder is not: it predicts left to right. To start generation we feed in a special **beginning-of-sequence** token, `<bos>` — a token with no meaning in the language, but a meaning to the model. The decoder then proceeds autoregressively, each step taking the previous state and the previously generated element, until it produces a special **end-of-sequence** token, `<eos>`, signaling that it is done. Stitching two RNNs together this way is how we tackle sequence-to-sequence problems such as machine translation.
+
+---
+
+## Summary {#sec-summary}
+
+::: {.callout-note}
+**Key takeaways from Lecture 6:**
+
+- A **sequence** is an ordered series of random variables. The **chain rule of probability** decomposes the joint distribution into conditionals $p(\bm{x}_1)\, p(\bm{x}_2 \mid \bm{x}_1) \cdots$, and a single model of $p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1)$ lets us score sequences and **sample autoregressively**.
+- Text is represented by mapping tokens to indices, then to **one-hot vectors**; multiplying a one-hot vector by the **embedding matrix** selects a learned **word embedding**. Next-element prediction is then $|V|$-way classification with a variable-length input.
+- A **vanilla RNN** is a one-hidden-layer network made recurrent: $\bm{h}_t = \sigma(\bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h)$. It processes any length with a fixed number of parameters, and $\bm{h}_t$ summarizes the sequence up to step $t$.
+- **Backpropagation through time** unrolls the network. The recurrent term $d\bm{h}_t/d\bm{W}_h$ involves repeated multiplication by $\bm{W}_h$, so gradients can **explode or vanish**, making recurrent networks hard to train.
+- The **LSTM** adds a cell with input, forget, and output gates that give explicit control over remembering, updating, and forgetting, and it trains more reliably than a vanilla RNN.
+- RNNs can be made **deep** (stacked layers) or **bidirectional** (parallel forward and backward passes, when the full sequence is available).
+- Sequence models support **language modeling** (trained with **teacher forcing**), **sequence classification** (from the final hidden state), and **sequence-to-sequence** learning via an **encoder–decoder** architecture, where the encoder's final state is the context that conditions the decoder.
+:::
+
+**Next lecture:** Attention and the transformer - the mechanism that lets a model condition directly on every element of a sequence, avoiding the single-context bottleneck and the sequential recurrence of RNNs, and that has largely replaced them.
