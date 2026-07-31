@@ -1,0 +1,404 @@
+---
+title: "Lecture 7: Attention"
+description: "Attention as a differentiable associative memory: the query–key–value framing, a soft one-nearest-neighbor classifier, attention in sequence-to-sequence models, self-attention and its path-length advantage, position encodings, and multi-headed self-attention."
+bibliography: references.bib
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 7: Attention</h1>
+</div>
+```
+
+**Overview.** This lecture develops **attention**, a core layer in modern neural networks. We motivate it as the neural-network version of an associative memory, or key–value store, and identify the five ingredients any attention mechanism must specify: a query, keys, values, a comparison function, and a reduction function. We then see three instances of this template of increasing relevance — a Python dictionary, a soft one-nearest-neighbor classifier, and attention in sequence-to-sequence models — before arriving at **self-attention**, the mechanism at the heart of the transformer. We examine why self-attention is attractive through the notion of path length, view it as a pair of matrix multiplications, address its indifference to order with position encodings, and close with multi-headed self-attention.
+
+## Attention as an Associative Memory {#sec-associative-memory}
+
+To motivate attention, consider what we might call an **associative memory**, or **key–value store** — a fairly fundamental data structure, of which attention is loosely the neural-network version. Building one requires a few pieces. We have a set of objects we want to store, which we call the **values**; the values are a set, meaning they have no order. We want to associate each value with a **key**, an identifier; there is exactly one key per value. To retrieve a value, we supply a **query**, which is the identifier of the thing we want back.
+
+Retrieval then involves two functions. The first is a **comparison function**, which takes the query and determines how well it matches a given key. The second is a **reduction function**, which takes the results of the comparison — a sense of how well the query matches each key — and returns something based on the stored values.
+
+::: {.definition-block}
+**Definition.** An *attention mechanism* is specified by five ingredients: a **query**, a set of **keys**, a set of **values** (one value per key), a **comparison function** that scores the query against each key, and a **reduction function** that combines the values according to those scores.
+:::
+
+A familiar example is a Python dictionary. Its comparison function tests for equality — in practice it hashes the keys and the query and checks for matching hashes, which is not equality exactly but is equality with very high probability. Given a query, it finds the key equal to the query, and there can be only one, since the keys are unique. Its reduction function returns the value corresponding to that key. One could imagine implementing a dictionary as a set of (key, value) tuples: compare the query to the first entry of every tuple, find the one whose key matches, and return its second entry. This is not how dictionaries are actually built, but it captures the behavior.
+
+A dictionary is not something we can put inside a neural network and backpropagate through: its assignments are hard, testing for equality and returning only the matching value. What we will do over this lecture is make this behavior soft and smooth, and use it as a core layer.
+
+### The abstract picture {#sec-abstract}
+
+Drawing the mechanism helps. We have a set of keys and a query. The mechanism first compares the query to every key with the comparison function, producing a set of scores — one per key — that say how well the query matches that key. We also have a set of values, the same number as keys. The reduction function then returns something computed from the values, weighted by the scores. Reduction functions map a set of things to a single thing; a max, a sum, and an average are all reductions, and here the output has the size of a single value.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="aA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="24" y="30" font-size="24" font-weight="600" fill="#333">An attention mechanism</text>
+<rect x="40" y="70" width="90" height="150" rx="4" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<line x1="40" y1="91.4" x2="130" y2="91.4" stroke="#5795C7" stroke-width="1"/>
+<line x1="40" y1="112.9" x2="130" y2="112.9" stroke="#5795C7" stroke-width="1"/>
+<line x1="40" y1="134.3" x2="130" y2="134.3" stroke="#5795C7" stroke-width="1"/>
+<line x1="40" y1="155.7" x2="130" y2="155.7" stroke="#5795C7" stroke-width="1"/>
+<line x1="40" y1="177.1" x2="130" y2="177.1" stroke="#5795C7" stroke-width="1"/>
+<line x1="40" y1="198.6" x2="130" y2="198.6" stroke="#5795C7" stroke-width="1"/>
+<text x="85" y="62" text-anchor="middle" font-size="14" fill="#666">keys</text>
+<rect x="60" y="244" width="120" height="30" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="120" y="264" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">query</text>
+<line x1="120" y1="244" x2="120" y2="224" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"/>
+<text x="175" y="120" font-size="15" fill="#333">compare</text>
+<line x1="150" y1="138" x2="215" y2="138" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"/>
+<rect x="250" y="72.0" width="31.5" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"/>
+<rect x="250" y="93.4" width="54.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"/>
+<rect x="250" y="114.9" width="18.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"/>
+<rect x="250" y="136.3" width="81.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"/>
+<rect x="250" y="157.7" width="45.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"/>
+<rect x="250" y="179.1" width="27.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"/>
+<rect x="250" y="200.6" width="63.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"/>
+<line x1="250" y1="70" x2="250" y2="220" stroke="#C75794" stroke-width="1.5"/>
+<text x="295" y="62" text-anchor="middle" font-size="14" fill="#666">scores a</text>
+<rect x="420" y="70" width="90" height="150" rx="4" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<line x1="420" y1="91.4" x2="510" y2="91.4" stroke="#57C7AE" stroke-width="1"/>
+<line x1="420" y1="112.9" x2="510" y2="112.9" stroke="#57C7AE" stroke-width="1"/>
+<line x1="420" y1="134.3" x2="510" y2="134.3" stroke="#57C7AE" stroke-width="1"/>
+<line x1="420" y1="155.7" x2="510" y2="155.7" stroke="#57C7AE" stroke-width="1"/>
+<line x1="420" y1="177.1" x2="510" y2="177.1" stroke="#57C7AE" stroke-width="1"/>
+<line x1="420" y1="198.6" x2="510" y2="198.6" stroke="#57C7AE" stroke-width="1"/>
+<text x="465" y="62" text-anchor="middle" font-size="14" fill="#666">values</text>
+<text x="545" y="150" font-size="15" fill="#333">reduce</text>
+<line x1="520" y1="138" x2="590" y2="138" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"/>
+<rect x="560" y="120" width="100" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="610" y="143" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
+<text x="24" y="292" font-size="14" fill="#666">Compare the query to every key to get scores; reduce the values by those scores to get the output.</text>
+</svg></div>
+```
+
+Some notation. The keys are vectors $\bm{k}_i \in \mathbb{R}^{d_k}$ for $i \in \{1, \dots, N\}$, so there are $N$ of them. The query is $\bm{q} \in \mathbb{R}^{d_q}$; depending on the comparison function, $\bm{q}$ can have its own dimensionality, though in many mechanisms $d_q = d_k$. The values are $\bm{v}_i \in \mathbb{R}^{d_v}$, one per key. The comparison function $\alpha$ takes the query and one key and returns a scalar score,
+
+$$a_i = \alpha(\bm{q}, \bm{k}_i) \in \mathbb{R}, \qquad \bm{a} \in \mathbb{R}^N,$$
+
+collecting the scores into a vector $\bm{a}$. The reduction function takes the values and the scores and returns a vector,
+
+$$f(\{\bm{v}_1, \dots, \bm{v}_N\}, \bm{a}) \in \mathbb{R}^{d_v}.$$
+
+For the dictionary, the comparison could output $1$ when $\bm{q}$ and $\bm{k}_i$ are equal and $0$ otherwise — a one-hot vector marking the match — and the reduction would return the value at the entry equal to $1$.
+
+::: {.callout-note}
+**Attention operates on sets.** Although the keys and values can be drawn as the rows of a matrix, every operation here is an operation on a set: shuffling the keys and values (together) leaves the result unchanged. The same is true of a dictionary, whose keys and values have no inherent order. This property will return when we apply attention to sequences.
+:::
+
+---
+
+## A Soft One-Nearest-Neighbor Classifier {#sec-one-nn}
+
+To move from dictionaries toward the attention mechanisms we put in networks, consider a one-nearest-neighbor classifier. It is not usually introduced as an attention mechanism, but it has the same primitives, and the framing helps clarify what attention is doing.
+
+Filling in the five ingredients: the **query** is the data point we want to classify. What do we compare it to? The training data points — so the **keys** are the data points of the training set. What do we want back? A label — so the **values** are the labels of the training set, one per key. For the **comparison function**, a nearest-neighbor classifier uses distance; taking Euclidean distance, and negating it for a reason that will become clear,
+
+$$\alpha(\bm{q}, \bm{k}_i) = -\lVert \bm{q} - \bm{k}_i \rVert = a_i.$$
+
+For the **reduction function**, a one-nearest-neighbor classifier returns the label of the single closest training point. With the negation in place, the closest point has the largest score, so we take an $\operatorname{argmax}$ — treating it, as usual, as returning a one-hot vector — and take its dot product with the vector of labels $V$ (one integer label per training point):
+
+$$f(\{\bm{v}_1, \dots, \bm{v}_N\}, \bm{a}) = \operatorname{argmax}(\bm{a}) \cdot V.$$
+
+The one-hot argmax selects the label of the entry with the largest score, that is, the smallest distance.
+
+We would not put this in a neural network as written, because the $\operatorname{argmax}$ has a derivative of zero almost everywhere. But we have seen a function that does roughly what argmax does, in a soft way: the **softmax** (which, as noted before, is better thought of as a soft argmax). Replacing the argmax with a softmax makes the classifier differentiable:
+
+::: {.boxed-eq}
+$$\text{To make the one-nearest-neighbor classifier soft (differentiable), replace } \operatorname{argmax} \text{ with } \operatorname{softmax}.$$
+:::
+
+Strictly, this is no longer a one-nearest-neighbor classifier. It finds the points closest to the query and averages their labels in proportion to their closeness. The attention mechanisms we build into networks will look much like this soft one-nearest-neighbor classifier, with a different comparison function and with values that are something other than labels.
+
+::: {.callout-note}
+**This framing is subtle.** Expressing a one-nearest-neighbor classifier as an attention mechanism is not obvious; it has appeared both as a job-interview question and as a final-exam question.
+:::
+
+---
+
+## Sequence-to-Sequence with Attention {#sec-seq2seq-attention}
+
+The first place attention appeared widely in neural networks was in sequence-to-sequence models, so we do not yet leave recurrent networks behind. Recall from the previous lecture the encoder–decoder RNN: the input sequence is fed into an encoder RNN, whose final hidden state $\bm{h}_T$ summarizes the input, and this state initializes a decoder RNN that generates the output. We called this summary the **context** $\bm{c}$, and set it to $\bm{h}_T$.
+
+If $\bm{c} = \bm{h}_T$, then $\bm{h}_T$ has to encode all relevant information about the input, because the decoder's only access to the input is through $\bm{c}$. This is limiting: for a long input, we are forcing more and more information into a single fixed-length vector, and compressing all the relevant information — while discarding the irrelevant — into one vector can be hard.
+
+We can do better by noting that a decoder's output at a given step may depend on only a few inputs. Consider translating the English sentence "the cat sat on the mat" into French, "le chat s'est assis sur le tapis." The word *tapis* is a translation of *mat*, and to produce it we need to know essentially only the word *mat*, not the rest of the sentence. But with a single context, the decoder must rely on $\bm{h}_T$ for every output, whether or not a given output depends on the whole input.
+
+The idea is to compute a **different context $\bm{c}_{t'}$ at each output step $t'$**, recomputing it based on what we are about to predict — so that the context for producing the French *tapis* focuses on the encoder state for *mat*. We implement this with an attention mechanism [@bahdanau2015neural].
+
+We fill in the five ingredients for sequence-to-sequence attention:
+
+- The **query** is the decoder's hidden state from the previous step, $\bm{s}_{t'-1}$. (We cannot use $\bm{s}_{t'}$, since it will depend on the context $\bm{c}_{t'}$ we are trying to compute.)
+- The **values** are the encoder states $\bm{h}_1, \dots, \bm{h}_T$, since the context should be a function of them.
+- The **keys** are also the encoder states $\bm{h}_1, \dots, \bm{h}_T$ — we compare the query against them to decide which values to retrieve. (These are the only $T$ things the encoder gives us to compare against.)
+- The **comparison function**, in the original model, is a small MLP. The decoder and encoder states come from different RNNs and may not be directly comparable, so we linearly transform both, add them, apply a $\tanh$, and collapse the result to a scalar with a weight vector $\bm{w}_v$:
+
+::: {.boxed-eq}
+$$\alpha(\bm{q}, \bm{k}_i) = \bm{w}_v^\top \tanh(\bm{W}_q \bm{q} + \bm{W}_k \bm{k}_i) = a_i,$$
+:::
+
+where $\bm{w}_v$, $\bm{W}_q$, and $\bm{W}_k$ are learned. The choice is heuristic: because the encoder and decoder states might not be directly comparable, we pass them through a small network so it can learn a meaningful notion of affinity.
+
+- The **reduction function** produces the context as a softmax-weighted average of the encoder states:
+
+$$\bm{c}_{t'} = \operatorname{softmax}(\bm{a}) \cdot [\bm{h}_1, \bm{h}_2, \dots, \bm{h}_T].$$
+
+The softmax outputs are non-negative and sum to one, so they act as the coefficients of an average over the encoder states, weighted by the affinity between the decoder query and each encoder key.
+
+One change to the decoder is needed. Previously there was a single context used only to initialize the decoder; now there is a different $\bm{c}_{t'}$ at each step, so we pass it as an additional input,
+
+$$\bm{s}_{t'} = g(\bm{s}_{t'-1}, \bm{y}_{t'-1}, \bm{c}_{t'}),$$
+
+for instance by concatenating $\bm{c}_{t'}$ with the previous output before feeding it in. This encoder–decoder RNN with attention is generally more effective for sequence-to-sequence tasks, because we no longer force all information about the input into a single state; instead we recompute a focused context at each output step.
+
+If we plot the attention weights over the input at each decoder step, we can see what the mechanism learns. For a translation, the weights tend to concentrate on the input word being translated, and shift as generation proceeds — even reordering when the languages order phrases differently, as when "European Economic Area" becomes "zone économique européenne." None of this is hard-coded; it is learned by gradient descent on the training data.
+
+---
+
+## Self-Attention {#sec-self-attention}
+
+Sequence-to-sequence RNNs with attention work, but the mechanism now dominant is **self-attention**, the core operation inside the transformer [@vaswani2017attention]. Self-attention has the same role as a recurrent layer: it takes a sequence of inputs and produces a sequence of outputs of the same length, which can be fed to a further layer. It performs this mapping not through recurrence but through an attention mechanism.
+
+::: {.definition-block}
+**Definition.** In *self-attention*, the queries, keys, and values all come from the same sequence — hence "self." Given an input sequence, we transform it three ways to produce queries, keys, and values, then use them to produce an output sequence of the same length.
+:::
+
+Let the input sequence be $\bm{x}_1, \dots, \bm{x}_T \in \mathbb{R}^m$; this may be the model's input or the output of a previous layer. We form queries, keys, and values by projecting each element through three learned weight matrices, shared across all positions:
+
+::: {.boxed-eq}
+$$\bm{q}_t = \bm{W}_Q \bm{x}_t, \qquad \bm{k}_t = \bm{W}_K \bm{x}_t, \qquad \bm{v}_t = \bm{W}_V \bm{x}_t,$$
+:::
+
+with $\bm{W}_Q, \bm{W}_K \in \mathbb{R}^{d_k \times m}$ and $\bm{W}_V \in \mathbb{R}^{d_v \times m}$, all learnable. There are $T$ queries, $T$ keys, and $T$ values. The comparison function is about as simple as possible: the dot product of the query with a key, normalized by $\sqrt{d_k}$,
+
+$$\alpha(\bm{q}, \bm{k}_i) = \frac{\bm{q}^\top \bm{k}_i}{\sqrt{d_k}}.$$
+
+The normalization keeps the scores from having an overly large range: if $\bm{q}$ and $\bm{k}_i$ have entries that are standard normal, dividing the dot product by $\sqrt{d_k}$ keeps its variance the same, by an argument much like the one used to initialize weight matrices. Because the query and key are different linear maps of the input, the dot product measures a learned compatibility between them. The reduction function is the same softmax-weighted average as before,
+
+$$f(\{\bm{v}_1, \dots, \bm{v}_T\}, \bm{a}) = \operatorname{softmax}(\bm{a}) \cdot V.$$
+
+Self-attention thus maps a length-$T$ sequence to a length-$T$ sequence: for each of the $T$ queries we compute a comparison against all keys and a reduction over all values, giving one output per position. Where a recurrent layer produced a sequence of hidden states, self-attention produces a sequence of weighted averages of the projected input.
+
+### Path length {#sec-path-length}
+
+Why is a sequence of weighted averages a reasonable thing to compute? One way to see the appeal is through **path length**, a notion close to the receptive field from Lecture 5: the number of operations required to mix information between two elements of the input. Take an input sequence of five elements and ask how many operations are needed to produce an output that depends on both $\bm{x}_1$ and $\bm{x}_5$.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 720 320" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Path length: operations to mix xₐ and x₅</text>
+<text x="30" y="70" font-size="16" font-weight="600" fill="#333">ConvNet (length-3)</text>
+<line x1="64" y1="180" x2="30" y2="250" stroke="#e53935" stroke-width="2.6"/>
+<line x1="64" y1="180" x2="64" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="64" y1="180" x2="98" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="98" y1="180" x2="64" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="98" y1="180" x2="98" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="98" y1="180" x2="132" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="132" y1="180" x2="98" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="132" y1="180" x2="132" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="132" y1="180" x2="166" y2="250" stroke="#e53935" stroke-width="2.6"/>
+<line x1="98" y1="110" x2="64" y2="180" stroke="#e53935" stroke-width="2.6"/>
+<line x1="98" y1="110" x2="98" y2="180" stroke="#aaa" stroke-width="1.2"/>
+<line x1="98" y1="110" x2="132" y2="180" stroke="#e53935" stroke-width="2.6"/>
+<circle cx="30" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="64" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="98" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="132" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="166" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="64" cy="180" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="98" cy="180" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="132" cy="180" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="98" cy="110" r="9" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="98" y="285" text-anchor="middle" font-size="15" fill="#792051" font-weight="600">path length: 2</text>
+<text x="270" y="70" font-size="16" font-weight="600" fill="#333">RNN</text>
+<line x1="255" y1="120" x2="255" y2="250" stroke="#e53935" stroke-width="2.6"/>
+<line x1="289" y1="120" x2="289" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="323" y1="120" x2="323" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="357" y1="120" x2="357" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="391" y1="120" x2="391" y2="250" stroke="#aaa" stroke-width="1.2"/>
+<line x1="255" y1="120" x2="289" y2="120" stroke="#e53935" stroke-width="2.6"/>
+<line x1="289" y1="120" x2="323" y2="120" stroke="#e53935" stroke-width="2.6"/>
+<line x1="323" y1="120" x2="357" y2="120" stroke="#e53935" stroke-width="2.6"/>
+<line x1="357" y1="120" x2="391" y2="120" stroke="#e53935" stroke-width="2.6"/>
+<circle cx="255" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="255" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="289" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="289" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="323" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="323" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="357" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="357" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="391" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="391" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="391" cy="120" r="9" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="323" y="285" text-anchor="middle" font-size="15" fill="#792051" font-weight="600">path length: 5</text>
+<text x="500" y="70" font-size="16" font-weight="600" fill="#333">Self-attention</text>
+<line x1="490" y1="250" x2="626" y2="120" stroke="#e53935" stroke-width="2.6"/>
+<line x1="524" y1="250" x2="626" y2="120" stroke="#aaa" stroke-width="1.2"/>
+<line x1="558" y1="250" x2="626" y2="120" stroke="#aaa" stroke-width="1.2"/>
+<line x1="592" y1="250" x2="626" y2="120" stroke="#aaa" stroke-width="1.2"/>
+<line x1="626" y1="250" x2="626" y2="120" stroke="#e53935" stroke-width="2.6"/>
+<circle cx="490" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="524" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="558" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="592" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="626" cy="250" r="9" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<circle cx="490" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="524" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="558" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="592" cy="120" r="9" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<circle cx="626" cy="120" r="9" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="558" y="285" text-anchor="middle" font-size="15" fill="#792051" font-weight="600">path length: 1</text>
+<text x="20" y="308" font-size="14" fill="#666">Path length is also the number of non-parallelizable steps; self-attention outputs are computed in parallel.</text>
+</svg></div>
+```
+
+For a convolutional network with length-3 kernels, one convolution produces outputs that each depend on three adjacent inputs; no single output yet depends on both $\bm{x}_1$ and $\bm{x}_5$. A second convolution bridges them, so the path length is $2$ — the same relationship between kernel size and receptive field we saw for images. For a recurrent network, the output that depends on both $\bm{x}_1$ and $\bm{x}_5$ is the one at the last step, reached after roughly five sequential updates, so the path length is $5$. For self-attention, every output is a softmax-weighted average of all the inputs, so every output already depends on every input: the path length is $1$.
+
+Path length also measures the number of operations that cannot be parallelized. In a convolutional network the second convolution must wait for the first; in a recurrent network each step waits for the previous one. In self-attention, each output is an independent weighted average of the inputs, computed without reference to the other outputs, so all outputs can be computed in parallel. This matters because the hardware we train on is built for large parallel matrix computations, so avoiding sequential dependencies is valuable.
+
+### Self-attention as matrix operations {#sec-matrix}
+
+The whole mechanism is two matrix multiplications. Stack the queries into a $T \times d_k$ matrix and the keys into a $d_k \times T$ matrix. Their product is a $T \times T$ matrix in which entry $(i, j)$ is the dot product of query $i$ with key $j$; dividing every entry by $\sqrt{d_k}$ gives the matrix of attention scores.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 720 340" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Self-attention as two matrix multiplications</text>
+<text x="20" y="58" font-size="16" font-weight="600" fill="#442079">Comparison</text>
+<rect x="60" y="72" width="42" height="84" rx="3" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="81" y="66" text-anchor="middle" font-size="13" fill="#666">d_k</text>
+<text x="52" y="118" text-anchor="end" font-size="13" fill="#666">T</text>
+<text x="81" y="174" text-anchor="middle" font-size="13" fill="#442079" font-weight="600">queries</text>
+<text x="112" y="122" font-size="20" fill="#555">×</text>
+<rect x="130" y="90" width="84" height="42" rx="3" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="172" y="84" text-anchor="middle" font-size="13" fill="#666">T</text>
+<text x="122" y="115" text-anchor="end" font-size="13" fill="#666">d_k</text>
+<text x="172" y="150" text-anchor="middle" font-size="13" fill="#205279" font-weight="600">keys</text>
+<text x="228" y="122" font-size="20" fill="#555">=</text>
+<rect x="250" y="72" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="292" y="66" text-anchor="middle" font-size="13" fill="#666">T</text>
+<text x="242" y="118" text-anchor="end" font-size="13" fill="#666">T</text>
+<text x="292" y="174" text-anchor="middle" font-size="13" fill="#792051" font-weight="600">scores</text>
+<text x="342" y="122" font-size="16" fill="#555">÷ √d_k</text>
+<text x="20" y="212" font-size="16" font-weight="600" fill="#442079">Reduction</text>
+<rect x="90" y="226" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="132" y="220" text-anchor="middle" font-size="13" fill="#666">T</text>
+<text x="82" y="272" text-anchor="end" font-size="13" fill="#666">T</text>
+<text x="132" y="328" text-anchor="middle" font-size="13" fill="#792051" font-weight="600">attention matrix</text>
+<text x="66" y="246" text-anchor="end" font-size="11" fill="#792051">softmax(</text>
+<text x="180" y="276" font-size="20" fill="#555">×</text>
+<rect x="210" y="226" width="42" height="84" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="231" y="220" text-anchor="middle" font-size="13" fill="#666">d_v</text>
+<text x="202" y="272" text-anchor="end" font-size="13" fill="#666">T</text>
+<text x="231" y="328" text-anchor="middle" font-size="13" fill="#207965" font-weight="600">values</text>
+<text x="262" y="276" font-size="20" fill="#555">=</text>
+<rect x="290" y="226" width="42" height="84" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="311" y="220" text-anchor="middle" font-size="13" fill="#666">d_v</text>
+<text x="282" y="272" text-anchor="end" font-size="13" fill="#666">T</text>
+<text x="311" y="328" text-anchor="middle" font-size="13" fill="#794520" font-weight="600">output</text>
+<text x="20" y="332" font-size="14" fill="#666">Each row of the attention matrix is a softmax; multiplying by the values gives one weighted average per position.</text>
+</svg></div>
+```
+
+For the reduction, apply a softmax to each row of the $T \times T$ matrix — turning each row of scores into non-negative weights that sum to one — to obtain the **attention matrix**. Multiplying it by the $T \times d_v$ matrix of values gives the $T \times d_v$ output: $T$ outputs, each a weighted average of the values and so of dimension $d_v$. Drawn this way, the parallelism needs no argument: it is a product of matrices.
+
+---
+
+## Position Encoding {#sec-position}
+
+There is something odd about applying self-attention to sequences. Since attention operates on sets, shuffling the keys and values leaves the output unchanged; shuffling the input sequence would produce the same output sequence, shuffled the same way. Self-attention is orderless, which makes little sense for sequences — shuffling the words of an English sentence changes, or destroys, its meaning. To process sequences, we must supply information about the position of each element.
+
+::: {.callout-note}
+**Self-attention is orderless.** As a set operation, self-attention ignores the order of its inputs, so on its own it is ill-suited to sequences. We fix this by encoding position.
+:::
+
+One original approach is to learn a vector — an **embedding** — for each sequence position, and add it to the input before applying self-attention. Since the added values are position-dependent and learned, they encode position. The trouble is extrapolation: the sequence length $T$ varies across inputs, and if we learn embeddings up to the largest length seen in training, we cannot handle a longer sequence at test time. This absolute-embedding approach is uncommon today for that reason.
+
+More common now is a **relative encoding**, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we learn a position term. Three variants:
+
+$$\text{(i)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top (\bm{k}_j + \bm{p}_{ij})}{\sqrt{d_k}}, \qquad \text{(ii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top \bm{k}_j}{\sqrt{d_k}} + p_{ij},$$
+
+where in (i) $\bm{p}_{ij} \in \mathbb{R}^{d_k}$ is a learned vector for each offset, and in (ii) $p_{ij}$ is a learned scalar acting as a relative bias that raises or lowers the score before the softmax. Both depend only on the offset $i - j$, up to a maximum beyond which a single far-apart encoding is reused, which allows extrapolation. Variant (i) is somewhat costly, requiring a learned $d_k$-dimensional vector for every offset.
+
+The third variant is **rotary position encoding** (RoPE) [@su2024roformer]. Define a rotation matrix $\bm{R}_i$ that rotates by an angle $i\theta$ for a fixed hyperparameter $\theta$, rotate the query by $i\theta$ and the key by $j\theta$, and compare:
+
+::: {.boxed-eq}
+$$\text{(iii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{(\bm{R}_i \bm{q}_i)^\top (\bm{R}_j \bm{k}_j)}{\sqrt{d_k}}, \qquad \bm{R}_i = \text{rotate by angle } i\theta.$$
+:::
+
+The difference in rotation angle, $(i - j)\theta$, tells the model how far apart the two positions are, injecting relative position information through the interaction of the rotations. Constructing the rotation matrices in detail gets into the weeds; the idea to keep in mind is that queries and keys are rotated by amounts depending on their positions, and the difference encodes the offset. RoPE is a common approach today.
+
+---
+
+## Multi-Headed Self-Attention {#sec-multihead}
+
+In a transformer, whenever we apply self-attention we do not apply it once but use a set of **heads** that attend independently and are then aggregated — much like having multiple channels in a convolutional network. The processing we want from self-attention may not be expressible with a single set of query, key, and value matrices, so we run $H$ of them in parallel.
+
+::: {.definition-block}
+**Definition.** *Multi-headed self-attention* applies $H$ independent self-attention mechanisms, each with its own $\bm{W}_Q^{(i)}, \bm{W}_K^{(i)}, \bm{W}_V^{(i)}$, and aggregates their outputs with a learned output matrix.
+:::
+
+Each head produces an output sequence
+
+$$\bm{h}^{(i)} = \operatorname{self\text{-}attention}(\bm{W}_Q^{(i)}, \bm{W}_K^{(i)}, \bm{W}_V^{(i)}, \bm{x}),$$
+
+with a different set of parameters per head. The outputs of all heads are stacked and mixed by a learned output matrix $\bm{W}_O$:
+
+::: {.boxed-eq}
+$$\text{Output} = \bm{W}_O \begin{bmatrix} \bm{h}^{(1)} \\ \bm{h}^{(2)} \\ \vdots \\ \bm{h}^{(H)} \end{bmatrix}, \qquad \bm{W}_O \in \mathbb{R}^{d_v \times H d_v}.$$
+:::
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 640 300" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="mA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Multi-headed self-attention</text>
+<rect x="260" y="244" width="120" height="34" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="320" y="266" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">input x</text>
+<rect x="60" y="140" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="115" y="162" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
+<text x="115" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 1</text>
+<line x1="320" y1="244" x2="115" y2="190" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<line x1="115" y1="140" x2="320" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="200" y="140" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="255" y="162" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
+<text x="255" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 2</text>
+<line x1="320" y1="244" x2="255" y2="190" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<line x1="255" y1="140" x2="320" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<text x="395" y="174" text-anchor="middle" font-size="22" fill="#999">···</text>
+<rect x="480" y="140" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="535" y="162" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
+<text x="535" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head H</text>
+<line x1="320" y1="244" x2="535" y2="190" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<line x1="535" y1="140" x2="320" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="250" y="74" width="140" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="320" y="96" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">W_O · concat</text>
+<line x1="320" y1="74" x2="320" y2="50" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="260" y="14" width="120" height="34" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="320" y="36" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
+<text x="20" y="292" font-size="14" fill="#666">H heads attend in parallel with separate W_Q, W_K, W_V; W_O mixes and projects their stacked outputs.</text>
+</svg></div>
+```
+
+The output matrix $\bm{W}_O$ maps from the $H$ stacked head outputs back to $d_v$-dimensional vectors, mixing information across heads, so that multi-headed self-attention still outputs $d_v$-sized vectors at each position. This is a modest change over single-head self-attention, but it lets the layer perform several kinds of processing at once. Multi-headed self-attention is a component of the transformer, which we take up next.
+
+---
+
+## Summary {#sec-summary}
+
+::: {.callout-note}
+**Key takeaways from Lecture 7:**
+
+- **Attention** is the neural-network version of an associative memory. Any attention mechanism specifies five ingredients: a **query**, **keys**, **values** (one per key), a **comparison function** scoring the query against each key, and a **reduction function** combining the values by those scores. It is an operation on sets.
+- A Python dictionary is attention with an equality comparison; a **one-nearest-neighbor classifier** is attention with a negative-distance comparison and an argmax reduction, made differentiable by replacing the argmax with a **softmax**.
+- In **sequence-to-sequence with attention**, the query is the previous decoder state, the keys and values are the encoder states, the comparison is a small learned MLP, and the reduction is a softmax-weighted average, giving a per-step context $\bm{c}_{t'}$ instead of a single fixed one.
+- **Self-attention** projects one input sequence into queries, keys, and values, compares with a scaled dot product $\bm{q}^\top \bm{k}_i / \sqrt{d_k}$, and reduces with a softmax-weighted average, mapping a length-$T$ sequence to a length-$T$ sequence. Its **path length** is $1$ and it is fully parallelizable — advantages over convolutional (path length $2$) and recurrent (path length $T$) layers.
+- Self-attention is two matrix multiplications: $\bm{Q}\bm{K}^\top / \sqrt{d_k}$ gives the scores, and a row-wise softmax times $V$ gives the output.
+- Because self-attention is **orderless**, sequences require **position encodings** — absolute learned embeddings (which cannot extrapolate) or relative encodings, including **RoPE**, which rotates queries and keys by position-dependent angles.
+- **Multi-headed self-attention** runs $H$ attention mechanisms in parallel and combines them with a learned output matrix.
+:::
+
+**Next lecture:** The transformer - how multi-headed self-attention, position encodings, residual connections, and normalization combine into the architecture that has become standard across sequences, images, and beyond.

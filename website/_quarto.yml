@@ -22,6 +22,7 @@ book:
     - lectures/04-gradient-descent-adaptive-gradient-methods.qmd
     - lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.qmd
     - lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.qmd
+    - lectures/07-attention.qmd
 
 format:
   html:
