@@ -226,3 +226,4 @@ website/_site/
 website/.quarto/
 **/*.quarto_ipynb
 .claude
+lecture_notes/*

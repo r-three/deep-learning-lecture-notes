@@ -1,0 +1,446 @@
+---
+title: "Lecture 8: Transformers, Part 1"
+description: "Assembling the transformer from familiar ingredients: self-attention, layer normalization, residual connections, and position-wise feed-forward networks; the transformer layer block and five common modifications; encoder-only transformers; and pre-training with masked language modeling (BERT)."
+bibliography: references.bib
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 8: Transformers, Part 1</h1>
+</div>
+```
+
+**Overview.** Self-attention (Lecture 7) is associated with a neural network architecture in the same way a convolution is associated with a convolutional network: the architecture is the **transformer** [@vaswani2017attention]. We have already seen almost all of its ingredients, so we first list them — adding one new piece, layer normalization — and describe how they are stitched into a repeating transformer layer block. We then survey five modifications to that block that have become common since the transformer was proposed. Finally we turn to what a transformer can do: the encoder-only transformer for classifying, labeling, and extracting from sequences, and the idea of pre-training, culminating in masked language modeling and BERT.
+
+## The Transformer's Ingredients {#sec-ingredients}
+
+We already know almost everything needed to build a transformer, so much of this section is a review; we mainly need to write the pieces down and add one new one. The first ingredient is **self-attention**, covered at the end of Lecture 7. Given an input sequence $\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T \in \mathbb{R}^d$, self-attention projects each element three ways, using learned matrices, into queries, keys, and values:
+
+$$\bm{q}_t = \bm{W}_Q \bm{x}_t, \qquad \bm{k}_t = \bm{W}_K \bm{x}_t, \qquad \bm{v}_t = \bm{W}_V \bm{x}_t,$$
+
+with $\bm{W}_Q, \bm{W}_K \in \mathbb{R}^{d_k \times d}$ and $\bm{W}_V \in \mathbb{R}^{d_v \times d}$; these three matrices are the only trainable parameters. Each projection is applied independently to every element of the sequence, so the whole operation is parallel across positions. The comparison function is the scaled dot product,
+
+$$a_{ij} = \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top \bm{k}_j}{\sqrt{d_k}},$$
+
+and the reduction function applies a softmax to the scores and averages the values, $\operatorname{softmax}(\bm{a}) \cdot V$. Every output element is a softmax-weighted average of the values.
+
+Because self-attention is a set operation, it ignores the order of the input sequence, so the second ingredient is a **position encoding** to inject order — absolute learned embeddings, relative encodings with an embedding or a bias, or rotary encodings (RoPE), all from Lecture 7. The third ingredient is **multi-headed self-attention**: rather than one self-attention, apply $H$ in parallel with independent query, key, and value matrices and project the concatenated results back to $\mathbb{R}^{d_v}$ with an output matrix $\bm{W}_O$, much as a convolutional network uses multiple channels.
+
+### Layer normalization {#sec-layernorm}
+
+The one genuinely new ingredient is **layer normalization** [@ba2016layer]. Recall batch normalization (Lecture 5): it made a layer's activations approximately zero-mean and unit-variance so their scale would not grow or shrink through the forward and backward passes, but it computed the mean and variance over the batch — so the processing of one example depended on the others in the batch, which is undesirable. Layer normalization makes a very small change: normalize each activation by the statistics of its own feature vector rather than the batch.
+
+::: {.definition-block}
+**Definition.** *Layer normalization* normalizes each element of a sequence over its feature dimension. Given a length-$T$ sequence $\bm{h}_1, \dots, \bm{h}_T \in \mathbb{R}^d$, it computes, for each step $t$,
+$$\mu_t = \frac{1}{d} \sum_{i=1}^{d} h_{t,i}, \qquad \sigma_t = \sqrt{\frac{1}{d} \sum_{i=1}^{d} (h_{t,i} - \mu_t)^2},$$
+the mean and standard deviation over the $d$ feature values, and outputs
+$$\operatorname{layernorm}(\bm{h})_t = \bm{\gamma} \odot \frac{\bm{h}_t - \mu_t}{\sigma_t} + \bm{\beta}.$$
+:::
+
+As in batch normalization, $\bm{\gamma}$ and $\bm{\beta}$ are learned parameters that let the model rescale and shift the normalized activation rather than forcing it to be exactly zero-mean and unit-variance. The only difference from batch normalization is the axis over which the statistics are computed — the feature axis instead of the batch axis. This normalizing each feature vector on its own assumes the features are distributed the same way; that assumption is not really valid, but the normalization is helpful for training, and normalizing over the batch is the alternative we already rejected.
+
+### The remaining ingredients {#sec-remaining}
+
+The fourth ingredient is the **residual connection** from Lecture 5: for a transformation $f$, replace $f(\bm{x})$ with $f(\bm{x}) + \bm{x}$, adding a skip path from input to output that helps stabilize training and lets gradients flow.
+
+The fifth is the **position-wise feed-forward network**. Just as the query, key, and value projections are applied independently to each element of the sequence, a position-wise feed-forward network applies a whole small MLP independently to each element. Using a single hidden layer,
+
+$$\bm{h}_t = \bm{W}_2\, \phi(\bm{W}_1 \bm{x}_t + \bm{b}_1) + \bm{b}_2,$$
+
+with a nonlinearity $\phi$ such as a ReLU, which is what the original transformer used. This is an ordinary MLP; the only twist is that we feed each sequence element through it separately, hence "position-wise."
+
+The last ingredients are the **embeddings** for the input (Lecture 6) and, since we usually do something classification-like, a **classifier** on the output.
+
+That is the full set. Layer normalization is a small tweak on batch normalization, and the position-wise feed-forward network is a small tweak on an ordinary MLP; everything else we have seen before.
+
+---
+
+## The Transformer Layer Block {#sec-block}
+
+As with the ResNet block (Lecture 5), we assemble the ingredients into a block and repeat it. The transformer is unusually uniform: where a convolutional network began with a large convolution and pooling and ended with global pooling, the transformer is just the same block, in the same dimensions, over and over, between input embeddings and an output.
+
+::: {.algorithm}
+#### Transformer layer block
+
+**Input:** a sequence. Apply, in order:
+
+1. Multi-headed self-attention, wrapped in a residual connection, then layer normalization.
+2. A position-wise feed-forward network, wrapped in a residual connection, then layer normalization.
+
+**Output:** a sequence of the same length. Repeat the block $L$ times, each with its own parameters.
+:::
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 760 220" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="bA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Transformer layer block</text>
+<text x="24" y="119" font-size="14" fill="#205279" font-weight="600">input</text>
+<line x1="66" y1="114.0" x2="88" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"/>
+<rect x="88" y="90" width="92" height="48" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="134" y="119" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">MHSA</text>
+<line x1="180" y1="114.0" x2="198" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"/>
+<circle cx="211" cy="114.0" r="13" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="211" y="119" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="224" y1="114.0" x2="242" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"/>
+<rect x="242" y="90" width="70" height="48" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="277" y="118" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">layer norm</text>
+<line x1="312" y1="114.0" x2="330" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"/>
+<rect x="330" y="90" width="88" height="48" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="374" y="119" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">FFN</text>
+<line x1="418" y1="114.0" x2="436" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"/>
+<circle cx="449" cy="114.0" r="13" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="449" y="119" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="462" y1="114.0" x2="480" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"/>
+<rect x="480" y="90" width="70" height="48" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="515" y="118" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">layer norm</text>
+<line x1="550" y1="114.0" x2="574" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"/>
+<text x="576" y="119" font-size="14" fill="#794520" font-weight="600">out</text>
+<path d="M80,84 Q80,60 146,60 Q211,60 211,101.0" fill="none" stroke="#8457C7" stroke-width="1.6" marker-end="url(#bA)"/>
+<path d="M322,84 Q322,60 386,60 Q449,60 449,101.0" fill="none" stroke="#8457C7" stroke-width="1.6" marker-end="url(#bA)"/>
+<path d="M66,150 L66,160 L550,160 L550,150" fill="none" stroke="#888" stroke-width="1.2"/>
+<text x="308" y="178" text-anchor="middle" font-size="14" fill="#666">repeat L times</text>
+<text x="20" y="200" font-size="13" fill="#666">Purple arcs are residual (skip) connections. Only self-attention mixes information across positions.</text>
+</svg></div>
+```
+
+Stacking $L$ blocks gives the transformer. Each block has its own parameters — the query/key/value projections and output matrix of multi-headed self-attention, the $\bm{\gamma}$ and $\bm{\beta}$ of the layer norms, and the weights and biases of the feed-forward network — but the structure is identical, and the dimension along the stack, often called $d_{\text{model}}$, does not change. Why residual connections and layer norms sit exactly where they do is a matter of trial and error and empirical results; this is the original arrangement, and we return to variations below.
+
+What does the transformer actually do? Of its parts, only self-attention combines information across positions — through the softmax-weighted average, it mixes information over time. The layer norm and the position-wise feed-forward network do not: each acts on one position independently, so shuffling their input sequence would simply shuffle the output the same way. The residual connections and layer norms are there mainly for stability, to let us stack many blocks and still backpropagate gradients effectively; the feed-forward networks transform each activation independently.
+
+::: {.callout-note}
+**On the name.** "Transformer" is a generic name — many things transform things. The explanation offered for it is that the architecture transforms sequences: self-attention mixes information across a sequence to produce a new one.
+:::
+
+Every part of the block is parallelizable over time. The position-wise feed-forward network and the layer norm compute each position independently, and multi-headed self-attention computes each output position independently as well: to produce output $\bm{h}_t$ one does not need any other output position, only the full input sequence. The transformer was introduced as an alternative to recurrent networks precisely for this reason. A recurrent network is inherently sequential — computing $\bm{h}_t$ requires $\bm{h}_{t-1}$, and so on — which limits parallelism and makes propagating information over time require repeated recurrent steps, whereas a transformer bridges positions with a single application of self-attention.
+
+::: {.callout-note}
+**A stable architecture.** The transformer was proposed in 2017. In the years since, the architecture has changed remarkably little — a transformer trained today looks much like the original, in contrast to the rapid churn of convolutional and recurrent architectures in the years before it. The modifications below are the changes that have gained traction; even so, a transformer built exactly as originally proposed would still work.
+:::
+
+---
+
+## Transformer Block Modifications {#sec-modifications}
+
+Five modifications to the transformer block have become common enough to be worth knowing. Together they cover most of the differences between the original transformer and current models.
+
+### 1. Layer norm position {#sec-mod-ln}
+
+In the original block, each layer norm comes *after* a residual connection wrapped around some nonlinear processing; this is now called **post-layer norm**. The alternative, **pre-layer norm**, puts the layer norm *before* the processing. The consequential part is not the reordering itself but that the residual connection is then routed *around* the layer norm.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 760 300" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="pA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Layer norm position: post-LN vs pre-LN</text>
+<text x="20" y="78" font-size="14" font-weight="600" fill="#792051">post-LN</text>
+<line x1="92" y1="80.0" x2="108" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="108" y="60" width="72" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="144" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">MHSA</text>
+<line x1="180" y1="80.0" x2="194" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<circle cx="206" cy="80.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="206" y="85" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="218" y1="80.0" x2="232" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="232" y="60" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="264" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="296" y1="80.0" x2="310" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="310" y="60" width="64" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="342" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">FFN</text>
+<line x1="374" y1="80.0" x2="388" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<circle cx="400" cy="80.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="400" y="85" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="412" y1="80.0" x2="426" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="426" y="60" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="458" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="490" y1="80.0" x2="506" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<path d="M100,56 Q100,38 153,38 Q206,38 206,69.0" fill="none" stroke="#8457C7" stroke-width="1.5" marker-end="url(#pA)"/>
+<path d="M302,56 Q302,38 351,38 Q400,38 400,69.0" fill="none" stroke="#8457C7" stroke-width="1.5" marker-end="url(#pA)"/>
+<text x="20" y="208" font-size="14" font-weight="600" fill="#207965">pre-LN</text>
+<line x1="92" y1="210.0" x2="108" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="108" y="190" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="140" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="172" y1="210.0" x2="186" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="186" y="190" width="72" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="222" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">MHSA</text>
+<line x1="258" y1="210.0" x2="272" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<circle cx="284" cy="210.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="284" y="215" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="296" y1="210.0" x2="310" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="310" y="190" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="342" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="374" y1="210.0" x2="388" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<rect x="388" y="190" width="64" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="420" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">FFN</text>
+<line x1="452" y1="210.0" x2="466" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<circle cx="478" cy="210.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="478" y="215" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="490" y1="210.0" x2="506" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"/>
+<path d="M98,186 Q98,166 191,166 Q284,166 284,199.0" fill="none" stroke="#8457C7" stroke-width="2" marker-end="url(#pA)"/>
+<path d="M298,186 Q298,166 388,166 Q478,166 478,199.0" fill="none" stroke="#8457C7" stroke-width="2" marker-end="url(#pA)"/>
+<text x="20" y="285" font-size="13" fill="#666">Pre-LN routes the residual around the layer norm, leaving an uninterrupted residual stream (bold purple).</text>
+</svg></div>
+```
+
+With pre-layer norm there is a path from the output all the way back to the input with no processing on it at all — an **uninterrupted residual stream**. This relies on a convention we have only stated in passing: the output dimension of multi-headed self-attention is set equal to the input dimension $d$ (the $d_{\text{model}}$ above), so, together with layer norm and a feed-forward network that also preserve the dimension, no projection is needed on the residual path and it stays clean. A clean residual path lets gradients backpropagate from output to input directly, which may help train deeper and more stable models. Whether pre- or post-layer norm trains better is hard to state definitively, since training stability depends on initialization, optimizer, and hyperparameters; but pre-layer norm blocks have become more common. One consequence is worth noting: since the residual stream is uninterrupted and begins at the embeddings, the transformer effectively takes the embeddings, computes something from them, adds it back, and repeats — incremental processing of a running representation rather than wholesale replacement.
+
+### 2. Removal of biases {#sec-mod-bias}
+
+The block has biases in two places: the feed-forward network and the layer norm. Dropping the feed-forward biases gives $\bm{W}_2\, \phi(\bm{W}_1 \bm{x}_t)$; dropping the layer-norm bias $\bm{\beta}$ gives $\bm{\gamma} \odot (\bm{h}_t - \mu_t)/\sigma_t$, which is called **RMSNorm** [@zhang2019root], since it divides by a root-mean-square quantity. If a model with biases and a model without them work about the same, the one without is preferable — fewer parameters and slightly cheaper. In practice removing the biases does not hurt, plausibly because a transformer can build a constant feature that acts as a bias when it meets a weight matrix, or because the many layer norms make biases redundant. This change is widespread.
+
+### 3. Gated feed-forward networks {#sec-mod-glu}
+
+The third change replaces the feed-forward network's nonlinearity with a **gated linear unit**, a class of nonlinearities rather than a single one. Assuming no biases, the gated feed-forward network is
+
+::: {.boxed-eq}
+$$\bm{W}_3\big(\phi(\bm{W}_2 \bm{x}_t) \odot \bm{W}_1 \bm{x}_t\big),$$
+:::
+
+where $\bm{W}_1 \bm{x}_t$ is a plain linear transformation, $\phi(\bm{W}_2 \bm{x}_t)$ is a second linear transformation passed through a nonlinearity, the two are multiplied element-wise (the "gating"), and $\bm{W}_3$ projects the result to the output [@shazeer2020glu]. The nonlinearity people most often use is **Swish**, applied element-wise as $\phi(x) = x\,\sigma(x)$. Recall that multiplying $x$ by the Heaviside step function would give a ReLU; a sigmoid is a soft step, so Swish looks like a soft ReLU — dipping slightly negative before rising. A gated feed-forward network with a Swish nonlinearity is often called a **SwiGLU**. Unlike the previous two changes, switching to a gated linear unit does seem to produce better models, so it is now widely used.
+
+### 4. Sub-quadratic self-attention {#sec-mod-subquadratic}
+
+Self-attention is quadratic in the sequence length: it computes a query–key dot product for every pair of positions, $T \times T$ of them. This is a modification people sometimes make and sometimes do not, and it helps to see why it is often unnecessary before seeing what it is.
+
+Two observations temper the concern. First, for typical transformer dimensions — the width $d_{\text{model}}$ along the residual stream and the hidden width $d_{\text{ff}}$ of the feed-forward networks — and modest sequence lengths (say $T < 1000$), the compute spent in the feed-forward networks is much greater than the compute spent in multi-headed self-attention; the quadratic term is not where most of the cost is. Second, the quadratic *memory* cost of materializing the $T \times T$ attention matrices — $L \times H \times T \times T$ values across $L$ blocks and $H$ heads — can be avoided by being careful about where intermediate values are stored on the hardware. On a GPU, moving data between the large VRAM and the small on-chip SRAM is far more expensive than the arithmetic itself, and by never materializing the full attention matrices — computing serially and keeping the working set small — the communication cost is controlled. This is **Flash Attention** [@dao2022flashattention].
+
+For sequences that are not modest — a document of many thousands of words — the quadratic time cost does matter, and there are many approaches to it. The simplest is **local self-attention**: rather than attending globally, where every output depends on every input, attend only over a window around the current position. Drawn as a $T \times T$ attention matrix, only a band around the diagonal is computed, so the cost becomes roughly $K \cdot T$ for a window of width $K$ — linear. This resembles a convolution, though it is not one: within the window it still computes a softmax-weighted average over query–key dot products rather than applying a fixed kernel. What is lost is global visibility: the path length is no longer $1$ but grows as in a convolutional network. To keep long-range dependencies reachable, a common pattern interleaves mostly local blocks with the occasional global one.
+
+### 5. Grouped-query attention {#sec-mod-gqa}
+
+Recall that multi-headed self-attention gives every head its own queries, keys, and values, via $H$ separate query, key, and value matrices. Two relaxations reduce the number of distinct keys and values.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 720 300" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Multi-head → multi-query → grouped-query attention</text>
+<text x="24" y="91" font-size="13" fill="#207965" font-weight="600">values</text>
+<text x="24" y="143" font-size="13" fill="#205279" font-weight="600">keys</text>
+<text x="24" y="195" font-size="13" fill="#442079" font-weight="600">queries</text>
+<text x="140" y="56" text-anchor="middle" font-size="16" font-weight="600" fill="#333">MHSA</text>
+<rect x="96" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"/>
+<rect x="118" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"/>
+<rect x="140" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"/>
+<rect x="162" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"/>
+<rect x="96" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<rect x="118" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<rect x="140" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<rect x="162" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<rect x="96" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="118" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="140" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="162" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<text x="140" y="226" text-anchor="middle" font-size="12" fill="#666">heads</text>
+<text x="374" y="56" text-anchor="middle" font-size="16" font-weight="600" fill="#333">MQA</text>
+<rect x="363.0" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"/>
+<rect x="363.0" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<rect x="330" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="352" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="374" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="396" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<text x="374" y="226" text-anchor="middle" font-size="12" fill="#666">heads</text>
+<text x="596" y="56" text-anchor="middle" font-size="16" font-weight="600" fill="#333">GQA</text>
+<rect x="563.0" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"/>
+<rect x="607.0" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"/>
+<rect x="563.0" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<rect x="607.0" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"/>
+<rect x="552" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="574" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="596" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<rect x="618" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"/>
+<text x="596" y="226" text-anchor="middle" font-size="12" fill="#666">heads</text>
+<text x="20" y="290" font-size="13" fill="#666">GQA uses G groups of keys/values (here 2) with a separate query per head; G=1 is MQA, G=H is MHSA.</text>
+</svg></div>
+```
+
+**Multi-query attention** keeps a different query per head but shares a single set of keys and values across all heads [@shazeer2019fast]. This saves some compute, since the input is projected to keys and values only once, and — more importantly on hardware — it reduces how many distinct objects must be stored and moved in memory, which is especially beneficial for autoregressive prediction (Lecture 9). It does produce models that work slightly worse, since sharing all keys and values may be too strong an assumption. **Grouped-query attention** relaxes this: instead of one shared set of keys and values, use $G$ groups, each with its own keys and values, while keeping a separate query per head [@ainslie2023gqa]. With $H$ heads and $G$ groups (where $G$ divides $H$), $G = 1$ is multi-query attention and $G = H$ is ordinary multi-headed self-attention, so the number of groups interpolates between them, recovering most of the speed and memory benefit with less loss in quality.
+
+::: {.callout-note}
+**A common origin.** Several of these modifications — gated linear units, RMSNorm, multi-query attention, and relative attention biases — trace to the same researcher, Noam Shazeer.
+:::
+
+---
+
+## Encoder-Only Transformers {#sec-encoder-only}
+
+We can now build transformers, but not yet do anything with them. The transformer was originally proposed with an encoder–decoder architecture, like the encoder–decoder RNN of Lecture 6, but the simplest way to use one is the **encoder-only transformer** — so named because it uses only the encoder part of that original design.
+
+::: {.definition-block}
+**Definition.** An *encoder-only transformer*, or *encoder*, is a transformer layer block repeated $L$ times. It takes an input sequence of length $T$ and produces an output sequence of length $T$.
+:::
+
+Because the input and output sequences have the same length, with a one-to-one correspondence between positions, an encoder supports the same kinds of tasks as a recurrent network that maps a length-$T$ sequence to a length-$T$ sequence.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 720 340" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="tA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Uses of an encoder-only transformer</text>
+<rect x="40" y="64" width="250" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="165" y="91" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<text x="48" y="126" font-size="12" fill="#205279">the</text>
+<line x1="56" y1="108" x2="56" y2="110" stroke="#bbb" stroke-width="1"/>
+<text x="96" y="126" font-size="12" fill="#205279">food</text>
+<line x1="104" y1="108" x2="104" y2="110" stroke="#bbb" stroke-width="1"/>
+<text x="144" y="126" font-size="12" fill="#205279">was</text>
+<line x1="152" y1="108" x2="152" y2="110" stroke="#bbb" stroke-width="1"/>
+<text x="192" y="126" font-size="12" fill="#205279">good</text>
+<line x1="200" y1="108" x2="200" y2="110" stroke="#bbb" stroke-width="1"/>
+<text x="240" y="126" font-size="12" fill="#205279">[CLS]</text>
+<line x1="248" y1="108" x2="248" y2="110" stroke="#bbb" stroke-width="1"/>
+<rect x="232" y="30" width="70" height="26" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="267" y="47" text-anchor="middle" font-size="11" font-weight="600" fill="#792051">classifier</text>
+<line x1="280" y1="64" x2="280" y2="56" stroke="#888" stroke-width="1.5" marker-end="url(#tA)"/>
+<text x="330" y="90" font-size="15" fill="#333">sequence classification</text>
+<rect x="40" y="170" width="250" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="165" y="197" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<text x="150" y="160" font-size="12" fill="#794520">start   end</text>
+<line x1="52" y1="170" x2="52" y2="162" stroke="#bbb" stroke-width="1"/>
+<line x1="82" y1="170" x2="82" y2="162" stroke="#bbb" stroke-width="1"/>
+<line x1="112" y1="170" x2="112" y2="162" stroke="#bbb" stroke-width="1"/>
+<line x1="142" y1="170" x2="142" y2="162" stroke="#bbb" stroke-width="1"/>
+<line x1="172" y1="170" x2="172" y2="162" stroke="#bbb" stroke-width="1"/>
+<line x1="202" y1="170" x2="202" y2="162" stroke="#bbb" stroke-width="1"/>
+<line x1="232" y1="170" x2="232" y2="162" stroke="#bbb" stroke-width="1"/>
+<line x1="262" y1="170" x2="262" y2="162" stroke="#bbb" stroke-width="1"/>
+<text x="48" y="232" font-size="12" fill="#205279">question</text>
+<text x="160" y="232" font-size="12" fill="#205279">context</text>
+<line x1="52" y1="214" x2="52" y2="216" stroke="#bbb" stroke-width="1"/>
+<line x1="82" y1="214" x2="82" y2="216" stroke="#bbb" stroke-width="1"/>
+<line x1="112" y1="214" x2="112" y2="216" stroke="#bbb" stroke-width="1"/>
+<line x1="142" y1="214" x2="142" y2="216" stroke="#bbb" stroke-width="1"/>
+<line x1="172" y1="214" x2="172" y2="216" stroke="#bbb" stroke-width="1"/>
+<line x1="202" y1="214" x2="202" y2="216" stroke="#bbb" stroke-width="1"/>
+<line x1="232" y1="214" x2="232" y2="216" stroke="#bbb" stroke-width="1"/>
+<line x1="262" y1="214" x2="262" y2="216" stroke="#bbb" stroke-width="1"/>
+<text x="330" y="196" font-size="15" fill="#333">span extraction</text>
+<rect x="40" y="276" width="250" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="165" y="303" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<text x="52" y="268" font-size="11" fill="#794520">article</text>
+<line x1="58" y1="276" x2="58" y2="270" stroke="#bbb" stroke-width="1"/>
+<text x="108" y="268" font-size="11" fill="#794520">noun</text>
+<line x1="114" y1="276" x2="114" y2="270" stroke="#bbb" stroke-width="1"/>
+<text x="164" y="268" font-size="11" fill="#794520">verb</text>
+<line x1="170" y1="276" x2="170" y2="270" stroke="#bbb" stroke-width="1"/>
+<text x="220" y="268" font-size="11" fill="#794520">adj</text>
+<line x1="226" y1="276" x2="226" y2="270" stroke="#bbb" stroke-width="1"/>
+<text x="52" y="338" font-size="12" fill="#205279">the</text>
+<line x1="58" y1="320" x2="58" y2="322" stroke="#bbb" stroke-width="1"/>
+<text x="108" y="338" font-size="12" fill="#205279">food</text>
+<line x1="114" y1="320" x2="114" y2="322" stroke="#bbb" stroke-width="1"/>
+<text x="164" y="338" font-size="12" fill="#205279">was</text>
+<line x1="170" y1="320" x2="170" y2="322" stroke="#bbb" stroke-width="1"/>
+<text x="220" y="338" font-size="12" fill="#205279">good</text>
+<line x1="226" y1="320" x2="226" y2="322" stroke="#bbb" stroke-width="1"/>
+<text x="330" y="302" font-size="15" fill="#333">sequence labeling</text>
+</svg></div>
+```
+
+- **Sequence classification.** Append a special **CLS token** to the input — for example, "the food was good `<CLS>`" — and feed the output vector at that position into a classifier. The CLS position acts as a summary of the whole sequence, as the final hidden state did for a recurrent classifier (Lecture 6). This supports tasks such as sentiment analysis.
+- **Span extraction.** Given a question followed by a context paragraph, and knowing the answer appears in the context, classify each output position as the start of the answer span, the end, or neither. For "so-and-so was born in 1953" with the question "when was so-and-so born?", the model marks the start and end of "1953." Nothing new is generated; a region of the input is identified.
+- **Sequence labeling.** Output a label for every input position — for instance, part-of-speech tags: "the" is an article, "food" a noun, "was" a verb, "good" an adjective.
+
+An encoder-only transformer cannot generate a new sequence of a different length, but it can classify a whole sequence, label each position, or extract a span.
+
+---
+
+## Pre-Training {#sec-pretraining}
+
+One more ingredient matters when working with transformers, though it is not architectural: **pre-training**. Suppose we care about a task, such as sentiment classification, and can collect some labeled data for it. Language is complicated, and even all the labeled data we have may not be enough to train a good model. Pre-training improves performance without collecting more labeled data for the target task.
+
+::: {.definition-block}
+**Definition.** *Pre-training* is the first step of *transfer learning*: train the model on one task, then continue training — *fine-tune* — on the target task, which may have far less labeled data.
+:::
+
+Why should this help? The transformer has a **limited inductive bias**. A convolutional network's inductive bias is locality and translation invariance; a recurrent network's is that each position depends on everything before it. The transformer says only that every output may depend on every input — a weak assumption. Whatever structure the target problem has, the model must learn it from the target data: for sentiment analysis on English text, it would have to learn the grammar of English and the meaning of words from the labeled sentiment data alone. Pre-training can instead teach that structure — the meaning of words, how grammar works — beforehand, relieving the pressure on the small target dataset. Often this structure can be learned from a large, data-rich, and possibly **unlabeled** task, where "unlabeled" means we did not pay anyone to annotate it — text collected from the internet, for instance. Empirically, pre-training done well can improve performance, use less labeled data, and converge faster.
+
+### Pre-training on text with language modeling {#sec-pretraining-how}
+
+For images, the long-standing recipe was to pre-train a convolutional network on a large generic classification task such as ImageNet — around a million images across a thousand classes — then discard the classification head, attach a new one, and fine-tune on the target task. Text has no such giant labeled dataset, but there is an enormous amount of unlabeled text. We have already seen a way to train a model on unlabeled text: **language modeling** (Lecture 6), predicting the next token,
+
+$$p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1),$$
+
+which conditions on the past and requires no additional labels — given a trillion words of text, we can train a language model on all of them.
+
+Autoregressive next-token prediction is not the only option. Since the joint probability of a sequence can be decomposed in any order (Lecture 6), we can train a model to condition on more of the sequence. In the extreme, we predict a token given *every other token* in the sequence — the full past and future, everything except the token itself — which is **masked language modeling**:
+
+::: {.boxed-eq}
+$$p(\bm{x}_t \mid \bm{x}_T, \bm{x}_{T-1}, \dots, \bm{x}_{t+1}, \bm{x}_{t-1}, \dots, \bm{x}_1).$$
+:::
+
+This is a valid distribution to model and needs no additional labels. Modeling it requires bidirectionality — conditioning on both sides of a position — which an encoder-only transformer has built in, since every output position already depends on every input position.
+
+### BERT {#sec-bert}
+
+There is a wrinkle: if we feed the full input sequence in and ask the model to predict a token given every other token, the model can see the answer, because we fed it in. The model that popularized masked language modeling for pre-training, **BERT** (Bidirectional Encoder Representations from Transformers) [@devlin2019bert], addresses this by corrupting the input first.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 270" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="mkA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">BERT: masked language modeling</text>
+<rect x="60" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="100" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">the</text>
+<rect x="155" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="195" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">cat</text>
+<rect x="250" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="290" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">sat</text>
+<rect x="345" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="385" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">on</text>
+<rect x="440" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="480" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">the</text>
+<rect x="535" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="575" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">mat</text>
+<text x="345" y="116" text-anchor="middle" font-size="15" fill="#555">mask 15%</text>
+<rect x="60" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="100" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">the</text>
+<rect x="155" y="112" width="80" height="30" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="195" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">[MASK]</text>
+<rect x="250" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="290" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">sat</text>
+<rect x="345" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="385" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">on</text>
+<rect x="440" y="112" width="80" height="30" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="480" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">[MASK]</text>
+<rect x="535" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="575" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">mat</text>
+<rect x="60" y="176" width="560" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="340" y="201" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<line x1="100" y1="142" x2="100" y2="176" stroke="#bbb" stroke-width="1"/>
+<line x1="195" y1="142" x2="195" y2="176" stroke="#bbb" stroke-width="1"/>
+<line x1="290" y1="142" x2="290" y2="176" stroke="#bbb" stroke-width="1"/>
+<line x1="385" y1="142" x2="385" y2="176" stroke="#bbb" stroke-width="1"/>
+<line x1="480" y1="142" x2="480" y2="176" stroke="#bbb" stroke-width="1"/>
+<line x1="575" y1="142" x2="575" y2="176" stroke="#bbb" stroke-width="1"/>
+<rect x="155" y="232" width="80" height="30" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="195" y="251" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">cat</text>
+<line x1="195" y1="216" x2="195" y2="232" stroke="#bbb" stroke-width="1"/>
+<rect x="440" y="232" width="80" height="30" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="480" y="251" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">the</text>
+<line x1="480" y1="216" x2="480" y2="232" stroke="#bbb" stroke-width="1"/>
+<text x="470" y="254" font-size="13" fill="#666">predict masked tokens</text>
+</svg></div>
+```
+
+BERT masks some input tokens and trains the model to predict them. Given "the cat sat on the mat," it masks tokens to produce "the [MASK] sat on [MASK] mat," and trains the encoder to maximize the probability of the missing tokens — that $\bm{x}_2$ is "cat" and $\bm{x}_5$ is "the" — given the corrupted sequence. This is not quite the masked language modeling objective above, which conditions on *every* other token: because more than one token is masked at a time, each prediction conditions on almost all the others. Masking one token at a time would match the objective exactly but would train the model to predict only one token per sequence, which is inefficient; masking more lets each sequence supply more predictions. BERT masks 15% of tokens.
+
+In implementation this is exactly the **sequence labeling** task from above, applied at the masked positions: with a vocabulary of $|V|$ words, predicting the missing token is $|V|$-way classification, one label per masked position. Pre-training an encoder this way yields parameters that serve as an initialization for fine-tuning on a target task — sentiment analysis, span extraction, part-of-speech tagging — with better performance, less labeled data, and faster convergence.
+
+Why does masked language modeling teach the structure of language? To fill in a missing word, the model must use the meaning of the surrounding words: to complete "the [MASK] was fluffy and purring," it needs to know that a fluffy, purring thing is likely a cat; to recover "on" in "the cat sat [MASK] the mat," it needs to know that a mat is something things sit *on*. Filling in words thus forces the model to learn about word meaning and grammar. Analyses of a pre-trained BERT bear this out: individual attention heads learn interpretable patterns — one head has direct objects attending to their verbs, another has noun modifiers attending to their nouns — accurate enough that thresholding the attention weights recovers such relations well above chance [@clark2019what]. None of this is supervised; it emerges from masked language modeling alone.
+
+---
+
+## Summary {#sec-summary}
+
+::: {.callout-note}
+**Key takeaways from Lecture 8:**
+
+- The **transformer** is built from self-attention, position encodings, multi-headed self-attention, **layer normalization** (which normalizes over the feature axis rather than the batch axis, unlike batch norm), residual connections, position-wise feed-forward networks, and embeddings plus a classifier.
+- The **transformer layer block** applies multi-headed self-attention (with a residual connection and layer norm) then a position-wise feed-forward network (with a residual connection and layer norm), and is repeated $L$ times. Only self-attention mixes information across positions; the whole block is parallelizable over time, which motivated the transformer as an alternative to recurrent networks.
+- Five common **modifications**: pre-layer norm (an uninterrupted residual stream), removing biases (**RMSNorm**), gated feed-forward networks (**SwiGLU**), sub-quadratic self-attention (Flash Attention for memory, local attention for long sequences), and **grouped-query attention** (interpolating between multi-head and multi-query).
+- An **encoder-only transformer** maps a length-$T$ sequence to a length-$T$ sequence and supports sequence classification (via a CLS token), span extraction, and sequence labeling.
+- **Pre-training** is the first step of transfer learning; it helps because the transformer has a limited inductive bias, and structure can be learned from large, possibly unlabeled data. For text, one pre-trains with **language modeling** or **masked language modeling**.
+- **BERT** implements masked language modeling by masking 15% of tokens and predicting them — sequence labeling on the masked positions — teaching the model word meaning and grammar without supervision.
+:::
+
+**Next lecture:** Transformers, part 2 - encoder–decoder and decoder-only transformers, and how they are used for autoregressive language modeling and generation.
