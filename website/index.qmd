@@ -65,12 +65,12 @@ prerequisites for the undergraduate version of this course, see
 | 1 | [Class introduction; linear & logistic regression](lectures/01-intro-regression.qmd) |
 | 2 | [Multilayer perceptrons, backpropagation](lectures/02-mlp-backprop.qmd) |
 | 3 | [Under/overfitting, regularization, numerical stability, autodiff](lectures/03-regularization.qmd) |
-| 4 | Gradient descent, adaptive gradient methods |
-| 5 | Convolutional neural networks, batch/layer normalization, residual connections |
-| 6 | Sequences, recurrent neural networks, and sequence-to-sequence learning |
-| 7 | Attention |
-| 8 | Transformers part 1 |
-| 9 | Transformers part 2, large language models |
+| 4 | [Gradient descent, adaptive gradient methods](lectures/04-gradient-descent-adaptive-gradient-methods.qmd) |
+| 5 | [Convolutional neural networks, batch/layer normalization, residual connections](lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.qmd) |
+| 6 | [Sequences, recurrent neural networks, and sequence-to-sequence learning](lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.qmd) |
+| 7 | [Attention](lectures/07-attention.qmd) |
+| 8 | [Transformers part 1](lectures/08-transformers-part-1.qmd) |
+| 9 | [Transformers part 2, large language models](lectures/09-transformers-part-2-large-language-models.qmd) |
 | 10 | Architecture grab bag part 1: LoRA, GNNs, and MoEs |
 | 11 | Architecture grab bag part 2: transposed convolution, UNet, autoencoders, and VAEs |
 | 12 | Deep learning engineering; fairness, accountability, and transparency |
