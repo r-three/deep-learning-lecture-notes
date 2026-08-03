@@ -25,6 +25,7 @@ book:
     - lectures/07-attention.qmd
     - lectures/08-transformers-part-1.qmd
     - lectures/09-transformers-part-2-large-language-models.qmd
+    - lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.qmd
 
 format:
   html:

@@ -1,0 +1,362 @@
+---
+title: "Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs"
+description: "An assortment of noteworthy architectural ideas: low-rank adaptation for parameter-efficient fine-tuning, graph neural networks (graph convolutional and graph attention networks) for graph-structured data, and mixture-of-experts layers for decoupling parameters from compute."
+bibliography: references.bib
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</h1>
+</div>
+```
+
+**Overview.** Deep learning is largely the study of neural network architectures and the optimizers used to train them, and we have now seen a good number of architectures — fully connected networks, recurrent networks, convolutional networks, and the transformer. Many others exist for other purposes, and this lecture samples three that are especially worth knowing. First is **low-rank adaptation** (LoRA), a technique for fine-tuning that updates far fewer parameters than the full model. Second are **graph neural networks**, for data structured as a graph, in two forms: the graph convolutional network and the graph attention network. Third are **mixture-of-experts** layers, which let us increase a model's parameter count without a matching increase in its computational cost. The three topics are largely independent.
+
+## Low-Rank Adaptation (LoRA) {#sec-lora}
+
+The first idea is less an architecture than a technique, used in transfer learning. Recall the setup: we pre-train a model on a broad task — language modeling, masked language modeling, large-scale image classification — and then do additional training on a downstream task we care about, going from a pre-trained model to a fine-tuned one. Instruction tuning (Lecture 9) is one example.
+
+Consider a single weight matrix $\bm{W} \in \mathbb{R}^{n_\text{out} \times n_\text{in}}$, with the understanding that the same applies to every parameter matrix in the model. Write its pre-trained value as $\bm{W}_\text{pre}$ and its fine-tuned value as $\bm{W}_\text{ft}$. The difference between them is the accumulated weight update from fine-tuning — every gradient step added something to the matrix — which we call $\Delta\bm{W}$:
+
+$$\bm{W}_\text{ft} - \bm{W}_\text{pre} = \Delta\bm{W}, \qquad \bm{W}_\text{pre} + \Delta\bm{W} = \bm{W}_\text{ft}.$$
+
+Ordinary fine-tuning updates every parameter in the model. An observation about transfer learning, though, is that we often do not need to. This can take many forms: we might train only a subset of parameters (for example, only the bias vectors, leaving the rest fixed), or update a carefully chosen sparse subset, or add a small number of new parameters. Fine-tuning that updates or adds fewer parameters than the model contains is called **parameter-efficient fine-tuning**, and there is a library from Hugging Face by that name (PEFT) implementing several such methods. LoRA is the one now used most of the time.
+
+### The low-rank update {#sec-lora-lowrank}
+
+The starting point is that $\Delta\bm{W}$ can often be approximated as a product of two matrices, $\bm{B}\bm{A}$, where $\bm{B}$ and $\bm{A}$ are much thinner than $\bm{W}$:
+
+::: {.boxed-eq}
+$$\Delta\bm{W} \approx \bm{B}\bm{A}, \qquad \bm{B} \in \mathbb{R}^{n_\text{out} \times r}, \quad \bm{A} \in \mathbb{R}^{r \times n_\text{in}}, \qquad r \ll n_\text{out}, \; r \ll n_\text{in}.$$
+:::
+
+Since $\bm{B}\bm{A}$ has rank at most $r$, this makes $\Delta\bm{W}$ **low-rank**. Two readings are possible. One is that if we fine-tune the full model and compute $\Delta\bm{W}$, it turns out to be approximately low-rank — sometimes true, sometimes not. The other, which is what we act on, is that if we *train so that* $\Delta\bm{W}$ is low-rank by construction, fine-tuning works about as well as updating the full matrix.
+
+::: {.definition-block}
+**Definition.** *Low-rank adaptation* (LoRA) fine-tunes a model by adding a low-rank update $\bm{B}\bm{A}$ to each chosen weight matrix, keeping the pre-trained matrix $\bm{W}_\text{pre}$ fixed and training only the new parameters $\bm{B}$ and $\bm{A}$.
+:::
+
+The layer computes its output using $\bm{W}_\text{pre} + \bm{B}\bm{A}$, but during training $\bm{W}_\text{pre}$ is frozen and only $\bm{B}$ and $\bm{A}$ are updated. These are new parameters that did not exist in the model before — an additional weight matrix, summed with the pre-trained one.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 560 270" width="100%" style="max-width:560px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="lA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Low-rank adaptation (LoRA)</text>
+<rect x="30" y="118" width="54" height="44" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="57" y="137" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">input</text>
+<text x="57" y="154" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">x</text>
+<line x1="84" y1="140" x2="116" y2="140" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<circle cx="116" cy="140" r="3" fill="#888"/>
+<path d="M116,140 L116,80 L160,80" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="160" y="58" width="110" height="44" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"/>
+<text x="215" y="85" text-anchor="middle" font-size="15" font-weight="600" fill="#666666">W_pre</text>
+<text x="215" y="48" text-anchor="middle" font-size="12" fill="#666">frozen</text>
+<path d="M270,80 L360,80 L360,124" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<path d="M116,140 L116,200 L160,200" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="160" y="178" width="44" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="182" y="205" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">A</text>
+<line x1="204" y1="200" x2="230" y2="200" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="230" y="178" width="44" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="252" y="205" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">B</text>
+<text x="217" y="240" text-anchor="middle" font-size="12" fill="#207965">trained (rank r)</text>
+<path d="M274,200 L360,200 L360,156" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<circle cx="360" cy="140" r="14" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="360" y="145" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="374" y1="140" x2="410" y2="140" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"/>
+<rect x="410" y="118" width="70" height="44" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="445" y="144" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">output</text>
+<text x="20" y="252" font-size="13" fill="#666">The frozen W_pre acts like a residual path; only the low-rank B·A update is trained. After training, fold B·A into W_pre.</text>
+</svg></div>
+```
+
+### Initialization {#sec-lora-init}
+
+Adding a random low-rank matrix to every weight matrix of a carefully pre-trained model would distort it — adding noise to parameters learned on a large task is likely to degrade the model. The standard remedy is to initialize $\bm{B}$ to zeros and $\bm{A}$ from a Gaussian, as usual. Then $\bm{B}\bm{A} = \bm{0}$ at the start, so LoRA fine-tuning begins from exactly the pre-trained model and only departs from it as training proceeds. (Because $\bm{B}$ starts at zero, one might worry that no gradient can flow; it does, because the pre-trained path acts like a residual connection around the $\bm{B}\bm{A}$ update, letting gradients reach $\bm{A}$.) There is no strong theory behind this, but empirically it works: LoRA fine-tuning is generally not much worse than fine-tuning the full model.
+
+### Why do this {#sec-lora-why}
+
+Several benefits follow, and they explain why LoRA is worth the trouble.
+
+- **The rank $r$ can be small, and varies by task.** For some datasets a rank-one update ($r = 1$) matches full fine-tuning; for others one needs $r = 8$ or $16$. But usually $r$ can be much smaller than $n_\text{in}$ and $n_\text{out}$. One way to see why: the pre-trained model was trained on a very broad task, and a fine-tuning task is usually a specialized subset of that — we need only steer the model, not relearn everything. The idea that fine-tuning can succeed in a low-dimensional subspace is sometimes phrased as the *intrinsic dimensionality* of the fine-tuning task being small [@aghajanyan2021intrinsic].
+- **Storing and communicating a LoRA is cheaper.** Full fine-tuning produces an update for every parameter, so sharing it costs as much as sharing a whole model — if the parameters take 10 gigabytes, so does the update. A LoRA update needs only $n_\text{out}\, r + n_\text{in}\, r$ values per matrix instead of $n_\text{out}\, n_\text{in}$, so storing the result of low-rank adaptation typically takes only 1–10% of the full model's storage.
+- **Not all weight matrices need updating.** The original LoRA paper [@hu2021lora], fine-tuning transformers, updated only the attention projection matrices (query, key, value, and output); one could instead update the feed-forward matrices, or both, and all three are done in practice. Updating fewer matrices makes the LoRA smaller still.
+- **Inference cost is unchanged.** After training, we can pre-compute $\bm{W}_\text{pre} + \bm{B}\bm{A}$ and fold the update into a single matrix, so a forward pass costs exactly what it did before. During training the two must be kept separate, since $\bm{W}_\text{pre}$ is fixed and $\bm{B}\bm{A}$ is trained, but afterward they merge. (This is not true of methods that inject new layers, which add computation at inference.) Left unmerged, a LoRA also enables serving: keep one copy of the pre-trained backbone, batch requests from many users, and add the appropriate per-user LoRA to each entry of the batch — giving each user their own fine-tuned variant without a separate full model each.
+- **Training memory is reduced.** When training with Adam (Lecture 4), we store, besides the parameters and cached activations, the first- and second-moment gradient accumulators, each as large as the parameters being updated. With LoRA we only maintain accumulators for $\bm{B}$ and $\bm{A}$, which are far smaller, lowering the memory cost of training — sometimes enough to fine-tune a larger model on hardware with less memory. We return to training memory in Lecture 12.
+
+---
+
+## Graph Neural Networks {#sec-gnn}
+
+We have applied neural networks to feature vectors, images, and sequences. Some data is instead structured as a **graph**, which generalizes several of these. A running example is a social network: each node is a person, and an edge between two nodes means they are connected — friends, or one following another. A task we might want is to classify the nodes: this node is a bot, that one is a human.
+
+Let the graph have $n$ nodes, each with a $d$-dimensional feature vector $\bm{x}_i \in \mathbb{R}^d$ — in the social network, attributes such as when the person joined, how many posts they have made, how many friends they have. Stacking the node feature vectors as rows gives a **node feature matrix** $\bm{X} \in \mathbb{R}^{n \times d}$. We also record the connectivity in an **adjacency matrix** $\bm{A} \in \mathbb{R}^{n \times n}$, with a $1$ where two nodes are connected and $0$ otherwise. Writing $i \sim j$ for "node $i$ is connected to node $j$,"
+
+$$\bm{A}_{ij} = \begin{cases} 1 & \text{if } i \sim j, \\ 0 & \text{otherwise.} \end{cases}$$
+
+For an unweighted graph the entries are just $0$ or $1$.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 640 300" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Graph: node features X and adjacency A</text>
+<line x1="70" y1="90" x2="150" y2="70" stroke="#999" stroke-width="1.5"/>
+<line x1="150" y1="70" x2="210" y2="130" stroke="#999" stroke-width="1.5"/>
+<line x1="70" y1="90" x2="120" y2="160" stroke="#999" stroke-width="1.5"/>
+<line x1="210" y1="130" x2="120" y2="160" stroke="#999" stroke-width="1.5"/>
+<line x1="120" y1="160" x2="70" y2="210" stroke="#999" stroke-width="1.5"/>
+<line x1="210" y1="130" x2="180" y2="210" stroke="#999" stroke-width="1.5"/>
+<line x1="120" y1="160" x2="180" y2="210" stroke="#999" stroke-width="1.5"/>
+<circle cx="70" cy="90" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<text x="70" y="94" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">1</text>
+<circle cx="150" cy="70" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<text x="150" y="74" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">2</text>
+<circle cx="210" cy="130" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<text x="210" y="134" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">3</text>
+<circle cx="120" cy="160" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<text x="120" y="164" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">4</text>
+<circle cx="70" cy="210" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<text x="70" y="214" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">5</text>
+<circle cx="180" cy="210" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<text x="180" y="214" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">6</text>
+<text x="140" y="250" text-anchor="middle" font-size="13" fill="#666">n nodes, features xᵢ ∈ ℝᵈ</text>
+<text x="385" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">X  (n × d)</text>
+<rect x="320" y="70" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
+<rect x="320" y="90" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
+<rect x="320" y="110" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
+<rect x="320" y="130" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
+<rect x="320" y="150" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
+<rect x="320" y="170" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
+<text x="458" y="84" font-size="11" fill="#666">← xᵢ</text>
+<text x="530" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#796020">A  (n × n)</text>
+<rect x="470" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="490" y="70" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="500" y="84" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="510" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="530" y="70" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="540" y="84" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="550" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="570" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="470" y="90" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="480" y="104" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="490" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="510" y="90" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="520" y="104" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="530" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="550" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="570" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="470" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="490" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="500" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="510" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="530" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="540" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="550" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="570" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="580" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="470" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="480" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="490" y="130" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="510" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="520" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="530" y="130" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="550" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="560" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="570" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="580" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="470" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="490" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="510" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="530" y="150" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="540" y="164" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="550" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="570" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="470" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="490" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="510" y="170" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="520" y="184" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="530" y="170" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"/>
+<text x="540" y="184" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="550" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<rect x="570" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"/>
+<text x="530" y="208" text-anchor="middle" font-size="12" fill="#666">Aᵢⱼ = 1 if i ~ j</text>
+</svg></div>
+```
+
+### Aggregating over neighbors {#sec-gnn-aggregate}
+
+With two matrices in hand, it is natural to multiply them. Consider $\bm{A}\bm{X}$, which is $n \times d$. Its $i$th row is
+
+$$(\bm{A}\bm{X})_i = \sum_{i \sim j} \bm{x}_j,$$
+
+the sum of the feature vectors of all nodes connected to node $i$ — multiplying row $i$ of $\bm{A}$ against $\bm{X}$ picks out the neighbors' rows and adds them. So $\bm{A}\bm{X}$ produces a new feature vector for each node by **aggregating information about its neighbors**.
+
+One oddity is that this sum is not normalized: a node with more neighbors (a higher **degree**) has more terms, and so a larger sum. To fix this, let $\bm{D}$ be the diagonal **degree matrix**, with $\bm{D}_{ii} = d_i$ the degree of node $i$ — obtained by summing row $i$ of $\bm{A}$. We can then normalize, in one of two ways:
+
+$$\bm{D}^{-1}\bm{A}\bm{X} \quad\text{(weight } \tfrac{1}{d_i}\text{)}, \qquad\text{or}\qquad \bm{D}^{-1/2}\bm{A}\bm{D}^{-1/2}\bm{X} \quad\text{(weight } \tfrac{1}{\sqrt{d_i d_j}}\text{)}.$$
+
+The first divides each row by its degree; the second uses the geometric mean of the two nodes' degrees. The second tends to work better in the model we build next, so we use it for now and return to the first later.
+
+### The graph convolutional network {#sec-gcn}
+
+To build a layer, recall what an ordinary layer does with feature vectors: project them through a learned matrix and apply a nonlinearity, $\sigma(\bm{W}\bm{x})$. We do the same here, projecting each node's feature vector through a learned $\bm{W} \in \mathbb{R}^{d \times d'}$ and combining it with the normalized neighbor aggregation. One correction is needed first: with the aggregation as written, node $i$'s own feature vector does not contribute to its new representation unless the node is connected to itself. Since it usually is not, we add self-connections by replacing $\bm{A}$ with $\hat{\bm{A}} = \bm{A} + \bm{I}$ (and correspondingly $\hat{\bm{D}}$). This gives the **graph convolutional network** [@kipf2017semi]:
+
+::: {.boxed-eq}
+$$\bm{H} = \sigma\!\big(\hat{\bm{D}}^{-1/2}\, \hat{\bm{A}}\, \hat{\bm{D}}^{-1/2}\, \bm{X}\, \bm{W}\big) \in \mathbb{R}^{n \times d'}, \qquad \bm{W} \in \mathbb{R}^{d \times d'}.$$
+:::
+
+Per node, this is $\bm{h}_i = \sigma\!\big(\sum_{i \sim j} \tfrac{1}{\sqrt{d_i d_j}}\, \bm{x}_j \bm{W}\big)$: project the neighbors through $\bm{W}$, sum them with degree normalization, and apply the nonlinearity $\sigma$ (an elementwise nonlinearity such as a ReLU).
+
+Why call it convolutional? Take an image, extract patches, and form a graph in which each pixel's neighbors are the pixels in its patch. Then this layer applies the same weight matrix $\bm{W}$ to every node and sums over its neighbors — a local, translation-invariant operation, just like a convolution (up to the degree normalization, which is constant when the patches are the same size and can be absorbed into $\bm{W}$). Stacking layers extends the reach: after one layer a node's representation depends on its neighbors, after two on its neighbors' neighbors, and so on — a notion much like the receptive field of a convolutional network (Lecture 5).
+
+### The graph attention network {#sec-gat}
+
+Consider the other normalization, $\bm{H} = \sigma(\bm{D}^{-1}\bm{A}\bm{X}\bm{W})$. Here row $i$ of $\bm{D}^{-1}\bm{A}$ has entries $1/d_i$ where node $i$ has a neighbor, and these are non-negative and sum to one:
+
+$$\sum_j (\bm{D}^{-1}\bm{A})_{ij} = \sum_{i \sim j} \frac{1}{d_i} = d_i \cdot \frac{1}{d_i} = 1.$$
+
+So each node's row looks like a probability distribution over its neighbors — a uniform one, reminiscent of a random walk that steps to each neighbor with probability $1/d_i$. Computing $\bm{D}^{-1}\bm{A}\bm{X}$ is then a weighted average of a node's neighbors, with uniform weights. There is no reason the weights must be uniform: for a given task, some neighbors may matter more than others. We have seen how to compute non-uniform weights over a set — attention (Lecture 7). The set here is genuinely a set: a node's neighbors have no order. Placing an attention mechanism over the neighbors gives the **graph attention network** (GAT).
+
+Filling in the five ingredients of an attention mechanism (Lecture 7), with $\bm{h}_i$ the current node representations:
+
+- **Queries, keys, and values** are all $\bm{W}\bm{h}_i$ — the same projection for all three, unlike any attention we have seen. This was tried and worked, and it projects the input once rather than three times.
+- **Comparison.** The score between nodes $i$ and $j$ passes the concatenation of their projections through a learned vector $\bm{v}$ and a LeakyReLU (a ReLU whose left side has a small nonzero slope rather than being flat):
+$$a_{ij} = \alpha(\bm{W}\bm{h}_i, \bm{W}\bm{h}_j) = \operatorname{LeakyReLU}\!\big(\bm{v}^\top [\bm{W}\bm{h}_i \,\|\, \bm{W}\bm{h}_j]\big).$$
+- **Reduction** is a softmax-weighted average over the neighbors:
+
+::: {.boxed-eq}
+$$\bm{h}_i' = \sigma\!\Big(\sum_{i \sim j} \operatorname{softmax}(\bm{a}_i)_j\, \bm{W}\bm{h}_j\Big).$$
+:::
+
+Restricting the sum to neighbors is done by masking — setting the scores for non-edges to $-\infty$ before the softmax, using the adjacency matrix, as we masked attention in Lecture 9. As usual, the attention is made multi-headed. Compared to the graph convolutional network's fixed degree-based weights, the GAT lets the comparison function *learn* how much each neighbor should count [@velickovic2018graph].
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 640 280" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Neighbor weighting: GCN (fixed) vs GAT (learned)</text>
+<text x="180" y="60" text-anchor="middle" font-size="16" font-weight="600" fill="#333">GCN: degree weights</text>
+<line x1="180" y1="150" x2="90" y2="110" stroke="#57C7AE" stroke-width="2.5"/>
+<text x="135" y="126" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<line x1="180" y1="150" x2="270" y2="110" stroke="#57C7AE" stroke-width="2.5"/>
+<text x="225" y="126" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<line x1="180" y1="150" x2="110" y2="220" stroke="#57C7AE" stroke-width="2.5"/>
+<text x="145" y="181" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<line x1="180" y1="150" x2="250" y2="220" stroke="#57C7AE" stroke-width="2.5"/>
+<text x="215" y="181" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<circle cx="90" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="270" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="110" cy="220" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="250" cy="220" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="180" cy="150" r="16" fill="#F7D9C4" stroke="#C78557" stroke-width="1.6"/>
+<text x="180" y="154" text-anchor="middle" font-size="12" font-weight="600" fill="#794520">i</text>
+<text x="470" y="60" text-anchor="middle" font-size="16" font-weight="600" fill="#333">GAT: learned weights</text>
+<line x1="470" y1="150" x2="380" y2="110" stroke="#8457C7" stroke-width="1.9"/>
+<text x="425" y="126" text-anchor="middle" font-size="10" fill="#442079">α=0.1</text>
+<line x1="470" y1="150" x2="560" y2="110" stroke="#8457C7" stroke-width="4.0"/>
+<text x="515" y="126" text-anchor="middle" font-size="10" fill="#442079">α=0.5</text>
+<line x1="470" y1="150" x2="400" y2="220" stroke="#8457C7" stroke-width="2.5"/>
+<text x="435" y="181" text-anchor="middle" font-size="10" fill="#442079">α=0.2</text>
+<line x1="470" y1="150" x2="540" y2="220" stroke="#8457C7" stroke-width="1.6"/>
+<text x="505" y="181" text-anchor="middle" font-size="10" fill="#442079">α=0.1</text>
+<circle cx="380" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="560" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="400" cy="220" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="540" cy="220" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
+<circle cx="470" cy="150" r="16" fill="#F7D9C4" stroke="#C78557" stroke-width="1.6"/>
+<text x="470" y="154" text-anchor="middle" font-size="12" font-weight="600" fill="#794520">i</text>
+<text x="20" y="266" font-size="13" fill="#666">The GAT learns how much each neighbor counts; the GCN uses fixed weights based on node degrees.</text>
+</svg></div>
+```
+
+::: {.callout-note}
+**A strained acronym.** The graph attention network is abbreviated GAT. The extra "T" has no clear source; a plausible account is that the well-known *generative adversarial network* had already taken GAN, and the later graph attention network borrowed the shape of the acronym.
+:::
+
+Both layers map a set of node feature vectors to a new set of the same size, so they stack like any layer: several graph convolutional or graph attention layers, optionally interleaved with position-wise feed-forward networks applied to each node independently, followed by a small classifier head that outputs, say, a bot-versus-human probability per node — all trained end-to-end with backpropagation.
+
+---
+
+## Mixture-of-Experts (MoE) {#sec-moe}
+
+For every model so far, increasing the number of parameters increases the computational cost: a wider MLP hidden layer, an extra layer, or more convolutional channels all add both parameters and computation. But a model's capacity — loosely, how much it can fit or memorize — grows with its parameters, and with more data we would like more capacity, hence more parameters, without paying more compute. A **mixture-of-experts** layer is one way to decouple the two.
+
+A mixture-of-experts layer replaces some layer in the model — often a position-wise feed-forward network in a transformer — with $n$ copies of it, called **experts**. The experts share the same architecture but have separate, unshared parameters. Replacing one layer with $n$ experts multiplies that layer's parameter count by $n$. Computing all $n$ experts, though, would multiply the compute by $n$ as well, gaining nothing.
+
+The key component is a **router**: a small layer that, for a given input, decides which experts to use. It outputs a probability for each of the $n$ experts, the **routing probabilities**, and only the top $k$ experts are actually run. Their outputs are multiplied by the routing probabilities and summed.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 320" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="mA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Mixture-of-experts layer</text>
+<rect x="300" y="270" width="80" height="32" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="340" y="290" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">input x</text>
+<rect x="300" y="210" width="80" height="34" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="340" y="231" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">router</text>
+<line x1="340" y1="270" x2="340" y2="244" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="40" y="120" width="76" height="34" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"/>
+<text x="78" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#666666">expert 1</text>
+<rect x="160" y="120" width="76" height="34" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="198" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#207965">expert 2</text>
+<path d="M340,210 L198,154" fill="none" stroke="#C75794" stroke-width="1.6"/>
+<rect x="300" y="120" width="76" height="34" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="338" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#207965">expert i</text>
+<path d="M340,210 L338,154" fill="none" stroke="#C75794" stroke-width="1.6"/>
+<rect x="470" y="120" width="76" height="34" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"/>
+<text x="508" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#666666">expert n</text>
+<text x="394" y="172" font-size="11" fill="#792051">top-k routed</text>
+<text x="423" y="142" text-anchor="middle" font-size="16" fill="#999">···</text>
+<circle cx="198.0" cy="74" r="12" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="198.0" y="79" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">×</text>
+<line x1="198.0" y1="120" x2="198.0" y2="86" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<circle cx="338.0" cy="74" r="12" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="338.0" y="79" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">×</text>
+<line x1="338.0" y1="120" x2="338.0" y2="86" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<circle cx="340" cy="40" r="14" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="340" y="45" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<path d="M198,62 L340,52" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<path d="M338,62 L340,52" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<line x1="354" y1="36" x2="410" y2="36" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="410" y="20" width="70" height="32" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="445" y="40" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">output</text>
+<text x="126" y="200" font-size="11" fill="#792051">routing probabilities</text>
+<text x="20" y="306" font-size="13" fill="#666">The router runs only the top-k experts; parameters grow by n, compute by only k. × weights each expert output by its routing probability.</text>
+</svg></div>
+```
+
+::: {.definition-block}
+**Definition.** A *mixture-of-experts layer* consists of $n$ experts with independent parameters and a router. The router assigns a probability to each expert; the layer runs the top $k$, weights their outputs by the routing probabilities, and sums them.
+:::
+
+This multiplies the layer's parameter count by $n$ but its compute by only about $k$ — the number of experts run per input. Since $k$ can be much smaller than $n$ (setting $k = n$ would recover the dense case and defeat the purpose), the cost is far below that of making the layer $n$ times larger. Some notes:
+
+- **The router is usually a linear classifier**, $\operatorname{softmax}(\bm{W}\bm{x})$: a weight matrix followed by a softmax to produce the $n$ routing probabilities.
+- **Routing is discrete** — only $k$ experts are run. A soft variant that runs every expert and combines them by the routing probabilities would multiply compute by $n$, gaining nothing, so the discreteness is the point. Typically $k$ is $1$ or $2$.
+- **Gradients reach only the activated experts**, since an expert that is not run receives no gradient. The discrete top-$k$ selection has zero gradient almost everywhere, so the router is trained through a different path: multiplying each expert's output by its routing probability lets gradients flow back to the router through that multiplication.
+
+::: {.callout-warning}
+**Router collapse.** There is no supervision telling the router which expert to use for which input; it must discover this on its own. This creates a failure mode. If the router sends an input to expert $i$, only expert $i$ is trained on that step, so an expert chosen slightly more often is trained more, becomes better, and is then chosen still more often — a feedback loop that can end with the router sending everything to one expert. The router has **collapsed**, and the layer is back to a single expert with $n$ times the parameters and nothing gained.
+:::
+
+The standard fix is a **load-balancing loss** added to the training loss. One common form, in pseudo-math, is
+
+$$\mathcal{L}_\text{balance} = \sum_\text{experts} (\text{fraction of the time the expert is chosen}) \times (\text{probability assigned to the expert}).$$
+
+This sum is smallest when each expert is chosen $1/n$ of the time with probability $1/n$ — evaluating to $n \cdot (1/n)^2 = 1/n$ — and largest, equal to $1$, when a single expert is always chosen with probability one. Minimizing it therefore pushes the router toward using the experts evenly. Other load-balancing losses exist; this one works reasonably [@shazeer2017outrageously; @fedus2022switch]. A more recent addition that helps is to include one **always-active expert**, routed to on every input in addition to whichever experts the router selects.
+
+---
+
+## Summary {#sec-summary}
+
+::: {.callout-note}
+**Key takeaways from Lecture 10:**
+
+- **Low-rank adaptation (LoRA)** fine-tunes by adding a low-rank update $\Delta\bm{W} \approx \bm{B}\bm{A}$ (rank $r \ll n_\text{in}, n_\text{out}$) to each chosen weight matrix, freezing $\bm{W}_\text{pre}$ and training only $\bm{B}, \bm{A}$. Initialize $\bm{B}$ to zero so training starts from the pre-trained model. It is cheaper to store and communicate, adds no inference cost once merged, and lowers training memory.
+- **Graph neural networks** operate on a node feature matrix $\bm{X}$ and adjacency matrix $\bm{A}$. Multiplying $\bm{A}\bm{X}$ aggregates each node's neighbors; degree normalization prevents high-degree nodes from dominating.
+- The **graph convolutional network** is $\bm{H} = \sigma(\hat{\bm{D}}^{-1/2}\hat{\bm{A}}\hat{\bm{D}}^{-1/2}\bm{X}\bm{W})$ with self-connections $\hat{\bm{A}} = \bm{A} + \bm{I}$ — a local, translation-invariant, convolution-like operation.
+- The **graph attention network** replaces fixed degree-based weights with a learned attention mechanism over each node's neighbors (queries, keys, and values all $\bm{W}\bm{h}_i$; a LeakyReLU comparison; a softmax-weighted average restricted to neighbors by masking).
+- A **mixture-of-experts layer** replaces a layer with $n$ experts and a router that runs the top $k$, multiplying parameters by $n$ but compute by only $k$. It decouples parameter count from compute. A **load-balancing loss** prevents the router from **collapsing** onto one expert.
+:::
+
+**Next lecture:** Architecture grab bag, part 2 - transposed convolution, the U-Net, autoencoders, and variational autoencoders.
