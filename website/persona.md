@@ -12,7 +12,7 @@ Not a rendered book chapter — this file lives at the project root as an author
 
 ## 1. The voice, in one paragraph
 
-Write calmly and precisely, as a knowledgeable person explaining something to a capable reader, not as a marketer selling it. Motivate before mechanism: pose the question a concept answers, then answer it. Prefer plain, direct sentences over clever ones. Hedge where the truth is qualified ("generally", "in practice", "typically", "under benign assumptions") rather than overstating. Be honest about conventions, limitations, and misnomers. Use "we" to walk the reader through the reasoning together. Never reach for excitement the material does not itself justify.
+Write calmly and precisely, as a knowledgeable person explaining something to a capable reader. Motivate before mechanism: pose the question a concept answers, then answer it. Prefer plain, direct sentences over clever ones. Hedge where the truth is qualified ("generally", "in practice", "typically", "under benign assumptions") rather than overstating. Be honest about conventions, limitations, and misnomers. Use "we" to walk the reader through the reasoning together. Never reach for excitement the material does not itself justify.
 
 Reference material for calibrating the voice:
 
