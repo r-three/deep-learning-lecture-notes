@@ -1,0 +1,225 @@
+---
+title: "Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency"
+description: "Two closing topics: the engineering of training large models across accelerators — data, tensor, and pipeline parallelism, plus precision and memory tricks — and the fairness, accountability, and transparency questions that arise when these models are applied to people."
+bibliography: references.bib
+---
+
+```{=html}
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</h1>
+</div>
+```
+
+**Overview.** This final lecture is really two short lectures on topics the course has otherwise set aside. The first is **deep learning engineering**: the models and training procedures we have studied all have to run on real hardware, and once a model is large enough, a single accelerator is no longer enough. We look at where the memory and compute costs come from, then at three ways to distribute a computation across many accelerators — **data**, **tensor**, and **pipeline parallelism** — and at several further tricks for making training smaller and faster (lower-precision number formats, mixed precision, gradient accumulation, and activation rematerialization). The second is **fairness, accountability, and transparency**: what can go right and wrong when the technology from this course is applied to real problems, especially problems that involve classifying people. The two parts are independent.
+
+## Deep Learning Engineering {#sec-engineering}
+
+For most of the course we have been able to ignore the fact that every model and training procedure ultimately runs on a computer. That has kept the exposition clean, but the details cannot be ignored forever. Three facts make them unavoidable.
+
+First, to run the neural networks we use in practice, we need a specialized **accelerator**. Usually this means a GPU, though there are others — TPUs, and increasingly more besides. An accelerator is a piece of hardware well suited to the operations inside a neural network, above all matrix multiplications. One can run a neural network on a CPU, which is general-purpose hardware, but accelerators are far better at it. They were not necessarily designed for neural networks; they happened to have the right shape. The key is that an accelerator has a great many cores — a modern GPU has thousands or tens of thousands — so it can perform parallel operations like matrix multiplies far more effectively than a CPU, which may have dozens.
+
+Second, accelerators have constraints. The most important is that a GPU has a **fixed amount of memory**: unlike many computers, you cannot open it up and add more. Accelerators also run much faster for some data types and operations than others, and the speed of moving data between different memories varies widely — between the large block of DRAM/VRAM, the CPU's RAM, the disk, and the small, fast SRAM where operations actually happen. These differences shape how we architect and run models.
+
+Third, one of the recurring lessons of the course is that deep learning models tend to get better as we make them bigger and train them on more data, and that costs compute. The growth over time has been steep. A clean, if slightly dated, example: ELMo, an early predecessor to BERT and the GPT-style models, was introduced in 2018 with about 100 million parameters [@peters2018deep]. By 2022, Google trained PaLM, then the largest language model, with about 540 billion parameters [@chowdhery2023palm] — more than a 5,000-fold increase. Since the compute cost of using most of our models scales roughly linearly with the parameter count, processing a single token with PaLM is over 5,000 times more expensive than with ELMo, and that is before accounting for PaLM's far larger training set (tens of trillions of tokens today, against tens of millions then).
+
+If the individual accelerator is fixed — we cannot add memory or cores to it — then the way to handle growing cost is to **distribute the computation** across many accelerators networked together. To reason about how, it helps to abstract away what a neural network is.
+
+### Where the costs come from {#sec-costs}
+
+Nearly every model in this course produces a prediction $\hat{y}_i$ from an input $\bm{x}_i$ using a parameterized function $f_{\bm{\theta}}$,
+
+$$\hat{y}_i = f_{\bm{\theta}}(\bm{x}_i),$$
+
+and throughout that function the expensive operations are matrix–vector products $\bm{W}\bm{h}$. Convolutions can be written as matrix multiplies (Lecture 11), and attention is built from them (Lecture 7); the elementwise nonlinearities in between are cheap by comparison. So from a high level, a neural network is a collection of matrix–vector products that we need to accelerate.
+
+To train it, at each step we take a batch of $N$ inputs, compute the gradient of a loss for each, and sum:
+
+$$\bm{g} = \sum_{i=1}^{N} \nabla_{\bm{\theta}}\, \mathcal{L}(\hat{y}_i, y_i), \qquad \bm{\theta} \leftarrow \bm{\theta} + \operatorname{optimizer}(\bm{g}).$$
+
+The summed gradient $\bm{g}$ is fed to an optimizer such as Adam (Lecture 4), which turns it into an update to the parameters. This abstract picture is enough to locate the costs, which fall into two kinds.
+
+**Memory.** Four things must sit in memory at once, and each grows the footprint:
+
+- **Parameters.** We can only compute $\bm{W}\bm{h}$ if $\bm{W}$ and $\bm{h}$ are in memory.
+- **Batch size.** A larger batch means loading more activations $\bm{h}$ at once.
+- **Cached activations.** Backpropagation caches the forward-pass activations so the backward pass does not recompute them (Lecture 2); those caches grow with the batch.
+- **Optimizer states.** Adam keeps a running mean of the gradient and of the squared gradient, each the size of the parameters — so training with Adam needs about three times the memory of the parameters alone. SGD keeps no such state, so its memory cost is a third of Adam's; momentum sits in between.
+
+**Compute.** The costs are computing the model output $f_{\bm{\theta}}$, computing the gradient $\nabla_{\bm{\theta}}$, and — scaling with the batch size — summing the per-example gradients. Updating the optimizer states also costs something, but relatively little.
+
+The question for the rest of this part is what to do when these costs become prohibitive: when the parameters do not fit on a single GPU, when the batch's cached activations do not fit, or simply when we want training to go faster.
+
+### Data parallelism {#sec-data-parallel}
+
+Start with the simplest case: the whole model fits on one GPU, and one GPU can do a forward and backward pass for at least a small slice of the batch, but we want a larger batch than one GPU can hold — and we have several GPUs. The gradient is a sum over the batch, and a sum can be split, which is what makes this easy.
+
+::: {.definition-block}
+**Definition.** *Data parallelism* places a copy of the model on each of $n$ accelerators, splits the batch $n$ ways so each accelerator processes $1/n$ of it, and sums the per-accelerator gradients to form the update.
+:::
+
+With two GPUs, the first processes inputs $\bm{x}_1, \dots, \bm{x}_{N/2}$ and computes the gradient summed over that half; the second does the same for $\bm{x}_{N/2+1}, \dots, \bm{x}_N$. The two partial sums are communicated, added, and the result is the same $\bm{g}$ we would have computed on one device.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Data parallelism</text><rect x="40" y="60" width="380" height="66" rx="8" fill="#fff" stroke="#5795C7" stroke-width="1.8"/><text x="70" y="52" font-size="14" fill="#205279" text-anchor="start" font-weight="600">GPU 1</text><rect x="56" y="76" width="120" height="34" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/><text x="116.0" y="97.0" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">inputs 1 ... N/2</text><line x1="176" y1="93" x2="214" y2="93" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><text x="320" y="98" font-size="15" fill="#205279" text-anchor="middle" font-weight="600">&#8721; &#8711;&#952; &#8467;(&#375;&#7522;, y&#7522;)</text><text x="320" y="116" font-size="11" fill="#205279" text-anchor="middle" font-weight="400">i = 1 ... N/2</text><rect x="40" y="160" width="380" height="66" rx="8" fill="#fff" stroke="#8457C7" stroke-width="1.8"/><text x="70" y="152" font-size="14" fill="#442079" text-anchor="start" font-weight="600">GPU 2</text><rect x="56" y="176" width="120" height="34" rx="6" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/><text x="116.0" y="196.66666666666666" text-anchor="middle" font-size="11" font-weight="600" fill="#442079">inputs N/2+1 ... N</text><line x1="176" y1="193" x2="214" y2="193" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><text x="320" y="198" font-size="15" fill="#442079" text-anchor="middle" font-weight="600">&#8721; &#8711;&#952; &#8467;(&#375;&#7522;, y&#7522;)</text><text x="320" y="216" font-size="11" fill="#442079" text-anchor="middle" font-weight="400">i = N/2+1 ... N</text><circle cx="480" cy="143" r="15" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/><text x="480" y="148" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text><path d="M420,93 L450,93 L450,132" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><path d="M420,193 L450,193 L450,154" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><line x1="495" y1="143" x2="540" y2="143" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><text x="565" y="148" font-size="18" fill="#333" text-anchor="middle" font-weight="600">g</text><text x="20" y="270" font-size="13" fill="#666" text-anchor="start">Each GPU holds a full copy of the model and processes half the batch; the summed gradients are added to</text><text x="20" y="288" font-size="13" fill="#666" text-anchor="start">form the update g. Simple and low-communication, but the whole model must fit on each device.</text></svg></div>
+```
+
+Two things follow. Each GPU processes half the inputs, so it does half the work, and since the two run in parallel, the batch can be processed roughly twice as fast — no GPU waits for another. And the batch can now be larger than would fit on a single device. The communication is light: each GPU works away on its half and only needs to share its summed gradient at the end, which is cheap next to the cost of the forward and backward passes.
+
+The drawbacks are two. First, the approach depends on having enough batch to go around. Batching is itself a form of parallelism — the examples in a batch are processed in parallel on one GPU — so if there are more GPUs than the batch can usefully be split across, we are forced to very small per-GPU batches and lose efficiency. Second, and more fundamentally, data parallelism still requires the *entire model* to fit on each GPU. If a model has 540 billion parameters stored as `float32` (4 bytes each), that is about 2 terabytes, and GPUs do not have that much memory. For such a model we must split the model itself across devices.
+
+### Tensor parallelism {#sec-tensor-parallel}
+
+The first way to split a model is **tensor parallelism**, a form of model parallelism. It exploits the fact that the operations are matrix–vector products $\bm{W}\bm{h}$, where each output entry is a dot product of a row of $\bm{W}$ with $\bm{h}$.
+
+Split $\bm{W}$ into two halves by columns, and split $\bm{h}$ into two matching halves. The first half of $\bm{W}$ times the first half of $\bm{h}$, plus the second half of $\bm{W}$ times the second half of $\bm{h}$, gives exactly $\bm{W}\bm{h}$ — the dot products decompose into partial sums that we add. Put the first half on GPU 1 and the second on GPU 2, run them in parallel, and communicate to sum the results.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 680 320" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Tensor parallelism</text><text x="40" y="70" font-size="13" fill="#666" text-anchor="start" font-weight="400">On one device:</text><rect x="40" y="82" width="120" height="80" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"/><text x="100" y="127" font-size="20" fill="#666666" text-anchor="middle" font-weight="600">W</text><rect x="168" y="82" width="24" height="80" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/><text x="180" y="127" font-size="15" fill="#205279" text-anchor="middle" font-weight="600">h</text><text x="210" y="127" font-size="18" fill="#333" text-anchor="middle" font-weight="400">=</text><rect x="228" y="82" width="24" height="80" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/><text x="240" y="127" font-size="15" fill="#794520" text-anchor="middle" font-weight="600">y</text><line x1="300" y1="60" x2="300" y2="300" stroke="#ddd" stroke-width="1.5"/><text x="330" y="70" font-size="13" fill="#666" text-anchor="start" font-weight="400">Split W by columns, h by halves, run in parallel, sum:</text><rect x="340" y="92" width="60" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/><text x="370" y="116" font-size="13" fill="#205279" text-anchor="middle" font-weight="600">W&#8321;</text><rect x="408" y="92" width="20" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/><text x="418" y="116" font-size="11" fill="#205279" text-anchor="middle" font-weight="600">h&#8321;</text><text x="456" y="116" font-size="12" fill="#205279" text-anchor="start" font-weight="600">GPU 1</text><rect x="340" y="150" width="60" height="40" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/><text x="370" y="174" font-size="13" fill="#442079" text-anchor="middle" font-weight="600">W&#8322;</text><rect x="408" y="150" width="20" height="40" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/><text x="418" y="174" font-size="11" fill="#442079" text-anchor="middle" font-weight="600">h&#8322;</text><text x="456" y="174" font-size="12" fill="#442079" text-anchor="start" font-weight="600">GPU 2</text><circle cx="560" cy="141" r="14" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/><text x="560" y="146" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text><path d="M528,112 L545,112 L545,130" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><path d="M528,170 L545,170 L545,152" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><line x1="574" y1="141" x2="606" y2="141" stroke="#888" stroke-width="1.5" marker-end="url(#a)"/><text x="624" y="146" font-size="16" fill="#794520" text-anchor="middle" font-weight="600">y</text><text x="20" y="265" font-size="13" fill="#666" text-anchor="start">Every matrix&#8211;vector product Wh is split across devices and the partial products summed. Fits larger weight</text><text x="20" y="283" font-size="13" fill="#666" text-anchor="start">matrices (larger models), but the devices must communicate on every matrix product &#8212; communication-intensive.</text></svg></div>
+```
+
+::: {.definition-block}
+**Definition.** *Tensor parallelism* splits the individual weight matrices (and the matching activations) across accelerators, each computing part of every matrix–vector product; the partial results are summed to reconstruct the full product.
+:::
+
+(One can equally split $\bm{W}$ by rows instead of columns, keeping $\bm{h}$ whole; the pieces then combine differently — worth working through.) The benefit is memory: each GPU stores only half of $\bm{W}$, so we can fit larger weight matrices, and applying this to every matrix in the model lets us fit a model about twice as large.
+
+The cost is communication. Data parallelism communicates once, at the very end. Tensor parallelism communicates *every* matrix–vector product. A 96-layer transformer with, say, seven weight matrices per layer (the query, key, value, and output projections, and the feed-forward up and down projections) requires the GPUs to talk on the order of $7 \times 96$ times per pass. So data parallelism tolerates a slow interconnect between GPUs, while tensor parallelism demands a very fast one.
+
+### Pipeline parallelism {#sec-pipeline-parallel}
+
+The other way to split a model is **pipeline parallelism**, also a form of model parallelism, which splits the model by *layers* rather than within each matrix. A model with, say, 64 layers might be cut into four contiguous blocks of 16, one block per GPU.
+
+::: {.definition-block}
+**Definition.** *Pipeline parallelism* partitions the model into contiguous groups of layers, placing each group on a separate accelerator; activations flow forward from one accelerator to the next, and gradients flow back.
+:::
+
+On the forward pass, GPU 1 runs its layers and passes its output to GPU 2, which runs its layers and passes to GPU 3, and so on to GPU 4, which produces the model output. The backward pass runs in reverse, GPU 4 back to GPU 1, and takes about twice as long as the forward pass.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 720 330" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Pipeline parallelism</text><text x="70" y="79.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 1</text><text x="70" y="119.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 2</text><text x="70" y="159.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 3</text><text x="70" y="199.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 4</text><rect x="120" y="60" width="52" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/><text x="146.0" y="79.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">L1</text><rect x="172" y="100" width="52" height="30" rx="6" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/><text x="198.0" y="119.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">L2</text><rect x="224" y="140" width="52" height="30" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/><text x="250.0" y="159.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">L3</text><rect x="276" y="180" width="52" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/><text x="302.0" y="199.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#207965">L4</text><rect x="328" y="180" width="92" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/><text x="374.0" y="199.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#207965">&#8711;L4</text><rect x="420" y="140" width="92" height="30" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/><text x="466.0" y="159.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">&#8711;L3</text><rect x="512" y="100" width="92" height="30" rx="6" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/><text x="558.0" y="119.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">&#8711;L2</text><rect x="604" y="60" width="92" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/><text x="650.0" y="79.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">&#8711;L1</text><line x1="146.0" y1="90" x2="198.0" y2="100" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="198.0" y1="130" x2="250.0" y2="140" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="250.0" y1="170" x2="302.0" y2="180" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="374.0" y1="180" x2="466.0" y2="170" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="466.0" y1="140" x2="558.0" y2="130" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><line x1="558.0" y1="100" x2="650.0" y2="90" stroke="#888" stroke-width="1.2" marker-end="url(#a)"/><ellipse cx="452" cy="92" rx="96" ry="34" fill="none" stroke="#AAAAAA" stroke-width="1.2" stroke-dasharray="4,3"/><text x="452" y="89" font-size="13" fill="#666666" text-anchor="middle" font-weight="600">bubble</text><text x="452" y="106" font-size="11" fill="#666666" text-anchor="middle" font-weight="400">(devices idle)</text><line x1="110" y1="240" x2="600" y2="240" stroke="#555" stroke-width="1.5" marker-end="url(#a)"/><text x="355" y="262" font-size="13" fill="#555" text-anchor="middle" font-weight="400">time</text><text x="20" y="300" font-size="13" fill="#666" text-anchor="start">The model is split by layers, one block per GPU; the backward pass (&#8711;L, ~2&#215; longer) runs in reverse. Devices</text><text x="20" y="318" font-size="13" fill="#666" text-anchor="start">sit idle in the bubble, so this gives no speedup on its own &#8212; only lower memory per device.</text></svg></div>
+```
+
+The advantages are that it is easy to implement and its communication is fairly low: the GPUs talk only when activations cross a block boundary — once per 16 layers here, not once per matrix — so it communicates far less than tensor parallelism (though more than data parallelism). Each GPU also holds only a quarter of the model, so a much larger model fits.
+
+The drawback is visible in the diagram. While GPU 1 works on the first block, the others sit idle, waiting for its output; while GPU 4 works, GPU 1 is idle. Most devices are idle most of the time. This idle region is called the **bubble**.
+
+::: {.callout-warning}
+**Pipeline parallelism does not, on its own, speed anything up.** With data or tensor parallelism, $n$ accelerators ideally cut the time by a factor of $n$. With the naive pipeline above, the total time is the same as running the whole model on one GPU — the accelerators just take turns. All we have bought is lower memory per device. So we avoid pipeline parallelism when we can, and reach for it when the model is too large to fit otherwise and a slow interconnect rules out tensor parallelism. PaLM is a reported example: fast TPU-to-TPU links within each of two supercomputers allowed tensor parallelism there, but the slower link between the two supercomputers was handled with pipeline parallelism across the pair.
+:::
+
+The bubble can be shrunk. The standard idea is to split the batch into smaller **microbatches** so that once a GPU finishes one microbatch it can begin the next, overlapping the work; more sophisticated schedules account for the backward pass being twice as expensive as the forward, and can make the bubble quite small.
+
+::: {.callout-note}
+**These strategies are abstracted away for you.** As with backpropagation, the complexity here is usually hidden behind a library — to train a large language model with data and model parallelism, you download something that does it. Understanding where the costs come from is still valuable: it lets you reason about which strategy fits a given model and interconnect, and therefore what will train, and how fast.
+:::
+
+### Making training smaller and faster {#sec-precision}
+
+Beyond parallelization, several general techniques make training smaller or faster.
+
+**Floating-point precision.** We represent real numbers in a floating-point format, and there are several to choose from, trading storage and speed against precision and range. A floating-point number has a sign bit, some bits for the value, and some **exponent** bits that scale it up or down. The usual, safe choice for neural network training is `float32`, with 8 exponent bits; `float64` is overkill. Halving the storage — and often roughly doubling the speed — invites a 16-bit format.
+
+```{=html}
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewBox="0 0 760 320" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Floating-point formats: sign, exponent, mantissa</text><text x="136" y="88" font-size="14" fill="#333" text-anchor="end" font-weight="600">float32</text><rect x="150" y="70" width="18.0" height="28" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"/><rect x="168.0" y="70" width="144.0" height="28" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"/><text x="240.0" y="88" font-size="12" fill="#442079" text-anchor="middle" font-weight="600">8 exp</text><rect x="312.0" y="70" width="414.0" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/><text x="519.0" y="88" font-size="12" fill="#205279" text-anchor="middle" font-weight="600">23 mantissa</text><text x="136" y="138" font-size="14" fill="#333" text-anchor="end" font-weight="600">float16</text><rect x="150" y="120" width="36.0" height="28" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"/><rect x="186.0" y="120" width="180.0" height="28" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"/><text x="276.0" y="138" font-size="12" fill="#442079" text-anchor="middle" font-weight="600">5 exp</text><rect x="366.0" y="120" width="360.0" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/><text x="546.0" y="138" font-size="12" fill="#205279" text-anchor="middle" font-weight="600">10 mantissa</text><text x="136" y="188" font-size="14" fill="#333" text-anchor="end" font-weight="600">bfloat16</text><rect x="150" y="170" width="36.0" height="28" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"/><rect x="186.0" y="170" width="288.0" height="28" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"/><text x="330.0" y="188" font-size="12" fill="#442079" text-anchor="middle" font-weight="600">8 exp</text><rect x="474.0" y="170" width="252.0" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/><text x="600.0" y="188" font-size="12" fill="#205279" text-anchor="middle" font-weight="600">7 mantissa</text><rect x="150" y="230" width="16" height="16" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"/><text x="172" y="243" font-size="13" fill="#666" text-anchor="start">1 sign bit</text><rect x="270" y="230" width="16" height="16" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"/><text x="292" y="243" font-size="13" fill="#666" text-anchor="start">exponent (range)</text><rect x="440" y="230" width="16" height="16" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/><text x="462" y="243" font-size="13" fill="#666" text-anchor="start">mantissa (precision)</text><text x="20" y="285" font-size="13" fill="#666" text-anchor="start">More exponent bits give a wider range; bfloat16 matches float32's 8 exponent bits and trades away mantissa</text><text x="20" y="303" font-size="13" fill="#666" text-anchor="start">(precision) instead, which makes it more stable for the numbers that arise in training than float16.</text></svg></div>
+```
+
+The obvious 16-bit format, `float16`, has 5 exponent bits. This is unstable: with so few exponent bits its largest representable value is around 65,000, and numbers beyond that become infinity — not implausible during training — while near the top of the range the gaps between representable numbers grow large, so a weight of 65,000 cannot be nudged to 64,999. The widely used alternative is `bfloat16` ("brain float", from Google Brain), which keeps 8 exponent bits like `float32` and gives up precision instead, sacrificing mantissa bits for range. For the kinds of numbers that arise in training, `bfloat16` is more stable.
+
+**Mixed precision.** The parameters are the quantities we are carefully tuning; the activations are transient. So we can keep the sensitive parts in high precision and the rest in low precision. The standard scheme computes the forward pass, the output, and the gradient in `float16`, then upcasts the gradient to `float32` and adds it to `float32` parameters. The quantity we tune stays high-precision, while the bulk of the computation runs at half the storage and roughly twice the speed.
+
+**Gradient accumulation.** A larger batch costs more memory. To use a batch larger than fits on the GPU, split it into **microbatches**: compute the gradient for one microbatch, add it to a running sum (kept, say, in CPU memory), compute the next, add it, and only after enough microbatches update the parameters. Since the batch gradient is a sum over examples, doing the sum sequentially gives an identical result while never holding the full batch at once — an effectively larger batch than memory allows, which matters when a small batch would make training unstable.
+
+**Activation rematerialization.** Backpropagation's caching of forward-pass activations is an optimization we can decline. If the caches are exhausting memory, we can simply not cache, and instead **recompute** the activations during the backward pass. This trades memory for compute: the backward pass, normally about twice the cost of the forward pass, grows more expensive — in the extreme, roughly quadratically. It is usually an act of desperation to fit a larger batch, but it is available. (Most people call this *checkpointing* or *gradient checkpointing*; *rematerialization* is a more descriptive name for recomputing rather than caching.)
+
+---
+
+## Fairness, Accountability, and Transparency {#sec-fairness}
+
+The rest of the course studied the technology itself. We now turn to its impact — what can go right and wrong when these models are applied to real problems. There is no settled name for this cluster of concerns; we use the standard term **fairness, accountability, and transparency**.
+
+The setting to keep in mind is classifying people. Many applications are not about people — house prices, cats versus dogs, machine translation — but many are, and there the central fact is this: a machine learning model can have **different performance on different subgroups** of its data. A cat-versus-dog classifier might simply be worse at Pomeranians. When the data is people, "subgroup" can mean a demographic group, and the differing performance can do real harm. Three examples run through this part.
+
+- **Skin cancer.** Suppose we build a convolutional network that diagnoses skin cancer from a photo of a skin lesion, classifying it as cancer to be treated or a benign mole. The characteristics of the image depend on skin color, so the model can perform differently across skin colors. If it works worse on some, and a health system adopts it, people with those skin colors face more misdiagnoses — cancers missed — and worse outcomes.
+- **Facial recognition.** Early commercial facial-recognition APIs were shown to be dramatically less accurate for dark-skinned women — a disparity along both skin color and gender at once [@buolamwini2018gender].
+- **Prison sentencing.** Suppose a model predicts a prison sentence from a written description of a case. If it is trained on historical data in which some demographic groups received harsher sentences, then — as we discuss below — the correct behavior of the model, in the machine learning sense, is to reproduce that bias.
+
+We carry the skin-cancer classifier through the rest of this part as the running example.
+
+### Measuring the problem {#sec-measuring}
+
+The simplest way to detect differing performance is to stop reporting a single accuracy over all data and instead **measure performance separately on each subgroup**. This is exactly how the facial-recognition disparity was found: rather than one accuracy number, accuracy was reported for each combination of skin color and gender, and the gaps became visible.
+
+The difficulty is doing this objectively. To measure accuracy per subgroup we must assign examples to subgroups, and deciding whether a person is, say, light- or dark-skinned is itself a subjective judgment. The measurement we need in order to see the problem carries a value judgment inside it.
+
+### Where does this come from? {#sec-where}
+
+Why might a model perform differently across groups? Several sources.
+
+**Distribution shift.** The broadest source is that we train on data from one distribution but deploy on another. We collect input–output pairs from a distribution $p(\bm{x}, y)$ and then test on a different distribution $\hat{p}(\bm{x}, y)$. This violates the assumption, standing since Lecture 1, that training and test data are drawn independently from the *same* distribution (the i.i.d. assumption). In practice that assumption almost never holds exactly, because the world changes over time: data collected in 2010 and a model deployed in 2020 will generally see different distributions. Distribution shift is the norm, not the exception.
+
+**Issues with the dataset.** The data may carry patterns we do not want the model to reproduce. A language model scraped from the internet is trained on text written from an enormous variety of perspectives, some of which a given user will find problematic — meaning, in the end, that it does not reflect that user's values. A model trained on such data can, and in the maximum-likelihood sense *should*, mimic it: if a pattern is in the data, the model learns it. The natural response — inspect the data and remove or edit what conflicts with our values — runs into scale. These datasets are often unfathomably large, tens of trillions of tokens, far too large to audit by hand. So the auditing is offloaded to a program, which may itself be imprecise.
+
+**Representativeness.** A related question is who a dataset represents — who participated in creating it, whose values it encodes, and who decided how to collect and curate it. Some demographic groups and geographic regions are better represented on the internet than others. And in a task like the skin-cancer classifier, if we gather lesion photos from one hospital serving one population but deploy globally, the local skin characteristics will not match the world's. Two concrete cases:
+
+- **Wikipedia.** Wikipedia is often used as a source of clean, grammatical, factual text — for instance, to train a classifier that keeps web text resembling Wikipedia and discards the rest. But Wikipedia was overwhelmingly written by white men, so treating it as the standard of good text can quietly encode one group's knowledge and perspective as the norm.
+- **A bad-words filter.** In building an openly released language model, one team filtered training data by discarding any web page containing a word from an existing list of banned words (a list written for comment moderation, adopted to avoid imposing the team's own judgments) [@raffel2020exploring]. The filter turned out to remove text unevenly: text written by, for example, LGBTQ authors was more likely to be discarded, because terms they were more likely to use appeared on the conservative list — so those groups ended up less represented in the data, with downstream effects that are hard to pin down.
+
+**Privacy and consent.** Content scraped from the internet was usually posted without model training in mind. Two problems follow from the fact that models can **memorize** their training data — a trained model can often be induced to emit a training example verbatim, whether a passage of text or an image [@carlini2021extracting]. First, privacy: someone who posted content, perhaps expecting some control over its storage and reproduction, may have that content reproduced by a model. Second, consent: posting to share with friends is not the same as consenting to permanent, unremovable storage in a model's weights. A third, related question is how much a model **remixes** versus reproduces its training data. Because we lack a precise notion of generalization, it is unclear whether a given generation is genuinely new or closely based on training data — which raises unresolved legal and copyright questions.
+
+### It is not only the data {#sec-modeling}
+
+Data clearly shapes a model's behavior — if it did not, there would be no point in machine learning. It is tempting to conclude that the data is therefore the only thing to fix: clean the data and the model is clean. Data matters, but other choices matter too. Modeling decisions can affect performance across subgroups on their own.
+
+A deliberately simple example. Take a dataset of 49 light-skinned faces and 50 dark-skinned faces — about as balanced as a 99-image set can be — and two generative models of faces. The first fits a zero-covariance Gaussian, so it always outputs the *average* face: a single blurry image of intermediate skin tone. The second outputs the *median* face, which — because the darker-skinned faces are the slight majority — is a dark-skinned face. Same data, two models, two very different behaviors. These toy models are almost useless, but real models do something in the same family: some averaging, some matching of the modes of the data, and some generative models deliberately seek modes, fitting one subpopulation well and another poorly. The choice is a modeling decision, not a property of the data.
+
+A less toy example is **model compression** — taking a large model and producing a smaller or faster one (by quantizing weights to lower precision, sparsifying, or otherwise shrinking it) with comparable accuracy. When the accuracy is comparable but slightly worse, one can ask which data the compressed model does worse on. Current techniques tend to sacrifice accuracy on the **long tail**: data with less common characteristics is hit harder by compression than typical data [@hooker2020characterising].
+
+::: {.callout-note}
+**"Models aren't biased, data is."** This is a claim people sometimes make. The examples above are the reply: the generative model's average-versus-median choice and compression's effect on the long tail both shift behavior across subgroups through the *modeling*, with the data held fixed. You cannot fix everything by fixing the data.
+:::
+
+### Who is responsible? {#sec-auditing}
+
+Suppose we accept that a model may perform differently across subgroups for some mix of data and modeling reasons. Who should be responsible for **noticing** — not necessarily fixing, but noticing — these issues? Each candidate has a problem.
+
+- **Industry** — the companies building and deploying the models — has misaligned incentives. A product making money creates a reason not to take it down even after a harm to some group is found. If the skin-cancer model saves the cost of paying doctors, there is an incentive to keep using it even when it misclassifies.
+- **A watchdog group** that audits systems and discloses problems, like white-hat hackers, has no control over how models are built or deployed. It can only plug holes in a sinking ship — flagging one problem at a time, unable to fix them or to be comprehensive.
+- **The impacted people** — "if it does not work for you, tell us" — face a double burden: the model already works worse for them, and now the work of fixing it is placed on them too.
+- **Researchers**, who develop the technology, should think through its implications, and often can. But nearly every technology here is **dual use** — usable for good or ill.
+
+::: {.callout-note}
+**Dual use.** A generative model of molecules built for drug discovery is, by the same token, good at designing poisons and bioweapons, which has been demonstrated. Convolutional networks that recognize faces make it possible, by scraping named photos from the internet, to identify people in public and end anonymity — a product that exists and that some police forces use. Even a high-school project on the sphere-packing problem, done at a hospital, was eventually cited only in a cigarette company's patent on fitting more cigarettes in a box. Thinking through positive and negative outcomes is necessary but does not by itself prevent the negative ones; more is needed.
+:::
+
+### Alignment {#sec-alignment}
+
+Finally, once a problem is identified, fixing it is not always feasible: re-filtering the data and retraining may be expensive, the problem may not be fixable earlier in the pipeline, and it may be hard to anticipate in advance. Meanwhile models are increasingly deployed in user-facing settings and are expected to do almost anything. A general-purpose model that can do anything can do helpful, harmless things — or unhelpful, harmful ones.
+
+So it helps to characterize the desired behavior. One starting framework, memorable partly for its alliteration, asks that a model be [@askell2021general]:
+
+- **Helpful** — it does what it is asked, and not something else;
+- **Harmless** — it does not harm people;
+- **Honest** — it accurately reflects the information it is given or trained on.
+
+These principles are plainly too simple to be the whole answer, but they are a place to start. The concern is that failures to be helpful, harmless, or honest can be **exacerbated as the action space expands** — as models are allowed to do more, the downstream consequences of falling short of these principles grow. There is no single answer that makes the technology only helpful, only harmless, and only honest. The point is to keep these questions in view when applying what this course has taught.
+
+## Summary {#sec-summary}
+
+::: {.callout-note}
+**Key takeaways from Lecture 12:**
+
+- Neural networks run on **accelerators** with fixed memory, and models keep growing (ELMo's ~100M parameters in 2018 to PaLM's ~540B in 2022), so training must be **distributed** across many accelerators.
+- Abstractly, a network is a stack of matrix–vector products $\bm{W}\bm{h}$; training memory is spent on **parameters, batch size, cached activations, and optimizer states** (Adam needs ~3× the parameters), and compute on the forward pass, the gradient, and the batch sum.
+- **Data parallelism** replicates the model and splits the batch — simple, low communication, but requires the whole model to fit on each device and depends on batch size. **Tensor parallelism** splits each weight matrix across devices — fits larger models, but communicates every matrix product. **Pipeline parallelism** splits the model by layers — low-ish communication, but leaves devices idle in the **bubble** and gives no speedup on its own.
+- Further engineering tricks: lower-precision formats (`bfloat16` keeps `float32`'s 8 exponent bits for stability, unlike `float16`), **mixed precision** (high-precision weights, low-precision everything else), **gradient accumulation** (sum microbatch gradients for a larger effective batch), and **activation rematerialization** (recompute activations to save memory at the cost of compute).
+- A model can have **different performance on different subgroups** of people (skin-cancer diagnosis, facial recognition, sentencing); this is detected by **measuring accuracy per subgroup**, which itself requires subjective grouping.
+- Disparities arise from **distribution shift** (the i.i.d. assumption rarely holds), **dataset issues and representativeness** (who the data represents, whose values, who curated it — Wikipedia, bad-words filtering), **privacy and consent** (models memorize and remix data), and from **modeling choices**, not data alone (average-versus-median generation, compression sacrificing the long tail).
+- No single party is well placed to **audit** (industry's incentives, watchdogs' lack of control, the impacted people's double burden, researchers facing **dual use**), and nearly all of this technology is dual use. A starting framework for desired behavior is that models be **helpful, harmless, and honest**, with the caveat that failures grow as the action space expands.
+:::
+
+**Next lecture:** This is the final lecture of the course. Having covered the architectures, objectives, and optimizers that make up modern deep learning — and now the engineering that makes them run and the questions raised when they are applied to people — you are equipped to build with these tools, and to do so responsibly.

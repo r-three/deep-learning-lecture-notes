@@ -27,6 +27,7 @@ book:
     - lectures/09-transformers-part-2-large-language-models.qmd
     - lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.qmd
     - lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.qmd
+    - lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.qmd
 
 format:
   html:
