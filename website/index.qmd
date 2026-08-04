@@ -72,7 +72,7 @@ prerequisites for the undergraduate version of this course, see
 | 8 | [Transformers part 1](lectures/08-transformers-part-1.qmd) |
 | 9 | [Transformers part 2, large language models](lectures/09-transformers-part-2-large-language-models.qmd) |
 | 10 | [Architecture grab bag part 1: LoRA, GNNs, and MoEs](lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.qmd) |
-| 11 | Architecture grab bag part 2: transposed convolution, UNet, autoencoders, and VAEs |
+| 11 | [Architecture grab bag part 2: transposed convolution, UNet, autoencoders, and VAEs](lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.qmd) |
 | 12 | Deep learning engineering; fairness, accountability, and transparency |
 
 ---
