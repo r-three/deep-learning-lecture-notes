@@ -72,6 +72,82 @@ Enable GitHub Pages in the repo settings (source: `gh-pages` branch, root `/`).
 
 ---
 
+## Authoring a Lecture from Notes (Transcript + Slides)
+
+Each lecture is written from its **transcript** and **slides** in
+`lecture_notes/Lecture <N>/`, following three reference guides:
+`website/persona.md` (voice and structure), `website/notation.qmd` (symbols),
+and `website/style.md` (figures). Three helper scripts at the repo root turn
+this into a repeatable, three-stage pipeline: **draft → refine text → fix
+figures**. Each script *generates a prompt* — you run that prompt in Claude Code,
+which reads the sources plus the guides and does the writing or editing. The
+scripts themselves only detect files and fill the prompt; they do not call a
+model.
+
+**Prerequisites for this pipeline** (not needed to build or view the site):
+Python 3 (standard library only — no packages to install) for the scripts, and
+Google Chrome for the figure-render check in the visual pass.
+
+Expected source layout (filenames are auto-detected, case- and space-insensitive):
+
+```
+lecture_notes/Lecture 11/
+  lecture11_transcript.txt   # the spoken transcript
+  Lecture11.pdf              # the slides / notes PDF
+  [anything *bonus* / *supplement* .pdf is picked up too]
+```
+
+### 1. Draft the `.qmd`
+
+```bash
+python gen_lecture_prompt.py 11 --title "Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs" --write
+```
+
+Writes `lecture_notes/Lecture 11/generation-prompt.filled.md`. Hand that prompt
+to Claude Code; it reads the transcript, slides, and the three guides, then
+drafts `website/lectures/11-<slug>.qmd` — prose in the lecture's measured voice,
+with inline SVG figures. Afterward, wire the file into `_quarto.yml` (see
+[Adding a New Lecture](#adding-a-new-lecture)) and run `quarto render` to confirm
+it compiles.
+
+### 2. Refine the text for alignment (fidelity pass)
+
+```bash
+python gen_fidelity_prompt.py 11 --write
+```
+
+Writes `lecture_notes/Lecture 11/fidelity-prompt.filled.md`. Running that prompt
+compares the drafted `.qmd` against the transcript and slides, records every
+discrepancy — `MISSING`, `MISALIGNED / INCORRECT`, `UNSOURCED ADDITIONS`,
+`ORDERING`, `NOTATION / VOICE` — in `lecture_notes/Lecture 11/fidelity-report.txt`,
+and then edits the `.qmd` to add the missing substance and correct the
+misaligned statements (targeted edits only, preserving voice and structure).
+
+### 3. Adjust and fix the figures (visual pass)
+
+```bash
+python gen_visual_prompt.py 11 --write
+```
+
+Writes `lecture_notes/Lecture 11/visual-prompt.filled.md`. Running that prompt
+renders each inline SVG (headless Chrome screenshot), *looks* at it next to the
+hand-drawn slide, and flags wrong numbers/labels and layout problems (overlaps,
+clipping, off-canvas text, misalignment, palette misuse). Findings go to
+`lecture_notes/Lecture 11/visual-report.txt`, and the SVG coordinates, labels,
+and values in the `.qmd` are corrected and re-rendered until each figure matches
+its source.
+
+**Options** (all three scripts):
+
+- Omit `--write` to print the prompt to stdout instead of saving it.
+- `--report <name>` overrides the report filename (passes 2 and 3).
+- `gen_lecture_prompt.py` needs `--title "..."` unless the lecture is in its
+  built-in registry; `--slug` is derived from the title if omitted.
+- After each stage, `cd website && quarto render lectures/11-<slug>.qmd` to
+  confirm the page still compiles (SVGs intact, no broken math or citations).
+
+---
+
 ## Writing Interactive Widgets
 
 Observable JS chunks are fenced with ` ```{ojs} `. They have access to:
