@@ -49,7 +49,7 @@ We will return to the question of what happens when that error is *not* small.
 
 The size of the error term, and therefore whether the update actually decreases $f$, depends on the learning rate $\eta$. This gives three qualitatively different regimes.
 
-If we want to be sure the approximate inequality holds, we can make $\epsilon = -\eta f'(x)$ very small by making $\eta$ very small. This works, but each step then covers very little ground, so minimizing the function takes a great many iterations. In deep learning each iteration means a forward and backward pass through the model, and, as we saw when we covered backpropagation (Lecture 2), the backward pass roughly triples the cost of the forward pass. A very small learning rate multiplies an already expensive computation by the number of steps, and training may run out of time or budget before it converges.
+If we want to be sure the approximate inequality holds, we can make $\epsilon = -\eta f'(x)$ very small by making $\eta$ very small. This works, but each step then covers very little ground, so minimizing the function takes a great many iterations. In deep learning each iteration means a forward and backward pass through the model, and, as we saw last lecture (Lecture 3), the backward pass roughly triples the cost of the forward pass. A very small learning rate multiplies an already expensive computation by the number of steps, and training may run out of time or budget before it converges.
 
 The opposite choice is a large $\eta$, to make faster progress. But when $\eta$ is too large the error term is no longer negligible, and the update can overshoot so badly that the new point is *worse* than where it started. Instead of decreasing, $f$ increases, and increases again on the next step. This is **divergence**: when training a model, we see the loss climbing rather than falling.
 
@@ -57,7 +57,7 @@ The learning rate we want is somewhere between these, "just right": large enough
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 650 608" width="100%" style="max-width:650px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 730 608" width="100%" style="max-width:730px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
   <defs><marker id="lrArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
   <text x="40" y="26" font-size="24" font-weight="600" fill="#333">Choosing the learning rate η</text>
   <g transform="translate(40,44)">
@@ -263,7 +263,7 @@ A picture helps convey why a single learning rate struggles here. Suppose the lo
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 760 300" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="30" y="28" font-size="16" font-weight="600" fill="#333">Descending in a valley: one learning rate, two curvatures</text>
 <ellipse cx="380" cy="150" rx="300" ry="70" fill="none" stroke="#57C7AE" stroke-width="1.5" opacity="0.40"/>
 <ellipse cx="380" cy="150" rx="234" ry="55" fill="none" stroke="#57C7AE" stroke-width="1.5" opacity="0.51"/>

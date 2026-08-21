@@ -73,13 +73,13 @@ To compute the output at $(i,j)$, we center the kernel at $(i,j)$ in the input, 
 
 It is easier to see what a convolution does with actual arithmetic. Take a $3\times3$ input image $\bm{X}$ with entries $0$ through $8$, and convolve it with a $2\times2$ kernel $\bm{V}$ with entries $0,1,2,3$. We can place the kernel at every valid location — every position where it fits entirely inside the input — and compute a dot product at each. There are four such positions, so the output has four entries. For the top-left position,
 
-$$0\cdot0 + 1\cdot1 + 2\cdot3 + 3\cdot4 = 17.$$
+$$0\cdot0 + 1\cdot1 + 2\cdot3 + 3\cdot4 = 19.$$
 
 Sliding the window one pixel right, down, and down-right gives $25$, $37$, and $43$.
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 660 250" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 660 285" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="cArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
 <text x="30" y="30" font-size="24" font-weight="600" fill="#333">Convolution: a worked example</text>
 <rect x="30" y="70" width="46" height="46" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
@@ -114,7 +114,7 @@ Sliding the window one pixel right, down, and down-right gives $25$, $37$, and $
 <text x="258" y="207" text-anchor="middle" font-size="15" fill="#666">kernel V (2×2)</text>
 <text x="324" y="147" text-anchor="middle" font-size="26" fill="#555">=</text>
 <rect x="350" y="93.0" width="46" height="46" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<text x="373" y="123" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">17</text>
+<text x="373" y="123" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">19</text>
 <rect x="396" y="93.0" width="46" height="46" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
 <text x="419" y="123" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">25</text>
 <rect x="350" y="139.0" width="46" height="46" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
@@ -123,7 +123,7 @@ Sliding the window one pixel right, down, and down-right gives $25$, $37$, and $
 <text x="419" y="169" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">43</text>
 <text x="396" y="207" text-anchor="middle" font-size="15" fill="#666">output H (2×2)</text>
 <rect x="350" y="93.0" width="46" height="46" fill="none" stroke="#e53935" stroke-width="2.5"/>
-<text x="30" y="230" font-size="16" fill="#792051">Top-left entry:  0·0 + 1·1 + 2·3 + 3·4 = 17</text>
+<text x="30" y="262" font-size="16" fill="#792051">Top-left entry:  0·0 + 1·1 + 2·3 + 3·4 = 19</text>
 </svg></div>
 ```
 
@@ -145,7 +145,7 @@ That the output shrinks is inconvenient. The standard remedy is **padding**: add
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 560 240" width="100%" style="max-width:560px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 560 300" width="100%" style="max-width:560px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="20" y="28" font-size="24" font-weight="600" fill="#333">Padding preserves the output size</text>
 <rect x="30" y="60" width="40" height="40" fill="#EEF4FA" stroke="#B9CFDF" stroke-width="1.3"/>
 <text x="50" y="87" text-anchor="middle" font-size="18" font-weight="400" fill="#9BB0C4">0</text>
@@ -234,7 +234,7 @@ The most common form is **max pooling**, whose reduction is the maximum. Applyin
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 620 220" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 620 250" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="pArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
 <text x="30" y="30" font-size="24" font-weight="600" fill="#333">Max pooling (2×2)</text>
 <rect x="30" y="64" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
@@ -268,7 +268,7 @@ The most common form is **max pooling**, whose reduction is the maximum. Applyin
 <rect x="360" y="130.0" width="44" height="44" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
 <text x="382" y="159" text-anchor="middle" font-size="20" font-weight="600" fill="#207965">8</text>
 <text x="360" y="194" text-anchor="middle" font-size="15" fill="#666">output (2×2)</text>
-<text x="30" y="205" font-size="14" fill="#666">Each output entry is the maximum of the corresponding 2×2 window.</text>
+<text x="30" y="238" font-size="14" fill="#666">Each output entry is the maximum of the corresponding 2×2 window.</text>
 </svg></div>
 ```
 
@@ -305,7 +305,7 @@ With convolution and pooling, and the dense layers from earlier lectures, we can
 
 If the pooling stride equals the pooling window size, each block shrinks the spatial dimensions. A common convention is to increase the number of channels as the spatial dimensions shrink, so that the cost and parameter count of each layer stay roughly fixed.
 
-Eventually we want to produce a prediction. Suppose we want to classify an image into ten classes, but the network has produced an activation volume of some height, width, and number of channels — say $7\times7\times100$ — over which we have little direct control. To turn a three-dimensional volume into a vector, we **flatten** it: a $7\times7\times100$ volume becomes a vector of $4900$ entries (a `reshape(-1)` in NumPy terms). We then apply one or more dense layers, ending in a softmax classifier, exactly as for a multilayer perceptron. The order in which we flatten does not matter, because a dense layer has no notion of order among its inputs — permuting the inputs and the corresponding weights leaves the output unchanged. That absence of order is precisely why we introduced convolutions: images have an order that dense layers ignore.
+Eventually we want to produce a prediction. Classification is not the only goal — a task like segmentation wants an output that keeps its spatial dimensions — but suppose we want to classify an image into ten classes. The network has produced an activation volume of some height, width, and number of channels — say $7\times7\times100$ — over which we have little direct control. To turn a three-dimensional volume into a vector, we **flatten** it: a $7\times7\times100$ volume becomes a vector of $4900$ entries (a `reshape(-1)` in NumPy terms). We then apply one or more dense layers, ending in a softmax classifier, exactly as for a multilayer perceptron. The order in which we flatten does not matter, because a dense layer has no notion of order among its inputs — permuting the inputs and the corresponding weights leaves the output unchanged. That absence of order is precisely why we introduced convolutions: images have an order that dense layers ignore.
 
 This simple network is enough to do image classification. Several later architectural innovations, though, make convolutional networks easier to train, and we cover two of them next: batch normalization and residual connections.
 

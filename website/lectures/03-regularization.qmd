@@ -326,7 +326,7 @@ $$\mathcal{L}_{\text{reg}} = \mathcal{L} + \lambda \lVert W \rVert_2^2$$
 
 The gradient descent update on this regularized loss is
 
-$$W \leftarrow W - \eta \nabla_W\!\left(\mathcal{L} + \lambda \lVert W \rVert_2^2\right) = W - \eta \nabla_W \mathcal{L} + (1 - 2\eta\lambda)\, W$$
+$$W \leftarrow W - \eta \nabla_W\!\left(\mathcal{L} + \lambda \lVert W \rVert_2^2\right) = (1 - 2\eta\lambda)\, W - \eta \nabla_W \mathcal{L}$$
 
 Since $\eta$ and $\lambda$ are both small, $(1-2\eta\lambda)$ is a number just under $1$ — every update multiplicatively **shrinks** $W$ a little, in addition to the usual gradient step. This is why L2 regularization is also called **weight decay**.
 
