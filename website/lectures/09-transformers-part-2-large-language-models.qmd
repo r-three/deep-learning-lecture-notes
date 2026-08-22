@@ -23,7 +23,7 @@ Drawing this as an attention matrix, where a cell is filled if that attention is
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 520 340" width="100%" style="max-width:520px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 520 358" width="100%" style="max-width:520px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="20" y="28" font-size="22" font-weight="600" fill="#333">Decoder-only: each token attends to the past</text>
 <text x="152" y="80" text-anchor="middle" font-size="14" fill="#205279">&lt;bos&gt;</text>
 <text x="216" y="80" text-anchor="middle" font-size="14" fill="#205279">the</text>
@@ -56,7 +56,8 @@ Drawing this as an attention matrix, where a cell is filled if that attention is
 <rect x="248" y="246" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"/>
 <rect x="312" y="246" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"/>
 <rect x="376" y="246" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"/>
-<text x="20" y="322" font-size="13" fill="#666">Filled cells are allowed attention — a lower-triangular (causal) pattern. No modification to the architecture.</text>
+<text x="20" y="322" font-size="13" fill="#666">Filled cells are allowed attention — a lower-triangular (causal) pattern.</text>
+<text x="20" y="340" font-size="13" fill="#666">No modification to the architecture.</text>
 </svg></div>
 ```
 
@@ -98,7 +99,7 @@ So people trained transformers on text, and since there was more text, trained l
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 460 300" width="100%" style="max-width:460px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 460 328" width="100%" style="max-width:460px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="20" y="28" font-size="22" font-weight="600" fill="#333">Scaling is predictable</text>
 <line x1="90" y1="70" x2="90" y2="250" stroke="#555" stroke-width="1.6"/>
 <line x1="90" y1="250" x2="410" y2="250" stroke="#555" stroke-width="1.6"/>
@@ -107,7 +108,8 @@ So people trained transformers on text, and since there was more text, trained l
 <text x="80" y="178" text-anchor="end" font-size="14" fill="#555">loss</text>
 <text x="80" y="196" text-anchor="end" font-size="13" fill="#888">(log)</text>
 <text x="250" y="278" text-anchor="middle" font-size="14" fill="#555">parameters (log)</text>
-<text x="20" y="288" font-size="13" fill="#666">Across many orders of magnitude, larger model and more data give a lower, predictable test loss.</text>
+<text x="20" y="298" font-size="13" fill="#666">Across many orders of magnitude, larger model and more data</text>
+<text x="20" y="316" font-size="13" fill="#666">give a lower, predictable test loss.</text>
 </svg></div>
 ```
 
@@ -198,14 +200,14 @@ This is the same as the encoder–decoder attention of the sequence-to-sequence 
 <line x1="646" y1="142.0" x2="660" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"/>
 <path d="M134,116 Q134,100 184,100 Q233,100 233,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"/>
 <path d="M502,116 Q502,100 540,100 Q579,100 579,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"/>
-<path d="M260,116 Q260,88 342,88 Q423,88 423,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"/>
+<path d="M305,116 Q305,88 364,88 Q423,88 423,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"/>
 <path d="M63,192 L63,186 L356,186 L356,164" fill="none" stroke="#57C7AE" stroke-width="1.8" marker-end="url(#eA)"/>
 <text x="364" y="194" font-size="12" fill="#207965">encoder outputs (keys, values)</text>
 <text x="20" y="228" font-size="13" fill="#666">Cross-attention: queries from the decoder, keys and values from the encoder outputs; inserted between self-attention and the FFN.</text>
 </svg></div>
 ```
 
-The encoder is unchanged, and the decoder differs from a decoder-only transformer only by the added cross-attention sublayer, which takes the encoder outputs as its keys and values. To train an encoder-decoder transformer, we can always use supervised sequence-to-sequence data — feed the English sentence into the encoder and train the decoder to generate the French translation, as with the sequence-to-sequence RNN. To train on unlabeled data, we use an objective similar to masked language modeling: corrupt some text by masking spans, and train the model to predict the missing parts [@raffel2020exploring]. Given "Thank you for inviting me to your party," we might mask "for inviting" and "party" to get "Thank you `<mask>` me to your `<mask>`," with target "`<mask>` for inviting `<mask>` party." Because the missing spans are generated autoregressively as an output sequence, a masked span can cover several tokens — unlike masked language modeling in an encoder-only model, where each masked position corresponds to a single token.
+The encoder is unchanged, and the decoder differs from a decoder-only transformer only by the added cross-attention sublayer, which takes the encoder outputs as its keys and values. To train an encoder-decoder transformer, we can always use supervised sequence-to-sequence data — feed the English sentence into the encoder and train the decoder to generate the French translation, as with the sequence-to-sequence RNN. To train on unlabeled data, we use an objective similar to masked language modeling: corrupt some text by masking spans, and train the model to predict the missing parts [@raffel2020exploring]. Given "Thank you for inviting me to your party," we might mask "for inviting" and "party" to get "Thank you `<mask>` me to your `<mask>`," with target "for inviting `<sep>` party" — the two recovered spans separated by a `<sep>` token. Because the missing spans are generated autoregressively as an output sequence, a masked span can cover several tokens — unlike masked language modeling in an encoder-only model, where each masked position corresponds to a single token.
 
 ::: {.callout-note}
 **Decoder-only or encoder-decoder for sequence-to-sequence?** A decoder-only transformer can also do sequence-to-sequence tasks — the prompting above feeds in a prefix and generates a continuation. The difference is that an encoder-decoder transformer has a separate encoder stack, with its own parameters, that processes the input with full visibility, whereas a decoder-only transformer's causal mask limits how the prefix is attended to. Both work; the encoder-decoder arrangement is arguably a more natural fit for sequence-to-sequence tasks.
@@ -263,7 +265,7 @@ To use a transformer we need a sequence, but an image is a grid of pixels with c
 <text x="42" y="148" text-anchor="end" font-size="13" fill="#666">h</text>
 <text x="128" y="252" text-anchor="middle" font-size="13" fill="#666">w × C channels</text>
 <line x1="222" y1="96" x2="300" y2="96" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"/>
-<text x="236" y="88" font-size="12" fill="#666">flatten P×P patch</text>
+<text x="236" y="60" font-size="12" fill="#666">flatten P×P patch</text>
 <rect x="310" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
 <rect x="356" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
 <rect x="402" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
@@ -284,7 +286,7 @@ This works well, with one caveat: it works especially well after pre-training. S
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 500 300" width="100%" style="max-width:500px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 500 328" width="100%" style="max-width:500px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Pre-training and inductive bias</text>
 <line x1="110" y1="64" x2="110" y2="244" stroke="#555" stroke-width="1.6"/>
 <line x1="110" y1="244" x2="410" y2="244" stroke="#555" stroke-width="1.6"/>
@@ -296,7 +298,8 @@ This works well, with one caveat: it works especially well after pre-training. S
 <text x="100" y="148" text-anchor="end" font-size="13" fill="#555">downstream</text>
 <text x="100" y="164" text-anchor="end" font-size="13" fill="#555">performance</text>
 <text x="260" y="272" text-anchor="middle" font-size="13" fill="#555">size of pre-training dataset</text>
-<text x="20" y="290" font-size="13" fill="#666">The vision transformer needs more pre-training than a convnet, but surpasses it once pre-trained enough.</text>
+<text x="20" y="298" font-size="13" fill="#666">The vision transformer needs more pre-training than a convnet,</text>
+<text x="20" y="316" font-size="13" fill="#666">but surpasses it once pre-trained enough.</text>
 </svg></div>
 ```
 
