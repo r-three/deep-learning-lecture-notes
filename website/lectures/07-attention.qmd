@@ -33,7 +33,7 @@ Drawing the mechanism helps. We have a set of keys and a query. The mechanism fi
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 720 300" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="aA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
 <text x="24" y="30" font-size="24" font-weight="600" fill="#333">An attention mechanism</text>
 <rect x="40" y="70" width="90" height="150" rx="4" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
@@ -66,10 +66,10 @@ Drawing the mechanism helps. We have a set of keys and a query. The mechanism fi
 <line x1="420" y1="177.1" x2="510" y2="177.1" stroke="#57C7AE" stroke-width="1"/>
 <line x1="420" y1="198.6" x2="510" y2="198.6" stroke="#57C7AE" stroke-width="1"/>
 <text x="465" y="62" text-anchor="middle" font-size="14" fill="#666">values</text>
-<text x="545" y="150" font-size="15" fill="#333">reduce</text>
-<line x1="520" y1="138" x2="590" y2="138" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"/>
-<rect x="560" y="120" width="100" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-<text x="610" y="143" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
+<text x="540" y="120" font-size="15" fill="#333">reduce</text>
+<line x1="515" y1="138" x2="596" y2="138" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"/>
+<rect x="600" y="120" width="100" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="650" y="143" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
 <text x="24" y="292" font-size="14" fill="#666">Compare the query to every key to get scores; reduce the values by those scores to get the output.</text>
 </svg></div>
 ```
@@ -188,7 +188,7 @@ Why is a sequence of weighted averages a reasonable thing to compute? One way to
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewBox="0 0 720 320" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
-<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Path length: operations to mix xₐ and x₅</text>
+<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Path length: operations to mix x₁ and x₅</text>
 <text x="30" y="70" font-size="16" font-weight="600" fill="#333">ConvNet (length-3)</text>
 <line x1="64" y1="180" x2="30" y2="250" stroke="#e53935" stroke-width="2.6"/>
 <line x1="64" y1="180" x2="64" y2="250" stroke="#aaa" stroke-width="1.2"/>
@@ -265,24 +265,24 @@ The whole mechanism is two matrix multiplications. Stack the queries into a $T \
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 720 340" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 720 362" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="20" y="28" font-size="22" font-weight="600" fill="#333">Self-attention as two matrix multiplications</text>
 <text x="20" y="58" font-size="16" font-weight="600" fill="#442079">Comparison</text>
 <rect x="60" y="72" width="42" height="84" rx="3" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
 <text x="81" y="66" text-anchor="middle" font-size="13" fill="#666">d_k</text>
 <text x="52" y="118" text-anchor="end" font-size="13" fill="#666">T</text>
 <text x="81" y="174" text-anchor="middle" font-size="13" fill="#442079" font-weight="600">queries</text>
-<text x="112" y="122" font-size="20" fill="#555">×</text>
-<rect x="130" y="90" width="84" height="42" rx="3" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
-<text x="172" y="84" text-anchor="middle" font-size="13" fill="#666">T</text>
-<text x="122" y="115" text-anchor="end" font-size="13" fill="#666">d_k</text>
-<text x="172" y="150" text-anchor="middle" font-size="13" fill="#205279" font-weight="600">keys</text>
-<text x="228" y="122" font-size="20" fill="#555">=</text>
-<rect x="250" y="72" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
-<text x="292" y="66" text-anchor="middle" font-size="13" fill="#666">T</text>
-<text x="242" y="118" text-anchor="end" font-size="13" fill="#666">T</text>
-<text x="292" y="174" text-anchor="middle" font-size="13" fill="#792051" font-weight="600">scores</text>
-<text x="342" y="122" font-size="16" fill="#555">÷ √d_k</text>
+<text x="118" y="122" font-size="20" fill="#555">×</text>
+<rect x="160" y="90" width="84" height="42" rx="3" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="202" y="84" text-anchor="middle" font-size="13" fill="#666">T</text>
+<text x="152" y="115" text-anchor="end" font-size="13" fill="#666">d_k</text>
+<text x="202" y="150" text-anchor="middle" font-size="13" fill="#205279" font-weight="600">keys</text>
+<text x="258" y="122" font-size="20" fill="#555">=</text>
+<rect x="280" y="72" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
+<text x="322" y="66" text-anchor="middle" font-size="13" fill="#666">T</text>
+<text x="272" y="118" text-anchor="end" font-size="13" fill="#666">T</text>
+<text x="322" y="174" text-anchor="middle" font-size="13" fill="#792051" font-weight="600">scores</text>
+<text x="372" y="122" font-size="16" fill="#555">÷ √d_k</text>
 <text x="20" y="212" font-size="16" font-weight="600" fill="#442079">Reduction</text>
 <rect x="90" y="226" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
 <text x="132" y="220" text-anchor="middle" font-size="13" fill="#666">T</text>
@@ -299,7 +299,7 @@ The whole mechanism is two matrix multiplications. Stack the queries into a $T \
 <text x="311" y="220" text-anchor="middle" font-size="13" fill="#666">d_v</text>
 <text x="282" y="272" text-anchor="end" font-size="13" fill="#666">T</text>
 <text x="311" y="328" text-anchor="middle" font-size="13" fill="#794520" font-weight="600">output</text>
-<text x="20" y="332" font-size="14" fill="#666">Each row of the attention matrix is a softmax; multiplying by the values gives one weighted average per position.</text>
+<text x="20" y="352" font-size="14" fill="#666">Each row of the attention matrix is a softmax; multiplying by the values gives one weighted average per position.</text>
 </svg></div>
 ```
 
@@ -353,33 +353,34 @@ $$\text{Output} = \bm{W}_O \begin{bmatrix} \bm{h}^{(1)} \\ \bm{h}^{(2)} \\ \vdot
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 640 300" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 640 356" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="mA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
 <text x="20" y="28" font-size="22" font-weight="600" fill="#333">Multi-headed self-attention</text>
-<rect x="260" y="244" width="120" height="34" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
-<text x="320" y="266" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">input x</text>
-<rect x="60" y="140" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
-<text x="115" y="162" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
-<text x="115" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 1</text>
-<line x1="320" y1="244" x2="115" y2="190" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
-<line x1="115" y1="140" x2="320" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
-<rect x="200" y="140" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
-<text x="255" y="162" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
-<text x="255" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 2</text>
-<line x1="320" y1="244" x2="255" y2="190" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
-<line x1="255" y1="140" x2="320" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
-<text x="395" y="174" text-anchor="middle" font-size="22" fill="#999">···</text>
-<rect x="480" y="140" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
-<text x="535" y="162" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
-<text x="535" y="180" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head H</text>
-<line x1="320" y1="244" x2="535" y2="190" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
-<line x1="535" y1="140" x2="320" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
-<rect x="250" y="74" width="140" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-<text x="320" y="96" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">W_O · concat</text>
-<line x1="320" y1="74" x2="320" y2="50" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
-<rect x="260" y="14" width="120" height="34" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-<text x="320" y="36" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
-<text x="20" y="292" font-size="14" fill="#666">H heads attend in parallel with separate W_Q, W_K, W_V; W_O mixes and projects their stacked outputs.</text>
+<rect x="260" y="270" width="120" height="34" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="320" y="292" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">input x</text>
+<rect x="60" y="166" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="115" y="188" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
+<text x="115" y="206" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 1</text>
+<line x1="320" y1="270" x2="115" y2="216" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<line x1="115" y1="166" x2="320" y2="136" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="200" y="166" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="255" y="188" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
+<text x="255" y="206" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 2</text>
+<line x1="320" y1="270" x2="255" y2="216" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<line x1="255" y1="166" x2="320" y2="136" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<text x="395" y="200" text-anchor="middle" font-size="22" fill="#999">···</text>
+<rect x="480" y="166" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="535" y="188" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
+<text x="535" y="206" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head H</text>
+<line x1="320" y1="270" x2="535" y2="216" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<line x1="535" y1="166" x2="320" y2="136" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="250" y="100" width="140" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="320" y="122" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">W_O · concat</text>
+<line x1="320" y1="100" x2="320" y2="76" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
+<rect x="260" y="40" width="120" height="34" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="320" y="62" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
+<text x="20" y="328" font-size="14" fill="#666">H heads attend in parallel with separate W_Q, W_K, W_V;</text>
+<text x="20" y="346" font-size="14" fill="#666">W_O mixes and projects their stacked outputs.</text>
 </svg></div>
 ```
 
