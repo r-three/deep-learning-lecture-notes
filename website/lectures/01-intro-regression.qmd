@@ -11,7 +11,7 @@ bibliography: references.bib
 </div>
 ```
 
-**Overview.** This lecture begins by comparing traditional software, which is generally rule-based; machine learning, which learns patterns and behavior from data; and deep learning, a branch of machine learning that focuses on training neural networks. We then build up two linear models, linear regression and logistic regression, that serve as building blocks for everything else in this course. Specifically, we introduce linear models from the perspective of deep learning in order to motivate the core concepts of loss functions, gradient descent, and the chain rule for differentiation.
+**Overview.** This lecture begins by comparing traditional software, which is generally rule-based; machine learning, which learns patterns and behavior from data; and deep learning, a branch of machine learning that focuses on training neural networks. We then build up two linear models, linear regression and logistic regression, that serve as building blocks for everything else in this course. Specifically, we introduce linear models from the perspective of deep learning in order to present the core concepts of loss functions, gradient descent, and the chain rule for differentiation.
 
 ## Motivation {#sec-motivation}
 
@@ -22,6 +22,7 @@ Consider the task of classifying handwritten images as **0** or **1**. This task
 ```python
 n_dark = 0
 for pixel in middle_row:
+    # Assume pixel values range from 0-255
     if pixel < 100:
         n_dark += 1
 if n_dark > 1:
@@ -142,7 +143,7 @@ Indeed, since the resurgence of this basic idea in the early 2000s, deep learnin
 </div>
 ```
 
-The maxim of learning as much of the modeling pipeline is referred to as *end-to-end* learning.
+The maxim of learning as much of the modeling pipeline as possible is referred to as *end-to-end* learning.
 The composition of many small differentiable functions is itself differentiable, by the chain rule.
 This is critical for end-to-end training and is the foundation of **backpropagation** (Lecture 2).
 
@@ -239,45 +240,53 @@ Discussing these innovations will be the main subject of this course.
 For the rest of this lecture we study two foundational linear models.
 
 ::: {.definition-block}
-**Definition.** *Linear regression* is a model that predicts a **scalar value** from an input feature vector. The prediction is an affine function of the features: any change in a feature always produces a constant, proportional change in the output.
+**Definition.** *Linear regression* is a model that predicts a **scalar value** from an input feature vector. The prediction is an affine function of the features, meaning that any change in a feature always produces a constant, proportional change in the output.
 :::
 
-**Running example.** Predict a home's sale price from three features: age (years), square footage (sqft), and number of bedrooms (nbr).
+As a running example, consider the task of predicting a home's sale price from three features: its age (years), the square footage (sqft), and the number of bedrooms (nbr).
 
 $$\hat{y} = w_1 \cdot \text{age} + w_2 \cdot \text{sqft} + w_3 \cdot \text{nbr} + b$$
 
-Collect the features into $\bm{x} = [\text{age},\, \text{sqft},\, \text{nbr}]^\top \in \mathbb{R}^3$ and weights into $\bm{w} = [w_1, w_2, w_3]^\top \in \mathbb{R}^3$:
+where $w_1$, $w_2$, and $w_3$ are the weights assigned to each feature value and $\hat{y}$ is the predicted price.
+The features can be combined into a feature vector $\bm{x} = [\text{age},\, \text{sqft},\, \text{nbr}]^\top \in \mathbb{R}^4$ and weights into the weight vector $\bm{w} = [w_1, w_2, w_3]^\top \in \mathbb{R}^3$, giving the standard expression for a linear regression model:
 
-::: {.boxed-eq}
 $$\hat{y} = \bm{w}^\top \bm{x} + b$$
-:::
 
-The weights $\bm{w}$ and bias $b$ are the **parameters** of the model. Together we write them as $\bm{\theta} = (\bm{w}, b)$, the values we will learn from data.
+The weight vector $\bm{w}$ and bias value $b$ are the **parameters** of the model.
+Together we write them as the parameter vector $\bm{\theta} = (\bm{w}, b)$.
+In general, the parameters $\bm{\theta}$ of a given model are the values that are tuned via optimization and "learned" from data.
 
-**Batched prediction.** In practice we process many examples simultaneously. Stacking $N$ examples row-wise into $\bm{X} \in \mathbb{R}^{N \times d}$:
+What if we want to process more than one example at a time?
+As we will discuss later, this is common during both training and inference, or "test time", when the trained model is being used to make predictions.
+We can assemple $N$ feature vectors into a matrix $\bm{X} \in \mathbb{R}^{N \times d}$ and compute the model's predictions as
 
 $$\hat{\bm{y}} = \bm{X}\bm{w} + b, \qquad \hat{\bm{y}} \in \mathbb{R}^N, \quad \bm{X} \in \mathbb{R}^{N \times d}$$
 
 ### The loss function
 
-To fit the parameters we need a scalar measure of how well the model is doing. For regression, we use the **squared error loss** for a single example $(\bm{x}, y)$:
+Given a model, we need a way to tune the parameters to fit the data.
+To determine how well the model fits the data (and ultimately as an objective to be optimized), we use a **loss function**.
+For regression (predicting a scalar value) a common loss function is the *squared error loss**:
 
 $$\mathcal{L}(\hat{y}, y) = \frac{1}{2}(\hat{y} - y)^2$$
 
-The $\frac{1}{2}$ is a convenience: it cancels the exponent of 2 when we differentiate. The **goal** is to find $\bm{\theta}$ that minimizes $\mathcal{L}$ over the training set.
+where $y$ is the true label for the input $\bm{x}$ used to produce the prediction $\hat{y}$. The $\frac{1}{2}$ is included for convenience because it will cancel out the exponent of 2 when we differentiate. The **goal** is to find $\bm{\theta}$ that minimizes $\mathcal{L}$ over the training set.
 
 ::: {.callout-note}
-**Closed form vs. gradient descent.** For linear regression a closed-form solution exists: $\bm{w}^* = (\bm{X}^\top \bm{X})^{-1}\bm{X}^\top \bm{y}$. We deliberately ignore it. In this course, we always use gradient descent, because it generalizes to neural networks whereas a closed-form solution does not.
+In the past, you may have fit linear regression via the closed-form solution $\bm{w}^* = (\bm{X}^\top \bm{X})^{-1}\bm{X}^\top \bm{y}$ that arises when analytically finding the minimum of the loss function. In this course, we ignore the closed-form solution and instead use gradient descent because it generalizes to neural networks whereas a closed-form solution does not.
 :::
 
 ### Gradient descent {#sec-gradient-descent}
 
-Gradient descent is the core optimization algorithm throughout deep learning. The idea: repeatedly move the parameters in the direction that most rapidly *decreases* the loss.
+Gradient descent is the core optimization algorithm used in deep learning.
+Gradient descent is an iterative algorithm where, at each step, we move the parameters in the direction that most rapidly *decreases* the loss.
+As long as the function being optimized is not too complex and as long as we don't move too much, we can be confident that we've decreased the loss.
+If we do this over and over again, we might hope to reach a minimum of the function.
 
 ::: {.algorithm}
 #### Gradient Descent
 
-**Initialize** parameters $\bm{\theta}$ (e.g., $\bm{w} = \bm{0}$, $b = 0$).
+**Initialize** parameters $\bm{\theta}$ (we will discuss how to do this later!).
 
 **Repeat** until a stopping criterion is met:
 $$\bm{\theta} \leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\mathcal{L}$$
@@ -285,12 +294,17 @@ $$\bm{\theta} \leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\mathcal{L}$$
 where $\eta > 0$ is the **learning rate** and $\nabla_{\bm{\theta}}\mathcal{L}$ is the gradient of the loss with respect to $\bm{\theta}$.
 :::
 
-**Stopping criteria**: in practice, training stops when one of these is triggered:
+There are many ways to decide when to stop performing gradient descent. Since loss functions are generally nonnegative, a natural criteria is to wait until the loss reaches zero, but this is only possible if the model can perfectly fit the data. In the case of a linear model, this would mean that the input-output relationship is perfectly linear, which is rarely the case. Otherheuristics used as stopping criteria include:
 
-- The loss reaches zero. *(Rare, only if the relationship is perfectly linear.)*
-- The loss stops decreasing.
+- The loss stops decreasing, or its rate of decrease gets sufficiently slow.
 - Performance on held-out **validation data** stops improving.
-- We run out of compute budget or patience. *(Common for large models.)*
+- We run out of compute budget or patience.
+
+Apart from the stopping criteria, to use gradient descent we must also specify a learning rate.
+Broadly, the learning rate dictates how quickly optimization progresses.
+However, as mentioned above (and as we will discuss further later), the gradient at a given location is only a local property of the function.
+Too large of a learning rate can therefore prevent gradient descent from making reliable progress and can even cause divergence, where the loss *increases*.
+Overall, we strive for a "just right" learning rate where the loss steadily decreases.
 
 ```{=html}
 <div class="interactive-widget">
@@ -373,65 +387,51 @@ html`${gdPlot}${gdStatus}`
 </div>
 ```
 
-**Effect of the learning rate.** Try extreme values of $\eta$ above:
-
-- **Too small** ($\eta \ll 1$): slow convergence, many steps needed to reach the minimum.
-- **Just right**: the loss decreases steadily to zero.
-- **Too large** ($\eta > 2$ for this loss): the updates *overshoot* and the loss **diverges**.
 
 ### Computing the gradients: the chain rule
 
-To run gradient descent we need $\nabla_{\bm{w}}\mathcal{L}$ and $\frac{\partial \mathcal{L}}{\partial b}$. We compute these by applying the **chain rule**, treating $\mathcal{L}$ as a composition of functions.
+Performing gradient descent requires $\nabla_{\bm{\theta}} \mathcal{L}$, or in the case of linear regression, $\nabla_{\bm{w}}\mathcal{L}$ and $\frac{\partial \mathcal{L}}{\partial b}$.
+For a differentiable model, we can compute these conveniently by applying the **chain rule**, which treats $\mathcal{L}$ as a composition of functions.
 
-For a single training example $(\bm{x}, y)$:
+For example, when computing the loss of a single training example $(\bm{x}, y)$ using linear regression, we have
 
 $$\hat{y} = \bm{w}^\top \bm{x} + b, \qquad \mathcal{L} = \tfrac{1}{2}(\hat{y} - y)^2$$
 
-Think of $\mathcal{L}$ as a function of $\hat{y}$, and $\hat{y}$ as a function of $\bm{w}$ (or $b$):
+If we consider $\mathcal{L}$ as a function of $\hat{y}$ and $\hat{y}$ as a function of $\bm{w}$ (or $b$) and apply the chain rule, we have
 
 $$\frac{d\mathcal{L}}{d\bm{w}} = \frac{d\mathcal{L}}{d\hat{y}} \cdot \frac{d\hat{y}}{d\bm{w}}, \qquad \frac{d\mathcal{L}}{db} = \frac{d\mathcal{L}}{d\hat{y}} \cdot \frac{d\hat{y}}{db}$$
 
-Computing each intermediate derivative:
+We can compute these derivatives individually as
+$$ \dfrac{d\mathcal{L}}{d\hat{y}} = \hat{y} - y, \qquad \dfrac{d\hat{y}}{d\bm{w}} = \bm{x}, \qquad \dfrac{d\hat{y}}{db} = 1$$
 
-| Quantity | Value |
-|---|---|
-| $\dfrac{d\mathcal{L}}{d\hat{y}}$ | $\hat{y} - y$ |
-| $\dfrac{d\hat{y}}{d\bm{w}}$ | $\bm{x}$ |
-| $\dfrac{d\hat{y}}{db}$ | $1$ |
+Substituting in these individual derivatives, we have
 
-Substituting:
-
-::: {.boxed-eq}
 $$\nabla_{\bm{w}}\mathcal{L} = (\hat{y} - y)\,\bm{x}, \qquad \frac{\partial \mathcal{L}}{\partial b} = \hat{y} - y$$
-:::
 
-The gradient has a clean interpretation: the update for weight $w_i$ is the prediction error $(\hat{y} - y)$ scaled by the feature value $x_i$. Features that appear more strongly in the input receive proportionally larger weight updates.
+For linear regression, the gradient has a clean interpretation: the update for weight $w_i$ is the prediction error $(\hat{y} - y)$ scaled by the feature value $x_i$. In this way, features that appear more strongly in the input receive proportionally larger weight updates.
 
 ### Mini-batch stochastic gradient descent
 
-So far, we have computed the gradient for a single example. In practice we compute it over a **mini-batch**, a random subset of the training data of size $B$:
+So far, we have computed the gradient of the loss for a single example.
+In practice it is common to compute the gradient for more than one example and update the parameters using the average gradient, like so:
 
-::: {.boxed-eq}
-$$\bm{w} \leftarrow \bm{w} - \frac{\eta}{B} \sum_{i=1}^{B} \nabla_{\bm{w}} \mathcal{L}^{(i)}$$
-:::
+$$\bm{\theta} \leftarrow \bm{\theta} - \frac{\eta}{B} \sum_{i=1}^{B} \nabla_{\bm{\theta}} \mathcal{L}^{(i)}$$
 
-| Variant | Batch size | Name |
-|---|---|---|
-| Full dataset | $B = N$ | Gradient descent |
-| Single example | $B = 1$ | Stochastic gradient descent (SGD) |
-| Random subset | $1 < B < N$ | **Mini-batch SGD** (standard in practice) |
-
-Using a mini-batch introduces noise into the gradient estimate. Somewhat counterintuitively, this noise often *helps*: it can prevent the optimizer from getting trapped in sharp local minima.
+where $B$ is called the the *batch size*.
+In the most extreme case, we could set the batch size equal to our training set size and compute the average gradient of all of the examples in our training set.
+However, computing the gradient for every example at every step of training might be unnecessarily expensive, as we will discuss later.
+More common in deep learning is therefore to draw a random sample of $B$ examples from the training set at each iteration.
 
 ### Hyperparameters
 
-Unlike parameters ($\bm{w}$, $b$), **hyperparameters** are not learned from data. They are set by the practitioner, typically through trial and error or heuristics.
+Unlike parameters like $\bm{w}$ and $b$, **hyperparameters** are generally not learned from data but instead are set by the practitioner, typically through trial and error or heuristics.
+So far we have observed the following hyperparameters:
 
 | Hyperparameter | Description |
 |---|---|
 | $\eta$ (learning rate) | Step size per gradient update |
 | Batch size $B$ | Number of examples per gradient update |
-| Stopping criterion | When to halt training |
+| Stopping criterion | When to stop training |
 | Initialization scheme | Starting values for $\bm{w}$ and $b$ |
 
 We will revisit all of these as the course progresses.
@@ -440,19 +440,23 @@ We will revisit all of these as the course progresses.
 
 ## Softmax (Logistic) Regression {#sec-softmax}
 
-Linear regression predicts a continuous scalar. **Classification** is different: we predict one of $K$ discrete, unordered classes.
+The goal of regression is to produce a continuous scalar value.
+However, many problems of interest involve assigning the input a discrete label from a set of possible class labels.
+Such problems are referred to **classification** tasks.
 
-**Why unordered matters.** In regression, predictions have a natural ordering (price \$100K < \$200K). Class labels typically do not: "cat" is not greater or less than "dog". This shapes both how we encode outputs and how we measure performance.
+Labels are further distinguished by the fact that, unlike the continuous values predicted during regression, they generally are unordered.
+For example, there is a natural order to the value of a house because a price of \$213,000 is more than \$190,000.
+In contrast, if we are predicting whether an image contains a picture of a cat or a dog, it would not be valid to say "cat is greater than dog" (or vice versa).
 
-::: {.definition-block}
-**Definition.** *Softmax regression* (also called *logistic regression*) is a linear model for multi-class classification. It produces a probability distribution over $K$ classes by applying the softmax function to a linear transformation of the input.
-:::
-
-**Running example.** Predict whether a home will sell *above asking*, *below asking*, or *not sell* from its age, square footage, number of bedrooms, and asking price ($K=3$, $d=4$).
+To turn our running "home price prediction" example into a classification task, we could instead aim to predict whether a given home would sell *above asking*, *below asking*, or *not sell*.
+In this way, it becomes a 3-class classification problem.
+As before, we will aim to make this prediction from its age, square footage, number of bedrooms, and asking price.
 
 ### One-hot encoding
 
-We represent class labels as **one-hot vectors**, length-$K$ vectors with a 1 at the position of the correct class and 0s elsewhere:
+Representing class labels as integer class IDs (e.g. 1, 2, 3) would imply some kind of ordering..
+We instead represent class labels as **one-hot vectors**, which are length-$K$ (where $K$ is the number of classes) vectors with a 1 at the position of the correct class and 0s elsewhere.
+In the home price example, we would use the following three one-hot vectors for our classes:
 
 $$
 \begin{aligned}
@@ -462,31 +466,34 @@ $$
 \end{aligned}
 $$
 
-The one-hot vector encodes the ground-truth probability distribution: probability 1 for the correct class, 0 for all others.
+Note that the (Euclidean) distance between any two one-hot vectors is always 1, thereby implying no order of any kind.
+As we will see later, one-hot vectors can also be interpreted as a probability distribution, where a given example's assigned class is given a probability of 1 and the remaining classes have probabilty 0.
 
 ### From scores to probabilities
 
-The model first computes a **score** $o_j$ for each class via a linear transformation:
+To make a prediction, a softmax regression model first computes a **score** $o_j$ for each class via a linear transformation of the features:
 
 $$\bm{o} = \bm{W}\bm{x} + \bm{b}, \qquad \bm{W} \in \mathbb{R}^{K \times d},\;\; \bm{b} \in \mathbb{R}^K,\;\; \bm{o} \in \mathbb{R}^K$$
 
 For the running example ($K=3$, $d=4$), $\bm{W}$ has $3 \times 4 = 12$ entries and $\bm{b}$ has $3$, so the model has $15$ parameters in all.
+A larger score means the model considers that class more likely.
+Note that each of these scores are produced in essentially the same way as the scalar output of a linear regression model.
+To convert the set of predicted scores to a valid probability distribution (non-negative, summing to 1), we apply the **softmax function**:
 
-A larger score means the model considers that class more likely. To convert scores to a valid probability distribution (non-negative, summing to 1), we apply the **softmax function**:
-
-::: {.boxed-eq}
 $$\operatorname{softmax}(\bm{o})_j = \frac{\exp(o_j)}{\displaystyle\sum_{k=1}^{K} \exp(o_k)}$$
-:::
 
-Two properties hold by construction:
-1. $\exp(o_j) \geq 0$ for all $j$ → values are **non-negative**.
-2. $\sum_j \operatorname{softmax}(\bm{o})_j = 1$ → values **sum to one**.
+Since $\exp(o_j) \geq 0$ for all $j$, the output values of softmax are non-negative.
+Additionally, we have that 
 
-The full softmax regression model is:
+$$\sum_j \operatorname{softmax}(\bm{o})_j = \frac{\displaystyle \sum_{j = 1}^K \exp(o_j)}{\displaystyle\sum_{k=1}^{K} \exp(o_k)} = 1$$
+
+Consequently, the output of the softmax function forms a valid probability distribution.
+We therefore can write the full softmax regression model as
 
 $$P(y \mid \bm{x}) = \operatorname{softmax}(\bm{W}\bm{x} + \bm{b})$$
 
-We call this a **linear model** because the scores $\bm{o} = \bm{W}\bm{x} + \bm{b}$ are a linear function of the input $\bm{x}$. The softmax is a nonlinear normalization step, but the model's decision boundaries are still linear.
+Effectively, as a given class' score becomes higher, the model assigns a higher probability to that class and a lower probability to the other classes.
+
 
 ```{=html}
 <div class="interactive-widget">
@@ -548,69 +555,61 @@ html`${smPlot}${smNote}`
 </div>
 ```
 
-::: {.callout-warning}
-**Softmax is not "soft max".** The name is a misnomer: it should be called "soft argmax." What softmax computes is a *differentiable* approximation to the argmax: a probability distribution concentrated on the highest-scoring class. As scores become more extreme, the distribution sharpens toward a one-hot vector.
-:::
-
 ---
 
 ## Cross-Entropy Loss {#sec-cross-entropy}
 
-How do we train softmax regression? We want parameters that maximize the model's predicted probability of the correct class across all training examples.
+For linear regression, we used a squared error loss.
+While it is technically possible to use a squared error loss to train a softmax regression model, in practice it is much more common to use the cross-entropy loss.[^1]
 
 ### From maximum likelihood to cross-entropy
 
-Given $N$ training examples $\{(\bm{x}^{(i)}, \bm{y}^{(i)})\}_{i=1}^N$, maximize the joint likelihood:
+Recall that we can consider softmax regression as producing a probability distribution over clases conditioned on the input.
+A natural objective would therefore to be maximizing the model's assigned probability to the *true* class over a dataset of labeled examples.
+Concretely, given $N$ training examples $\{(\bm{x}^{(i)}, \bm{y}^{(i)})\}_{i=1}^N$, we can start by aiming to maximize the joint likelihood:
 
-$$\prod_{i=1}^{N} P(y^{(i)} \mid \bm{x}^{(i)})$$
+$$\max_{\bm{\theta}} \prod_{i=1}^{N} P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})$$
 
-Because log is monotone, maximizing the log-likelihood is equivalent. Negating converts to minimization:
+It's typical to maximize the log likelihood instead, because the logarithm is a monotonic function (so the parameter values corresponding to the maximum doesn't change when you apply it) and because a product of probabilities can cause underflow and other numerical instabilities.
+Additionally, in machine learning we generally minimize a loss rather than maximize an objective.
+This leads to the minimization of the negative log-likelihood:
 
-$$-\sum_{i=1}^{N} \log P(y^{(i)} \mid \bm{x}^{(i)}) = -\sum_{i=1}^{N} \sum_{j=1}^{K} y_j^{(i)} \log \hat{y}_j^{(i)}$$
+$$\min_{\bm{\theta}} -\sum_{i=1}^{N} \log P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})$$
 
-where $\hat{y}_j^{(i)} = \operatorname{softmax}(\bm{W}\bm{x}^{(i)} + \bm{b})_j$ and the inner sum collapses to just the true class term (since $\bm{y}^{(i)}$ is one-hot). This is the **cross-entropy loss**: it measures how "wrong" a predicted probability distribution is relative to the ground truth.
+We can write this in the following eqvuialent form:
 
-### Single-example cross-entropy
+$$\min_{\bm{\theta}} -\sum_{i=1}^{N} \sum_{j=1}^{K} \bm{y}_j^{(i)} \log P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})$$
 
-For one example with scores $\bm{o} = \bm{W}\bm{x} + \bm{b}$ and one-hot label $\bm{y}$:
+by noting that $\bm{y}^{(i)}$ is one-hot.
+This final equation is the **cross-entropy loss**, a quantity from information theory that measures how "wrong" a probability distribution is relative to the ground truth.
 
-$$\mathcal{L}(\bm{y}, \hat{\bm{y}}) = -\sum_j y_j \log \frac{\exp(o_j)}{\sum_k \exp(o_k)}$$
+We can express the cross-entropy loss of for a single example using the softmax regression model with scores $\bm{o} = \bm{W}\bm{x} + \bm{b}$ and one-hot label $\bm{y}$ as
 
-Expanding the logarithm and using $\sum_j y_j = 1$:
+$$
+\begin{aligned}
+\mathcal{L}(\bm{y}, \hat{\bm{y}}) &= -\sum_j y_j \log \frac{\exp(o_j)}{\sum_k \exp(o_k)} \\
+&= \sum_j y_j \log \sum_k \exp(o_k) - \sum_j y_j o_j \\
+&= \log \sum_k \exp(o_k) \;-\; \sum_j y_j o_j
+\end{aligned}
+$$
 
-::: {.boxed-eq}
-$$\mathcal{L}(\bm{y}, \hat{\bm{y}}) = \log \sum_k \exp(o_k) \;-\; \sum_j y_j\, o_j$$
-:::
+where the simplifications come from the quotient rule of the logarithm and the fact that $\sum_j y_j = 1$.
+To perform gradient descent, we only need one additional term compared to those used in linear regression: $\frac{d\mathcal{L}}{do_j}$.
+The reexpression above makes $\frac{d\mathcal{L}}{do_j}$ straightforward to derive:
 
-The first term penalizes large scores everywhere; the second rewards a high score at the correct class.
+$$
+\begin{aligned}
+\frac{d\mathcal{L}}{do_j} &= \frac{d}{do_j}\!\left[\log \sum_k \exp(o_k)\right] - y_j \\
+& = \frac{\exp(o_j)}{\sum_k \exp(o_k)} - y_j \\
+&= \operatorname{softmax}(\bm{o})_j - y_j \\
+&= \hat{y}_j - y_j
+\end{aligned}
+$$
 
-### Gradient of the cross-entropy loss
-
-To use gradient descent we need $\frac{d\mathcal{L}}{do_j}$, the derivative with respect to each score. This is the only new ingredient in the chain rule compared to linear regression.
-
-$$\frac{d\mathcal{L}}{do_j} = \frac{d}{do_j}\!\left[\log \sum_k \exp(o_k)\right] - y_j = \frac{\exp(o_j)}{\sum_k \exp(o_k)} - y_j$$
-
-::: {.boxed-eq}
-$$\frac{d\mathcal{L}}{do_j} = \underbrace{\operatorname{softmax}(\bm{o})_j}_{\hat{y}_j} - y_j$$
-:::
-
-In vector form: $\nabla_{\bm{o}} \mathcal{L} = \hat{\bm{y}} - \bm{y}$.
-
-This is a remarkably clean result: **the gradient is simply the prediction error**, the gap between the predicted probability and the true one-hot label. When the model is perfectly confident in the correct class, the gradient is zero; the further off the prediction, the larger the gradient signal.
+which can be expressed in vector form as $\nabla_{\bm{o}} \mathcal{L} = \hat{\bm{y}} - \bm{y}$.
+Intuitively, the gradient of the cross-entropy loss for the softmax regression model is simply the gap between the predicted probability and the ground-truth label.
+When the model assigns all of its probability to the correct label, the gradient is zero; but as the model becomes more incorrect, the gradient increases.
 
 ---
 
-## Summary {#sec-summary}
-
-::: {.callout-note}
-**Key takeaways from Lecture 1:**
-
-- **Machine learning** produces programs learned from data. Classic ML requires hand-designed features; **deep learning** learns features automatically from data using big, complex, differentiable models trained end-to-end with gradient descent.
-- **Linear regression** predicts a scalar via $\hat{y} = \bm{w}^\top \bm{x} + b$, trained by minimizing the squared error loss $\mathcal{L} = \frac{1}{2}(\hat{y}-y)^2$ with gradient descent.
-- **Gradient descent** repeatedly applies $\bm{\theta} \leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\mathcal{L}$. The learning rate $\eta$ and batch size are key hyperparameters.
-- Gradients for linear regression follow from the chain rule: $\nabla_{\bm{w}}\mathcal{L} = (\hat{y}-y)\bm{x}$ and $\frac{\partial\mathcal{L}}{\partial b} = \hat{y}-y$.
-- **Softmax regression** extends linear regression to $K$-class classification. Scores $\bm{o} = \bm{W}\bm{x} + \bm{b}$ are converted to probabilities via softmax. It remains a "linear" model because the scores are linear in $\bm{x}$.
-- **Cross-entropy** is the natural loss for classification. Its gradient w.r.t. scores is $\hat{\bm{y}} - \bm{y}$, the prediction error.
-:::
-
-**Next lecture:** Multi-layer perceptrons and backpropagation - Why even the most clever stacking of linear models still yields a linear model, how adding nonlinearity overcomes this, and the algorithm that makes training deep networks efficient.
+[^1]: For some discussion of why the cross-entropy loss is a better choice, see [chapter 3 of Michael Nielson's Neural Networks and Deep Learning](http://neuralnetworksanddeeplearning.com/chap3.html#the_cross-entropy_cost_function).
