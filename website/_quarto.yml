@@ -42,6 +42,7 @@ format:
     number-depth: 2
     smooth-scroll: true
     html-math-method: katex
+    reference-section-title: "References"
     code-copy: true
     code-fold: false
     highlight-style: github

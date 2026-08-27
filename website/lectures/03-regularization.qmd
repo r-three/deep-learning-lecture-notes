@@ -351,8 +351,3 @@ The rescaling is chosen precisely so that $\mathbb{E}[x_i'] = x_i$ — dropout d
 :::
 
 **Next lecture:** Optimization — the adaptive, momentum-based variants of gradient descent used to train real networks in practice.
-
-## References {#sec-references .unnumbered}
-
-::: {#refs}
-:::

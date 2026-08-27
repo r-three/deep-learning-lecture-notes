@@ -51,44 +51,121 @@ Designing the best feature for complex tasks like large-scale object recognition
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 960 150" width="100%" style="max-width:960px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 1200 360" width="100%" style="max-width:1120px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
   <defs>
-    <marker id="arrC1" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker>
-    <clipPath id="digitClip"><rect x="40" y="45" width="160" height="90" rx="4"/></clipPath>
+    <marker id="arrC1" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#555"/></marker>
+    <clipPath id="digitClip"><rect x="95" y="130" width="110" height="110"/></clipPath>
+    <linearGradient id="gsGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000000"/><stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
   </defs>
-  
-  <!-- Input -->
-  <rect x="20" y="40" width="200" height="100" rx="8" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
-  <g clip-path="url(#digitClip)">
-    <!-- SVG Handwritten Digit (8) - Black stroke on transparent background -->
-    <path d="M 120 58 C 105 58 100 68 110 77 C 120 86 130 90 120 102 C 110 114 98 120 118 123 C 138 120 128 112 120 102 C 110 90 122 84 130 75 C 138 65 132 58 120 58 Z" 
-          fill="none" stroke="#222226" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- ===== Card 1: Input image (blue) ===== -->
+  <rect x="20" y="40" width="260" height="300" rx="8" fill="#E7F1FB" stroke="#5795C7" stroke-width="1.5"/>
+  <circle cx="42" cy="64" r="11" fill="#5795C7"/>
+  <text x="42" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">1</text>
+  <text x="60" y="70" font-size="18" font-weight="600" fill="#12374F">Input image</text>
+  <text x="150" y="98" text-anchor="middle" font-size="14" fill="#12374F">A handwritten digit</text>
+  <text x="150" y="116" text-anchor="middle" font-size="14" fill="#12374F">28×28 grayscale image</text>
+  <rect x="95" y="130" width="110" height="110" fill="#ffffff" stroke="#5795C7" stroke-width="1"/>
+  <g stroke="#E6EEF6" stroke-width="0.7">
+    <line x1="113" y1="130" x2="113" y2="240"/><line x1="131" y1="130" x2="131" y2="240"/>
+    <line x1="149" y1="130" x2="149" y2="240"/><line x1="167" y1="130" x2="167" y2="240"/>
+    <line x1="185" y1="130" x2="185" y2="240"/>
+    <line x1="95" y1="148" x2="205" y2="148"/><line x1="95" y1="166" x2="205" y2="166"/>
+    <line x1="95" y1="184" x2="205" y2="184"/><line x1="95" y1="202" x2="205" y2="202"/>
+    <line x1="95" y1="220" x2="205" y2="220"/>
   </g>
-  <rect x="40" y="45" width="160" height="90" rx="4" fill="none" stroke="#5795C7" stroke-width="1"/>
-  <line x1="220" y1="90.0" x2="260" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrC1)"/>
+  <g clip-path="url(#digitClip)">
+    <g transform="translate(2.5,72) scale(1.25)">
+      <!-- SVG Handwritten Digit (8) - kept as-is -->
+      <path d="M 120 58 C 105 58 100 68 110 77 C 120 86 130 90 120 102 C 110 114 98 120 118 123 C 138 120 128 112 120 102 C 110 90 122 84 130 75 C 138 65 132 58 120 58 Z"
+            fill="none" stroke="#222226" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <rect x="95" y="258" width="110" height="12" fill="url(#gsGrad)" stroke="#bbb" stroke-width="0.5"/>
+  <text x="95" y="286" font-size="14" fill="#555">0</text>
+  <text x="205" y="286" text-anchor="end" font-size="14" fill="#555">255</text>
 
-  <!-- Feature vector -->
-  <rect x="260" y="40" width="200" height="100" rx="8" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-  <text x="360.0" y="68" text-anchor="middle" font-size="16" font-weight="600" fill="#207965">Feature vector</text>
-  <path d="M325.0,76 L315.0,76 L315.0,135 L325.0,135" fill="none" stroke="#207965" stroke-width="1.4"/>
-  <path d="M395.0,76 L405.0,76 L405.0,135 L395.0,135" fill="none" stroke="#207965" stroke-width="1.4"/>
-  <rect x="325.0" y="78" width="70" height="9" fill="#A8D8CC"/>
-  <rect x="325.0" y="90" width="70" height="9" fill="#8AC9B8"/>
-  <rect x="325.0" y="102" width="70" height="9" fill="#6DBBA5"/>
-  <text x="360.0" y="123" text-anchor="middle" font-size="14" fill="#207965">⋮</text>
-  <rect x="325.0" y="126" width="70" height="9" fill="#4FA98F"/>
-  <line x1="460" y1="90.0" x2="500" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrC1)"/>
+  <line x1="284" y1="190" x2="316" y2="190" stroke="#555" stroke-width="1.5" marker-end="url(#arrC1)"/>
 
-  <!-- Classifier -->
-  <rect x="500" y="40" width="200" height="100" rx="8" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
-  <text x="600.0" y="82" text-anchor="middle" font-size="16" font-weight="600" fill="#792051">Simple</text>
-  <text x="600.0" y="102" text-anchor="middle" font-size="16" font-weight="600" fill="#792051">Classifier</text>
-  <line x1="700" y1="90.0" x2="740" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrC1)"/>
+  <!-- ===== Card 2: Feature vector (green) ===== -->
+  <rect x="320" y="40" width="260" height="300" rx="8" fill="#E6F4EF" stroke="#57C7AE" stroke-width="1.5"/>
+  <circle cx="342" cy="64" r="11" fill="#57C7AE"/>
+  <text x="342" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">2</text>
+  <text x="360" y="70" font-size="18" font-weight="600" fill="#124E3E">Feature vector</text>
+  <text x="450" y="98" text-anchor="middle" font-size="14" fill="#124E3E">Flattened into 784 numbers</text>
+  <text x="450" y="116" text-anchor="middle" font-size="14" fill="#124E3E">(28×28 = 784 pixels)</text>
+  <path d="M410,150 L402,150 L402,286 L410,286" fill="none" stroke="#124E3E" stroke-width="1.6"/>
+  <path d="M490,150 L498,150 L498,286 L490,286" fill="none" stroke="#124E3E" stroke-width="1.6"/>
+  <g>
+    <rect x="412" y="152" width="76" height="19" fill="#E6F2EE" stroke="#8AC9B8" stroke-width="0.6"/>
+    <text x="450" y="166" text-anchor="middle" font-size="14" fill="#124E3E">0.12</text>
+    <rect x="412" y="174" width="76" height="19" fill="#D9ECE5" stroke="#8AC9B8" stroke-width="0.6"/>
+    <text x="450" y="188" text-anchor="middle" font-size="14" fill="#124E3E">0.00</text>
+    <rect x="412" y="196" width="76" height="19" fill="#CCE6DD" stroke="#8AC9B8" stroke-width="0.6"/>
+    <text x="450" y="210" text-anchor="middle" font-size="14" fill="#124E3E">0.07</text>
+    <text x="450" y="230" text-anchor="middle" font-size="16" fill="#124E3E">⋮</text>
+    <rect x="412" y="240" width="76" height="19" fill="#B7DBCF" stroke="#8AC9B8" stroke-width="0.6"/>
+    <text x="450" y="254" text-anchor="middle" font-size="14" fill="#124E3E">0.93</text>
+    <rect x="412" y="262" width="76" height="19" fill="#A9D4C6" stroke="#8AC9B8" stroke-width="0.6"/>
+    <text x="450" y="276" text-anchor="middle" font-size="14" fill="#124E3E">0.11</text>
+  </g>
+  <text x="514" y="213" font-size="18" font-weight="600" fill="#124E3E">784</text>
+  <text x="514" y="231" font-size="14" fill="#124E3E">dims</text>
+  <rect x="388" y="300" width="124" height="28" rx="6" fill="#EAF5F1" stroke="#57C7AE" stroke-width="1"/>
+  <text x="450" y="319" text-anchor="middle" font-size="16" font-weight="600" fill="#124E3E">x ∈ ℝ⁷⁸⁴</text>
 
-  <!-- Output -->
-  <rect x="740" y="40" width="200" height="100" rx="8" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-  <text x="840.0" y="86" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">8   92%</text>
-  <text x="840.0" y="108" text-anchor="middle" font-size="14" fill="#999">3    5%</text>
+  <line x1="584" y1="190" x2="616" y2="190" stroke="#555" stroke-width="1.5" marker-end="url(#arrC1)"/>
+
+  <!-- ===== Card 3: Simple classifier (pink) ===== -->
+  <rect x="620" y="40" width="260" height="300" rx="8" fill="#FBE6F1" stroke="#C75794" stroke-width="1.5"/>
+  <circle cx="642" cy="64" r="11" fill="#C75794"/>
+  <text x="642" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">3</text>
+  <text x="660" y="70" font-size="18" font-weight="600" fill="#571639">Simple classifier</text>
+  <text x="750" y="98" text-anchor="middle" font-size="14" fill="#571639">Learns patterns from data,</text>
+  <text x="750" y="116" text-anchor="middle" font-size="14" fill="#571639">one score per digit 0–9</text>
+  <text x="642" y="205" font-size="16" fill="#571639">x</text>
+  <line x1="654" y1="200" x2="676" y2="200" stroke="#555" stroke-width="1.4" marker-end="url(#arrC1)"/>
+  <g stroke="#E7B6D0" stroke-width="0.8">
+    <line x1="690" y1="162" x2="776" y2="162"/><line x1="690" y1="162" x2="776" y2="186"/><line x1="690" y1="162" x2="776" y2="210"/><line x1="690" y1="162" x2="776" y2="234"/>
+    <line x1="690" y1="186" x2="776" y2="162"/><line x1="690" y1="186" x2="776" y2="186"/><line x1="690" y1="186" x2="776" y2="210"/><line x1="690" y1="186" x2="776" y2="234"/>
+    <line x1="690" y1="210" x2="776" y2="162"/><line x1="690" y1="210" x2="776" y2="186"/><line x1="690" y1="210" x2="776" y2="210"/><line x1="690" y1="210" x2="776" y2="234"/>
+    <line x1="690" y1="234" x2="776" y2="162"/><line x1="690" y1="234" x2="776" y2="186"/><line x1="690" y1="234" x2="776" y2="210"/><line x1="690" y1="234" x2="776" y2="234"/>
+  </g>
+  <g fill="#C75794">
+    <circle cx="690" cy="162" r="5"/><circle cx="690" cy="186" r="5"/><circle cx="690" cy="210" r="5"/><circle cx="690" cy="234" r="5"/>
+    <circle cx="776" cy="162" r="5"/><circle cx="776" cy="186" r="5"/><circle cx="776" cy="210" r="5"/><circle cx="776" cy="234" r="5"/>
+  </g>
+  <line x1="786" y1="200" x2="808" y2="200" stroke="#555" stroke-width="1.4" marker-end="url(#arrC1)"/>
+  <text x="816" y="196" font-size="14" fill="#571639">scores</text>
+  <text x="816" y="212" font-size="14" fill="#571639">(logits)</text>
+  <text x="750" y="300" text-anchor="middle" font-size="14" fill="#6E6E6E">e.g. logistic regression /</text>
+  <text x="750" y="318" text-anchor="middle" font-size="14" fill="#6E6E6E">softmax classifier</text>
+
+  <line x1="884" y1="190" x2="916" y2="190" stroke="#555" stroke-width="1.5" marker-end="url(#arrC1)"/>
+
+  <!-- ===== Card 4: Prediction (orange) ===== -->
+  <rect x="920" y="40" width="260" height="300" rx="8" fill="#FCEEE2" stroke="#C78557" stroke-width="1.5"/>
+  <circle cx="942" cy="64" r="11" fill="#C78557"/>
+  <text x="942" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">4</text>
+  <text x="960" y="70" font-size="18" font-weight="600" fill="#5A3517">Prediction</text>
+  <text x="1050" y="98" text-anchor="middle" font-size="14" fill="#5A3517">The highest-scoring digit</text>
+  <text x="1050" y="116" text-anchor="middle" font-size="14" fill="#5A3517">is selected (the argmax)</text>
+  <g>
+    <text x="944" y="142" text-anchor="middle" font-size="14" fill="#5A3517">0</text><rect x="960" y="131" width="5"   height="12" fill="#B3B3B3"/><text x="1162" y="142" text-anchor="end" font-size="14" fill="#6E6E6E">0.01</text>
+    <text x="944" y="158" text-anchor="middle" font-size="14" fill="#5A3517">1</text><rect x="960" y="147" width="7"   height="12" fill="#B3B3B3"/><text x="1162" y="158" text-anchor="end" font-size="14" fill="#6E6E6E">0.02</text>
+    <text x="944" y="174" text-anchor="middle" font-size="14" fill="#5A3517">2</text><rect x="960" y="163" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="174" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+    <text x="944" y="190" text-anchor="middle" font-size="14" fill="#5A3517">3</text><rect x="960" y="179" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="190" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+    <text x="944" y="206" text-anchor="middle" font-size="14" fill="#5A3517">4</text><rect x="960" y="195" width="5"   height="12" fill="#B3B3B3"/><text x="1162" y="206" text-anchor="end" font-size="14" fill="#6E6E6E">0.01</text>
+    <text x="944" y="222" text-anchor="middle" font-size="14" fill="#5A3517">5</text><rect x="960" y="211" width="7"   height="12" fill="#B3B3B3"/><text x="1162" y="222" text-anchor="end" font-size="14" fill="#6E6E6E">0.02</text>
+    <text x="944" y="238" text-anchor="middle" font-size="14" fill="#5A3517">6</text><rect x="960" y="227" width="5"   height="12" fill="#B3B3B3"/><text x="1162" y="238" text-anchor="end" font-size="14" fill="#6E6E6E">0.01</text>
+    <text x="944" y="254" text-anchor="middle" font-size="14" fill="#5A3517">7</text><rect x="960" y="243" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="254" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+    <text x="944" y="270" text-anchor="middle" font-size="14" font-weight="700" fill="#5A3517">8</text><rect x="960" y="259" width="142" height="12" fill="#D98A3C"/><text x="1162" y="270" text-anchor="end" font-size="14" font-weight="700" fill="#5A3517">0.92</text>
+    <text x="944" y="286" text-anchor="middle" font-size="14" fill="#5A3517">9</text><rect x="960" y="275" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="286" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+  </g>
+  <line x1="940" y1="300" x2="1160" y2="300" stroke="#E4CBB0" stroke-width="1"/>
+  <text x="1050" y="323" text-anchor="middle" font-size="16" font-weight="600" fill="#5A3517">Predicted: 8  ·  92% confidence</text>
 </svg>
 </div>
 ```
@@ -107,38 +184,114 @@ Indeed, since the resurgence of this basic idea in the early 2000s, deep learnin
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 1320 210" width="100%" style="max-width:1320px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 1200 400" width="100%" style="max-width:1120px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
   <defs>
-    <marker id="arrD1" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker>
-    <clipPath id="catClipBig2"><rect x="40" y="45" width="160" height="90" rx="4"/></clipPath>
+    <marker id="arrD1" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#555"/></marker>
+    <clipPath id="digitClip2"><rect x="95" y="130" width="110" height="110"/></clipPath>
+    <linearGradient id="gsGrad2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000000"/><stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
   </defs>
-  <!-- Input -->
-  <rect x="20" y="40" width="200" height="100" rx="8" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
-  <g clip-path="url(#catClipBig2)"><path d="M 120 58 C 105 58 100 68 110 77 C 120 86 130 90 120 102 C 110 114 98 120 118 123 C 138 120 128 112 120 102 C 110 90 122 84 130 75 C 138 65 132 58 120 58 Z" fill="none" stroke="#222226" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g>
-  <rect x="40" y="45" width="160" height="90" rx="4" fill="none" stroke="#5795C7" stroke-width="1"/>
-  <line x1="220" y1="90.0" x2="260" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrD1)"/>
-  <!-- Layer 1 -->
-  <rect x="260" y="40" width="200" height="100" rx="8" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-  <text x="360.0" y="96.0" text-anchor="middle" font-size="16" font-weight="600" fill="#207965">Layer 1</text>
-  <line x1="460" y1="90.0" x2="500" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrD1)"/>
-  <!-- Layer 2 -->
-  <rect x="500" y="40" width="200" height="100" rx="8" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-  <text x="600.0" y="96.0" text-anchor="middle" font-size="16" font-weight="600" fill="#207965">Layer 2</text>
-  <line x1="700" y1="90.0" x2="760.0" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrD1)"/>
-  <text x="790.0" y="96.0" font-size="20" fill="#888" text-anchor="middle">···</text>
-  <line x1="820" y1="90.0" x2="860" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrD1)"/>
-  <!-- Classifier -->
-  <rect x="860" y="40" width="200" height="100" rx="8" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"/>
-  <text x="960.0" y="82" text-anchor="middle" font-size="16" font-weight="600" fill="#792051">Simple</text>
-  <text x="960.0" y="102" text-anchor="middle" font-size="16" font-weight="600" fill="#792051">Classifier</text>
-  <line x1="1060" y1="90.0" x2="1100" y2="90.0" stroke="#888" stroke-width="1.5" marker-end="url(#arrD1)"/>
-  <!-- Output -->
-  <rect x="1100" y="40" width="200" height="100" rx="8" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-  <text x="1200.0" y="86" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">8   92%</text>
-  <text x="1200.0" y="108" text-anchor="middle" font-size="14" fill="#999">3    5%</text>
-  <!-- Captions -->
-  <text x="120.0" y="178" text-anchor="middle" font-size="24" fill="#666">input</text>
-  <text x="660.0" y="178" text-anchor="middle" font-size="24" fill="#666" font-style="italic">differentiable end-to-end: train all layers jointly with gradient descent</text>
+
+  <!-- ===== Card 1: Input image (blue) ===== -->
+  <rect x="20" y="40" width="260" height="300" rx="8" fill="#E7F1FB" stroke="#5795C7" stroke-width="1.5"/>
+  <circle cx="42" cy="64" r="11" fill="#5795C7"/>
+  <text x="42" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">1</text>
+  <text x="60" y="70" font-size="18" font-weight="600" fill="#12374F">Input image</text>
+  <text x="150" y="98" text-anchor="middle" font-size="14" fill="#12374F">A handwritten digit</text>
+  <text x="150" y="116" text-anchor="middle" font-size="14" fill="#12374F">28×28 grayscale image</text>
+  <rect x="95" y="130" width="110" height="110" fill="#ffffff" stroke="#5795C7" stroke-width="1"/>
+  <g stroke="#E6EEF6" stroke-width="0.7">
+    <line x1="113" y1="130" x2="113" y2="240"/><line x1="131" y1="130" x2="131" y2="240"/>
+    <line x1="149" y1="130" x2="149" y2="240"/><line x1="167" y1="130" x2="167" y2="240"/>
+    <line x1="185" y1="130" x2="185" y2="240"/>
+    <line x1="95" y1="148" x2="205" y2="148"/><line x1="95" y1="166" x2="205" y2="166"/>
+    <line x1="95" y1="184" x2="205" y2="184"/><line x1="95" y1="202" x2="205" y2="202"/>
+    <line x1="95" y1="220" x2="205" y2="220"/>
+  </g>
+  <g clip-path="url(#digitClip2)">
+    <g transform="translate(2.5,72) scale(1.25)">
+      <!-- SVG Handwritten Digit (8) - kept as-is -->
+      <path d="M 120 58 C 105 58 100 68 110 77 C 120 86 130 90 120 102 C 110 114 98 120 118 123 C 138 120 128 112 120 102 C 110 90 122 84 130 75 C 138 65 132 58 120 58 Z"
+            fill="none" stroke="#222226" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <rect x="95" y="258" width="110" height="12" fill="url(#gsGrad2)" stroke="#bbb" stroke-width="0.5"/>
+  <text x="95" y="286" font-size="14" fill="#555">0</text>
+  <text x="205" y="286" text-anchor="end" font-size="14" fill="#555">255</text>
+
+  <line x1="284" y1="190" x2="316" y2="190" stroke="#555" stroke-width="1.5" marker-end="url(#arrD1)"/>
+
+  <!-- ===== Card 2: Learned layers (green) ===== -->
+  <rect x="320" y="40" width="260" height="300" rx="8" fill="#E6F4EF" stroke="#57C7AE" stroke-width="1.5"/>
+  <circle cx="342" cy="64" r="11" fill="#57C7AE"/>
+  <text x="342" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">2</text>
+  <text x="360" y="70" font-size="18" font-weight="600" fill="#124E3E">Learned layers</text>
+  <text x="450" y="98" text-anchor="middle" font-size="14" fill="#124E3E">Many layers learn the</text>
+  <text x="450" y="116" text-anchor="middle" font-size="14" fill="#124E3E">features automatically</text>
+  <rect x="385" y="140" width="130" height="34" rx="6" fill="#DDEFEA" stroke="#57C7AE" stroke-width="1.2"/>
+  <text x="450" y="162" text-anchor="middle" font-size="15" font-weight="600" fill="#124E3E">Layer 1</text>
+  <line x1="450" y1="174" x2="450" y2="185" stroke="#555" stroke-width="1.4" marker-end="url(#arrD1)"/>
+  <rect x="385" y="187" width="130" height="34" rx="6" fill="#CFE7DF" stroke="#57C7AE" stroke-width="1.2"/>
+  <text x="450" y="209" text-anchor="middle" font-size="15" font-weight="600" fill="#124E3E">Layer 2</text>
+  <text x="450" y="242" text-anchor="middle" font-size="18" fill="#124E3E">⋮</text>
+  <line x1="450" y1="248" x2="450" y2="259" stroke="#555" stroke-width="1.4" marker-end="url(#arrD1)"/>
+  <rect x="385" y="261" width="130" height="34" rx="6" fill="#BADFD3" stroke="#57C7AE" stroke-width="1.2"/>
+  <text x="450" y="283" text-anchor="middle" font-size="15" font-weight="600" fill="#124E3E">Layer L</text>
+
+  <line x1="584" y1="190" x2="616" y2="190" stroke="#555" stroke-width="1.5" marker-end="url(#arrD1)"/>
+
+  <!-- ===== Card 3: Classifier (pink) ===== -->
+  <rect x="620" y="40" width="260" height="300" rx="8" fill="#FBE6F1" stroke="#C75794" stroke-width="1.5"/>
+  <circle cx="642" cy="64" r="11" fill="#C75794"/>
+  <text x="642" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">3</text>
+  <text x="660" y="70" font-size="18" font-weight="600" fill="#571639">Classifier</text>
+  <text x="750" y="98" text-anchor="middle" font-size="14" fill="#571639">The final layer outputs</text>
+  <text x="750" y="116" text-anchor="middle" font-size="14" fill="#571639">a score per digit 0–9</text>
+  <text x="642" y="205" font-size="16" fill="#571639">h</text>
+  <line x1="654" y1="200" x2="676" y2="200" stroke="#555" stroke-width="1.4" marker-end="url(#arrD1)"/>
+  <g stroke="#E7B6D0" stroke-width="0.8">
+    <line x1="690" y1="162" x2="776" y2="162"/><line x1="690" y1="162" x2="776" y2="186"/><line x1="690" y1="162" x2="776" y2="210"/><line x1="690" y1="162" x2="776" y2="234"/>
+    <line x1="690" y1="186" x2="776" y2="162"/><line x1="690" y1="186" x2="776" y2="186"/><line x1="690" y1="186" x2="776" y2="210"/><line x1="690" y1="186" x2="776" y2="234"/>
+    <line x1="690" y1="210" x2="776" y2="162"/><line x1="690" y1="210" x2="776" y2="186"/><line x1="690" y1="210" x2="776" y2="210"/><line x1="690" y1="210" x2="776" y2="234"/>
+    <line x1="690" y1="234" x2="776" y2="162"/><line x1="690" y1="234" x2="776" y2="186"/><line x1="690" y1="234" x2="776" y2="210"/><line x1="690" y1="234" x2="776" y2="234"/>
+  </g>
+  <g fill="#C75794">
+    <circle cx="690" cy="162" r="5"/><circle cx="690" cy="186" r="5"/><circle cx="690" cy="210" r="5"/><circle cx="690" cy="234" r="5"/>
+    <circle cx="776" cy="162" r="5"/><circle cx="776" cy="186" r="5"/><circle cx="776" cy="210" r="5"/><circle cx="776" cy="234" r="5"/>
+  </g>
+  <line x1="786" y1="200" x2="808" y2="200" stroke="#555" stroke-width="1.4" marker-end="url(#arrD1)"/>
+  <text x="816" y="196" font-size="14" fill="#571639">scores</text>
+  <text x="816" y="212" font-size="14" fill="#571639">(logits)</text>
+  <text x="750" y="309" text-anchor="middle" font-size="14" fill="#6E6E6E">e.g. softmax classifier</text>
+
+  <line x1="884" y1="190" x2="916" y2="190" stroke="#555" stroke-width="1.5" marker-end="url(#arrD1)"/>
+
+  <!-- ===== Card 4: Prediction (orange) ===== -->
+  <rect x="920" y="40" width="260" height="300" rx="8" fill="#FCEEE2" stroke="#C78557" stroke-width="1.5"/>
+  <circle cx="942" cy="64" r="11" fill="#C78557"/>
+  <text x="942" y="69" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">4</text>
+  <text x="960" y="70" font-size="18" font-weight="600" fill="#5A3517">Prediction</text>
+  <text x="1050" y="98" text-anchor="middle" font-size="14" fill="#5A3517">The highest-scoring digit</text>
+  <text x="1050" y="116" text-anchor="middle" font-size="14" fill="#5A3517">is selected (the argmax)</text>
+  <g>
+    <text x="944" y="142" text-anchor="middle" font-size="14" fill="#5A3517">0</text><rect x="960" y="131" width="5"   height="12" fill="#B3B3B3"/><text x="1162" y="142" text-anchor="end" font-size="14" fill="#6E6E6E">0.01</text>
+    <text x="944" y="158" text-anchor="middle" font-size="14" fill="#5A3517">1</text><rect x="960" y="147" width="7"   height="12" fill="#B3B3B3"/><text x="1162" y="158" text-anchor="end" font-size="14" fill="#6E6E6E">0.02</text>
+    <text x="944" y="174" text-anchor="middle" font-size="14" fill="#5A3517">2</text><rect x="960" y="163" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="174" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+    <text x="944" y="190" text-anchor="middle" font-size="14" fill="#5A3517">3</text><rect x="960" y="179" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="190" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+    <text x="944" y="206" text-anchor="middle" font-size="14" fill="#5A3517">4</text><rect x="960" y="195" width="5"   height="12" fill="#B3B3B3"/><text x="1162" y="206" text-anchor="end" font-size="14" fill="#6E6E6E">0.01</text>
+    <text x="944" y="222" text-anchor="middle" font-size="14" fill="#5A3517">5</text><rect x="960" y="211" width="7"   height="12" fill="#B3B3B3"/><text x="1162" y="222" text-anchor="end" font-size="14" fill="#6E6E6E">0.02</text>
+    <text x="944" y="238" text-anchor="middle" font-size="14" fill="#5A3517">6</text><rect x="960" y="227" width="5"   height="12" fill="#B3B3B3"/><text x="1162" y="238" text-anchor="end" font-size="14" fill="#6E6E6E">0.01</text>
+    <text x="944" y="254" text-anchor="middle" font-size="14" fill="#5A3517">7</text><rect x="960" y="243" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="254" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+    <text x="944" y="270" text-anchor="middle" font-size="14" font-weight="700" fill="#5A3517">8</text><rect x="960" y="259" width="142" height="12" fill="#D98A3C"/><text x="1162" y="270" text-anchor="end" font-size="14" font-weight="700" fill="#5A3517">0.92</text>
+    <text x="944" y="286" text-anchor="middle" font-size="14" fill="#5A3517">9</text><rect x="960" y="275" width="9"   height="12" fill="#B3B3B3"/><text x="1162" y="286" text-anchor="end" font-size="14" fill="#6E6E6E">0.03</text>
+  </g>
+  <line x1="940" y1="300" x2="1160" y2="300" stroke="#E4CBB0" stroke-width="1"/>
+  <text x="1050" y="323" text-anchor="middle" font-size="16" font-weight="600" fill="#5A3517">Predicted: 8  ·  92% confidence</text>
+
+  <!-- End-to-end training brace under the learned model (cards 2-3) -->
+  <path d="M320,352 Q320,360 330,360 L594,360 Q600,360 600,368 Q600,360 606,360 L870,360 Q880,360 880,352" fill="none" stroke="#6E6E6E" stroke-width="1.4"/>
+  <text x="600" y="388" text-anchor="middle" font-size="16" font-style="italic" fill="#555">trained end-to-end with gradient descent (backpropagation)</text>
 </svg>
 </div>
 ```

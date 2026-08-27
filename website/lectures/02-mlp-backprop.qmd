@@ -993,8 +993,3 @@ foreshadow most of what we'll learn this semester.
 
 **Next lecture:** Regularization and Overfitting - how to prevent the MLP
 from simply memorizing training data?
-
-## References {#sec-references .unnumbered}
-
-::: {#refs}
-:::
