@@ -383,6 +383,8 @@ gradient matrix of shape $N^m \times N^{m-1}$, matching $W^m$:
 $$\frac{\partial \mathcal{L}}{\partial W^m} = \frac{\partial \mathcal{L}}{\partial a^m} \cdot (h^{m-1})^\top$$
 :::
 
+The bias gradient follows the same derivation and is simpler: differentiating $a^m_i$ with respect to $b^m_i$ gives $1$ rather than $h^{m-1}_j$, so $\frac{\partial \mathcal{L}}{\partial b^m} = \frac{\partial \mathcal{L}}{\partial a^m}$.
+
 ### The Backward Recursion
 
 We still need $\frac{\partial \mathcal{L}}{\partial a^m}$. This is where the "back" in
@@ -438,8 +440,9 @@ $$W^m \leftarrow W^m - \eta\,\frac{\partial \mathcal{L}}{\partial W^m}$$
 
 **Why is this efficient?** A single forward pass (caching all $a^m$) plus a
 single backward pass gives **all** weight gradients simultaneously. Without
-caching, computing the gradient for layer 1 would require re-running layers
-$2,\ldots,L$ for every single weight, which is exponentially more expensive.
+caching, computing the gradient for layer 1 would require recomputing the same
+intermediate quantities over and over — far more expensive work that caching
+avoids at the cost of a little memory.
 
 ### Connecting Back to Vanishing Gradients
 
@@ -861,7 +864,7 @@ when "off". Give the combining neuron weight $+1$ from each of the four, so
 its pre-activation is $(\text{number of active bumps}) + b$. For the neuron
 to fire only when *all four* are on, this must be positive at 4 active
 bumps but negative at 3: $4+b>0$ and $3+b<0$, i.e. $b \in (-4,-3)$. Picking
-$b = -3.5 (the midpoint of that range) gives the largest safety margin
+$b = -3.5$ (the midpoint of that range) gives the largest safety margin
 against the bump neurons' outputs being only approximately 0/1; a steep
 sigmoid then turns this pre-activation into a clean AND gate. The result is
 a rectangular tower of height $h$ over the footprint
@@ -964,7 +967,7 @@ foreshadow most of what we'll learn this semester.
 | Caveat | What it means | Motivates |
 |---|---|---|
 | **It implies we can overfit** | We have training data, not the true function. A wide enough MLP can memorize every training point. | Regularization (Lecture 3) |
-| **The model may be enormous** | The number of bumps to tile a $d$-dimensional space grows exponentially in $d$. | Specialized architectures (i.g., CNNs, Transformers) |
+| **The model may be enormous** | The number of bumps to tile a $d$-dimensional space grows exponentially in $d$. | Specialized architectures (e.g., CNNs, Transformers) |
 | **It doesn't tell us how** | The constructive proof hand-picks weights. We can't do that at scale. | Gradient descent, backprop, adaptive optimizers |
 
 ---
