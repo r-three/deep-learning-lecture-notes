@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Two closing topics: the engineering of training large models across accelerators — data, tensor, and pipeline parallelism, plus precision and memory tricks — and the fairness, accountability, and transparency questions that arise when these models are applied to people.">
+
+<title>Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency – Neural Networks and Deep Learning</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-67d765188173d06cfd0f34779d32db47.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&amp;family=Source+Code+Pro:wght@400;500&amp;display=swap" rel="stylesheet">
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles/custom.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Neural Networks and Deep Learning</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <div class="dropdown">
+      <a href="" title="Share" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Share"><i class="bi bi-share"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://twitter.com/intent/tweet?url=|url|">
+              <i class="bi bi-twitter pe-1"></i>
+            Twitter
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://www.linkedin.com/sharing/share-offsite/?url=|url|">
+              <i class="bi bi-linkedin pe-1"></i>
+            LinkedIn
+            </a>
+          </li>
+      </ul>
+    </div>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/01-intro-regression.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 1: Introduction, Linear &amp; Logistic Regression</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/02-mlp-backprop.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/03-regularization.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 3: Under/overfitting, Regularization, Numerical Stability, Autodiff</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/04-gradient-descent-adaptive-gradient-methods.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 4: Gradient Descent, Adaptive Gradient Methods</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#sec-engineering" id="toc-sec-engineering" class="nav-link active" data-scroll-target="#sec-engineering">Deep Learning Engineering</a>
+  <ul class="collapse">
+  <li><a href="#sec-costs" id="toc-sec-costs" class="nav-link" data-scroll-target="#sec-costs">Where the costs come from</a></li>
+  <li><a href="#sec-data-parallel" id="toc-sec-data-parallel" class="nav-link" data-scroll-target="#sec-data-parallel">Data parallelism</a></li>
+  <li><a href="#sec-tensor-parallel" id="toc-sec-tensor-parallel" class="nav-link" data-scroll-target="#sec-tensor-parallel">Tensor parallelism</a></li>
+  <li><a href="#sec-pipeline-parallel" id="toc-sec-pipeline-parallel" class="nav-link" data-scroll-target="#sec-pipeline-parallel">Pipeline parallelism</a></li>
+  <li><a href="#sec-precision" id="toc-sec-precision" class="nav-link" data-scroll-target="#sec-precision">Making training smaller and faster</a></li>
+  </ul></li>
+  <li><a href="#sec-fairness" id="toc-sec-fairness" class="nav-link" data-scroll-target="#sec-fairness">Fairness, Accountability, and Transparency</a>
+  <ul class="collapse">
+  <li><a href="#sec-measuring" id="toc-sec-measuring" class="nav-link" data-scroll-target="#sec-measuring">Measuring the problem</a></li>
+  <li><a href="#sec-where" id="toc-sec-where" class="nav-link" data-scroll-target="#sec-where">Where does this come from?</a></li>
+  <li><a href="#sec-modeling" id="toc-sec-modeling" class="nav-link" data-scroll-target="#sec-modeling">It is not only the data</a></li>
+  <li><a href="#sec-auditing" id="toc-sec-auditing" class="nav-link" data-scroll-target="#sec-auditing">Who is responsible?</a></li>
+  <li><a href="#sec-alignment" id="toc-sec-alignment" class="nav-link" data-scroll-target="#sec-alignment">Alignment</a></li>
+  </ul></li>
+  <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</h1>
+</div>
+<p><strong>Overview.</strong> This final lecture is really two short lectures on topics the course has otherwise set aside. The first is <strong>deep learning engineering</strong>: the models and training procedures we have studied all have to run on real hardware, and once a model is large enough, a single accelerator is no longer enough. We look at where the memory and compute costs come from, then at three ways to distribute a computation across many accelerators — <strong>data</strong>, <strong>tensor</strong>, and <strong>pipeline parallelism</strong> — and at several further tricks for making training smaller and faster (lower-precision number formats, mixed precision, gradient accumulation, and activation rematerialization). The second is <strong>fairness, accountability, and transparency</strong>: what can go right and wrong when the technology from this course is applied to real problems, especially problems that involve classifying people. The two parts are independent.</p>
+<section id="sec-engineering" class="level2">
+<h2 class="anchored" data-anchor-id="sec-engineering">Deep Learning Engineering</h2>
+<p>For most of the course we have been able to ignore the fact that every model and training procedure ultimately runs on a computer. That has kept the exposition clean, but the details cannot be ignored forever. Three facts make them unavoidable.</p>
+<p>First, to run the neural networks we use in practice, we need a specialized <strong>accelerator</strong>. Usually this means a GPU, though there are others — TPUs, and increasingly more besides. An accelerator is a piece of hardware well suited to the operations inside a neural network, above all matrix multiplications. One can run a neural network on a CPU, which is general-purpose hardware, but accelerators are far better at it. They were not necessarily designed for neural networks; they happened to have the right shape. The key is that an accelerator has a great many cores — a modern GPU has thousands or tens of thousands — so it can perform parallel operations like matrix multiplies far more effectively than a CPU, which may have dozens.</p>
+<p>Second, accelerators have constraints. The most important is that a GPU has a <strong>fixed amount of memory</strong>: unlike many computers, you cannot open it up and add more. Accelerators also run much faster for some data types and operations than others, and the speed of moving data between different memories varies widely — between the large block of DRAM/VRAM, the CPU’s RAM, the disk, and the small, fast SRAM where operations actually happen. These differences shape how we architect and run models.</p>
+<p>Third, one of the recurring lessons of the course is that deep learning models tend to get better as we make them bigger and train them on more data, and that costs compute. The growth over time has been steep. A clean, if slightly dated, example: ELMo, an early predecessor to BERT and the GPT-style models, was introduced in 2018 with about 100 million parameters <span class="citation" data-cites="peters2018deep">(<a href="02-mlp-backprop.html#ref-peters2018deep" role="doc-biblioref">Peters et al. 2018</a>)</span>. By 2022, Google trained PaLM, then the largest language model, with about 540 billion parameters <span class="citation" data-cites="chowdhery2023palm">(<a href="02-mlp-backprop.html#ref-chowdhery2023palm" role="doc-biblioref"><span class="nocase">Chowdhery et al.</span> 2023</a>)</span> — more than a 5,000-fold increase. Since the compute cost of using most of our models scales roughly linearly with the parameter count, processing a single token with PaLM is over 5,000 times more expensive than with ELMo, and that is before accounting for PaLM’s far larger training set (tens of trillions of tokens today, against tens of millions then).</p>
+<p>If the individual accelerator is fixed — we cannot add memory or cores to it — then the way to handle growing cost is to <strong>distribute the computation</strong> across many accelerators networked together. To reason about how, it helps to abstract away what a neural network is.</p>
+<section id="sec-costs" class="level3">
+<h3 class="anchored" data-anchor-id="sec-costs">Where the costs come from</h3>
+<p>Nearly every model in this course produces a prediction <span class="math inline">\hat{y}_i</span> from an input <span class="math inline">\bm{x}_i</span> using a parameterized function <span class="math inline">f_{\bm{\theta}}</span>,</p>
+<p><span class="math display">\hat{y}_i = f_{\bm{\theta}}(\bm{x}_i),</span></p>
+<p>and throughout that function the expensive operations are matrix–vector products <span class="math inline">\bm{W}\bm{h}</span>. Convolutions can be written as matrix multiplies (Lecture 11), and attention is built from them (Lecture 7); the elementwise nonlinearities in between are cheap by comparison. So from a high level, a neural network is a collection of matrix–vector products that we need to accelerate.</p>
+<p>To train it, at each step we take a batch of <span class="math inline">N</span> inputs, compute the gradient of a loss for each, and sum:</p>
+<p><span class="math display">\bm{g} = \sum_{i=1}^{N} \nabla_{\bm{\theta}}\, \mathcal{L}(\hat{y}_i, y_i), \qquad \bm{\theta} \leftarrow \bm{\theta} + \operatorname{optimizer}(\bm{g}).</span></p>
+<p>The summed gradient <span class="math inline">\bm{g}</span> is fed to an optimizer such as Adam (Lecture 4), which turns it into an update to the parameters. This abstract picture is enough to locate the costs, which fall into two kinds.</p>
+<p><strong>Memory.</strong> Four things must sit in memory at once, and each grows the footprint:</p>
+<ul>
+<li><strong>Parameters.</strong> We can only compute <span class="math inline">\bm{W}\bm{h}</span> if <span class="math inline">\bm{W}</span> and <span class="math inline">\bm{h}</span> are in memory.</li>
+<li><strong>Batch size.</strong> A larger batch means loading more activations <span class="math inline">\bm{h}</span> at once.</li>
+<li><strong>Cached activations.</strong> Backpropagation caches the forward-pass activations so the backward pass does not recompute them (Lecture 2); those caches grow with the batch.</li>
+<li><strong>Optimizer states.</strong> Adam keeps a running mean of the gradient and of the squared gradient, each the size of the parameters — so training with Adam needs about three times the memory of the parameters alone. SGD keeps no such state, so its memory cost is a third of Adam’s; momentum sits in between.</li>
+</ul>
+<p><strong>Compute.</strong> The costs are computing the model output <span class="math inline">f_{\bm{\theta}}</span>, computing the gradient <span class="math inline">\nabla_{\bm{\theta}}</span>, and — scaling with the batch size — summing the per-example gradients. Updating the optimizer states also costs something, but relatively little.</p>
+<p>The question for the rest of this part is what to do when these costs become prohibitive: when the parameters do not fit on a single GPU, when the batch’s cached activations do not fit, or simply when we want training to go faster.</p>
+</section>
+<section id="sec-data-parallel" class="level3">
+<h3 class="anchored" data-anchor-id="sec-data-parallel">Data parallelism</h3>
+<p>Start with the simplest case: the whole model fits on one GPU, and one GPU can do a forward and backward pass for at least a small slice of the batch, but we want a larger batch than one GPU can hold — and we have several GPUs. The gradient is a sum over the batch, and a sum can be split, which is what makes this easy.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> <em>Data parallelism</em> places a copy of the model on each of <span class="math inline">n</span> accelerators, splits the batch <span class="math inline">n</span> ways so each accelerator processes <span class="math inline">1/n</span> of it, and sums the per-accelerator gradients to form the update.</p>
+</div>
+<p>With two GPUs, the first processes inputs <span class="math inline">\bm{x}_1, \dots, \bm{x}_{N/2}</span> and computes the gradient summed over that half; the second does the same for <span class="math inline">\bm{x}_{N/2+1}, \dots, \bm{x}_N</span>. The two partial sums are communicated, added, and the result is the same <span class="math inline">\bm{g}</span> we would have computed on one device.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Data parallelism</text><rect x="40" y="60" width="380" height="66" rx="8" fill="#fff" stroke="#5795C7" stroke-width="1.8"></rect><text x="70" y="52" font-size="14" fill="#205279" text-anchor="start" font-weight="600">GPU 1</text><rect x="56" y="76" width="120" height="34" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="116.0" y="97.0" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">inputs 1 ... N/2</text><line x1="176" y1="93" x2="214" y2="93" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="320" y="98" font-size="15" fill="#205279" text-anchor="middle" font-weight="600">∑ ∇θ ℓ(ŷᵢ, yᵢ)</text><text x="320" y="116" font-size="11" fill="#205279" text-anchor="middle" font-weight="400">i = 1 ... N/2</text><rect x="40" y="160" width="380" height="66" rx="8" fill="#fff" stroke="#8457C7" stroke-width="1.8"></rect><text x="70" y="152" font-size="14" fill="#442079" text-anchor="start" font-weight="600">GPU 2</text><rect x="56" y="176" width="120" height="34" rx="6" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect><text x="116.0" y="196.66666666666666" text-anchor="middle" font-size="11" font-weight="600" fill="#442079">inputs N/2+1 ... N</text><line x1="176" y1="193" x2="214" y2="193" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="320" y="198" font-size="15" fill="#442079" text-anchor="middle" font-weight="600">∑ ∇θ ℓ(ŷᵢ, yᵢ)</text><text x="320" y="216" font-size="11" fill="#442079" text-anchor="middle" font-weight="400">i = N/2+1 ... N</text><circle cx="480" cy="143" r="15" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle><text x="480" y="148" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text><path d="M420,93 L450,93 L450,132" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></path><path d="M420,193 L450,193 L450,154" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></path><line x1="495" y1="143" x2="540" y2="143" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="565" y="148" font-size="18" fill="#333" text-anchor="middle" font-weight="600">g</text><text x="20" y="270" font-size="13" fill="#666" text-anchor="start">Each GPU holds a full copy of the model and processes half the batch; the summed gradients are added to</text><text x="20" y="288" font-size="13" fill="#666" text-anchor="start">form the update g. Simple and low-communication, but the whole model must fit on each device.</text></svg></div>
+<p>Two things follow. Each GPU processes half the inputs, so it does half the work, and since the two run in parallel, the batch can be processed roughly twice as fast — no GPU waits for another. And the batch can now be larger than would fit on a single device. The communication is light: each GPU works away on its half and only needs to share its summed gradient at the end, which is cheap next to the cost of the forward and backward passes.</p>
+<p>The drawbacks are two. First, the approach depends on having enough batch to go around. Batching is itself a form of parallelism — the examples in a batch are processed in parallel on one GPU — so if there are more GPUs than the batch can usefully be split across, we are forced to very small per-GPU batches and lose efficiency. Second, and more fundamentally, data parallelism still requires the <em>entire model</em> to fit on each GPU. If a model has 540 billion parameters stored as <code>float32</code> (4 bytes each), that is about 2 terabytes, and GPUs do not have that much memory. For such a model we must split the model itself across devices.</p>
+</section>
+<section id="sec-tensor-parallel" class="level3">
+<h3 class="anchored" data-anchor-id="sec-tensor-parallel">Tensor parallelism</h3>
+<p>The first way to split a model is <strong>tensor parallelism</strong>, a form of model parallelism. It exploits the fact that the operations are matrix–vector products <span class="math inline">\bm{W}\bm{h}</span>, where each output entry is a dot product of a row of <span class="math inline">\bm{W}</span> with <span class="math inline">\bm{h}</span>.</p>
+<p>Split <span class="math inline">\bm{W}</span> into two halves by columns, and split <span class="math inline">\bm{h}</span> into two matching halves. The first half of <span class="math inline">\bm{W}</span> times the first half of <span class="math inline">\bm{h}</span>, plus the second half of <span class="math inline">\bm{W}</span> times the second half of <span class="math inline">\bm{h}</span>, gives exactly <span class="math inline">\bm{W}\bm{h}</span> — the dot products decompose into partial sums that we add. Put the first half on GPU 1 and the second on GPU 2, run them in parallel, and communicate to sum the results.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 680 320" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Tensor parallelism</text><text x="40" y="70" font-size="13" fill="#666" text-anchor="start" font-weight="400">On one device:</text><rect x="40" y="82" width="120" height="80" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"></rect><text x="100" y="127" font-size="20" fill="#666666" text-anchor="middle" font-weight="600">W</text><rect x="168" y="82" width="24" height="80" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="180" y="127" font-size="15" fill="#205279" text-anchor="middle" font-weight="600">h</text><text x="210" y="127" font-size="18" fill="#333" text-anchor="middle" font-weight="400">=</text><rect x="228" y="82" width="24" height="80" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect><text x="240" y="127" font-size="15" fill="#794520" text-anchor="middle" font-weight="600">y</text><line x1="300" y1="60" x2="300" y2="300" stroke="#ddd" stroke-width="1.5"></line><text x="330" y="70" font-size="13" fill="#666" text-anchor="start" font-weight="400">Split W by columns, h by halves, run in parallel, sum:</text><rect x="340" y="92" width="60" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="370" y="116" font-size="13" fill="#205279" text-anchor="middle" font-weight="600">W₁</text><rect x="408" y="92" width="20" height="40" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="418" y="116" font-size="11" fill="#205279" text-anchor="middle" font-weight="600">h₁</text><text x="456" y="116" font-size="12" fill="#205279" text-anchor="start" font-weight="600">GPU 1</text><rect x="340" y="150" width="60" height="40" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect><text x="370" y="174" font-size="13" fill="#442079" text-anchor="middle" font-weight="600">W₂</text><rect x="408" y="150" width="20" height="40" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect><text x="418" y="174" font-size="11" fill="#442079" text-anchor="middle" font-weight="600">h₂</text><text x="456" y="174" font-size="12" fill="#442079" text-anchor="start" font-weight="600">GPU 2</text><circle cx="560" cy="141" r="14" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle><text x="560" y="146" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text><path d="M528,112 L545,112 L545,130" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></path><path d="M528,170 L545,170 L545,152" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></path><line x1="574" y1="141" x2="606" y2="141" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="624" y="146" font-size="16" fill="#794520" text-anchor="middle" font-weight="600">y</text><text x="20" y="265" font-size="13" fill="#666" text-anchor="start">Every matrix–vector product Wh is split across devices and the partial products summed. Fits larger weight</text><text x="20" y="283" font-size="13" fill="#666" text-anchor="start">matrices (larger models), but the devices must communicate on every matrix product — communication-intensive.</text></svg></div>
+<div class="definition-block">
+<p><strong>Definition.</strong> <em>Tensor parallelism</em> splits the individual weight matrices (and the matching activations) across accelerators, each computing part of every matrix–vector product; the partial results are summed to reconstruct the full product.</p>
+</div>
+<p>(One can equally split <span class="math inline">\bm{W}</span> by rows instead of columns, keeping <span class="math inline">\bm{h}</span> whole; the pieces then combine differently — worth working through.) The benefit is memory: each GPU stores only half of <span class="math inline">\bm{W}</span>, so we can fit larger weight matrices, and applying this to every matrix in the model lets us fit a model about twice as large.</p>
+<p>The cost is communication. Data parallelism communicates once, at the very end. Tensor parallelism communicates <em>every</em> matrix–vector product. A 96-layer transformer with, say, seven weight matrices per layer (for example, the query, key, value, and output projections and the feed-forward projections) requires the GPUs to talk on the order of <span class="math inline">7 \times 96</span> times per pass. So data parallelism tolerates a slow interconnect between GPUs, while tensor parallelism demands a very fast one.</p>
+</section>
+<section id="sec-pipeline-parallel" class="level3">
+<h3 class="anchored" data-anchor-id="sec-pipeline-parallel">Pipeline parallelism</h3>
+<p>The other way to split a model is <strong>pipeline parallelism</strong>, also a form of model parallelism, which splits the model by <em>layers</em> rather than within each matrix. A model with, say, 64 layers might be cut into four contiguous blocks of 16, one block per GPU.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> <em>Pipeline parallelism</em> partitions the model into contiguous groups of layers, placing each group on a separate accelerator; activations flow forward from one accelerator to the next, and gradients flow back.</p>
+</div>
+<p>On the forward pass, GPU 1 runs its layers and passes its output to GPU 2, which runs its layers and passes to GPU 3, and so on to GPU 4, which produces the model output. The backward pass runs in reverse, GPU 4 back to GPU 1, and takes about twice as long as the forward pass.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 720 330" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Pipeline parallelism</text><text x="70" y="79.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 1</text><text x="70" y="119.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 2</text><text x="70" y="159.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 3</text><text x="70" y="199.0" font-size="13" fill="#333" text-anchor="middle" font-weight="600">GPU 4</text><rect x="120" y="60" width="52" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="146.0" y="79.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">L1</text><rect x="172" y="100" width="52" height="30" rx="6" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect><text x="198.0" y="119.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">L2</text><rect x="224" y="140" width="52" height="30" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect><text x="250.0" y="159.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">L3</text><rect x="276" y="180" width="52" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect><text x="302.0" y="199.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#207965">L4</text><rect x="328" y="180" width="92" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect><text x="374.0" y="199.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#207965">∇L4</text><rect x="420" y="140" width="92" height="30" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect><text x="466.0" y="159.33333333333334" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">∇L3</text><rect x="512" y="100" width="92" height="30" rx="6" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect><text x="558.0" y="119.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">∇L2</text><rect x="604" y="60" width="92" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="650.0" y="79.33333333333333" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">∇L1</text><line x1="146.0" y1="90" x2="198.0" y2="100" stroke="#888" stroke-width="1.2" marker-end="url(#a)"></line><line x1="198.0" y1="130" x2="250.0" y2="140" stroke="#888" stroke-width="1.2" marker-end="url(#a)"></line><line x1="250.0" y1="170" x2="302.0" y2="180" stroke="#888" stroke-width="1.2" marker-end="url(#a)"></line><line x1="374.0" y1="180" x2="466.0" y2="170" stroke="#888" stroke-width="1.2" marker-end="url(#a)"></line><line x1="466.0" y1="140" x2="558.0" y2="130" stroke="#888" stroke-width="1.2" marker-end="url(#a)"></line><line x1="558.0" y1="100" x2="650.0" y2="90" stroke="#888" stroke-width="1.2" marker-end="url(#a)"></line><ellipse cx="424" cy="92" rx="80" ry="34" fill="none" stroke="#AAAAAA" stroke-width="1.2" stroke-dasharray="4,3"></ellipse><text x="424" y="89" font-size="13" fill="#666666" text-anchor="middle" font-weight="600">bubble</text><text x="424" y="106" font-size="11" fill="#666666" text-anchor="middle" font-weight="400">(devices idle)</text><line x1="110" y1="240" x2="600" y2="240" stroke="#555" stroke-width="1.5" marker-end="url(#a)"></line><text x="355" y="262" font-size="13" fill="#555" text-anchor="middle" font-weight="400">time</text><text x="20" y="300" font-size="13" fill="#666" text-anchor="start">The model is split by layers, one block per GPU; the backward pass (∇L, ~2× longer) runs in reverse. Devices</text><text x="20" y="318" font-size="13" fill="#666" text-anchor="start">sit idle in the bubble, so this gives no speedup on its own — only lower memory per device.</text></svg></div>
+<p>The advantages are that it is easy to implement and its communication is fairly low: the GPUs talk only when activations cross a block boundary — once per 16 layers here, not once per matrix — so it communicates far less than tensor parallelism (though more than data parallelism). Each GPU also holds only a quarter of the model, so a much larger model fits.</p>
+<p>The drawback is visible in the diagram. While GPU 1 works on the first block, the others sit idle, waiting for its output; while GPU 4 works, GPU 1 is idle. Most devices are idle most of the time. This idle region is called the <strong>bubble</strong>.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Pipeline parallelism does not, on its own, speed anything up.</strong> With data or tensor parallelism, <span class="math inline">n</span> accelerators ideally cut the time by a factor of <span class="math inline">n</span>. With the naive pipeline above, the total time is the same as running the whole model on one GPU — the accelerators just take turns. All we have bought is lower memory per device. So we avoid pipeline parallelism when we can, and reach for it when the model is too large to fit otherwise and a slow interconnect rules out tensor parallelism. PaLM is a reported example: fast TPU-to-TPU links within each of two supercomputers allowed tensor parallelism there, but the slower link between the two supercomputers was handled with pipeline parallelism across the pair.</p>
+</div>
+</div>
+<p>The bubble can be shrunk. The standard idea is to split the batch into smaller <strong>microbatches</strong> so that once a GPU finishes one microbatch it can begin the next, overlapping the work; more sophisticated schedules account for the backward pass being twice as expensive as the forward, and can make the bubble quite small.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>These strategies are abstracted away for you.</strong> As with backpropagation, the complexity here is usually hidden behind a library — to train a large language model with data and model parallelism, you download something that does it. Understanding where the costs come from is still valuable: it lets you reason about which strategy fits a given model and interconnect, and therefore what will train, and how fast.</p>
+</div>
+</div>
+</section>
+<section id="sec-precision" class="level3">
+<h3 class="anchored" data-anchor-id="sec-precision">Making training smaller and faster</h3>
+<p>Beyond parallelization, several general techniques make training smaller or faster.</p>
+<p><strong>Floating-point precision.</strong> We represent real numbers in a floating-point format, and there are several to choose from, trading storage and speed against precision and range. A floating-point number has a sign bit, some bits for the value, and some <strong>exponent</strong> bits that scale it up or down. The usual, safe choice for neural network training is <code>float32</code>, with 8 exponent bits; <code>float64</code> is overkill. Halving the storage — and often roughly doubling the speed — invites a 16-bit format.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 760 320" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Floating-point formats: sign, exponent, mantissa</text><text x="136" y="88" font-size="14" fill="#333" text-anchor="end" font-weight="600">float32</text><rect x="150" y="70" width="18.0" height="28" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"></rect><rect x="168.0" y="70" width="144.0" height="28" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"></rect><text x="240.0" y="88" font-size="12" fill="#442079" text-anchor="middle" font-weight="600">8 exp</text><rect x="312.0" y="70" width="414.0" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect><text x="519.0" y="88" font-size="12" fill="#205279" text-anchor="middle" font-weight="600">23 mantissa</text><text x="136" y="138" font-size="14" fill="#333" text-anchor="end" font-weight="600">float16</text><rect x="150" y="120" width="36.0" height="28" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"></rect><rect x="186.0" y="120" width="180.0" height="28" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"></rect><text x="276.0" y="138" font-size="12" fill="#442079" text-anchor="middle" font-weight="600">5 exp</text><rect x="366.0" y="120" width="360.0" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect><text x="546.0" y="138" font-size="12" fill="#205279" text-anchor="middle" font-weight="600">10 mantissa</text><text x="136" y="188" font-size="14" fill="#333" text-anchor="end" font-weight="600">bfloat16</text><rect x="150" y="170" width="36.0" height="28" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"></rect><rect x="186.0" y="170" width="288.0" height="28" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"></rect><text x="330.0" y="188" font-size="12" fill="#442079" text-anchor="middle" font-weight="600">8 exp</text><rect x="474.0" y="170" width="252.0" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect><text x="600.0" y="188" font-size="12" fill="#205279" text-anchor="middle" font-weight="600">7 mantissa</text><rect x="150" y="230" width="16" height="16" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1"></rect><text x="172" y="243" font-size="13" fill="#666" text-anchor="start">1 sign bit</text><rect x="270" y="230" width="16" height="16" fill="#DBCDF0" stroke="#8457C7" stroke-width="1"></rect><text x="292" y="243" font-size="13" fill="#666" text-anchor="start">exponent (range)</text><rect x="440" y="230" width="16" height="16" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect><text x="462" y="243" font-size="13" fill="#666" text-anchor="start">mantissa (precision)</text><text x="20" y="285" font-size="13" fill="#666" text-anchor="start">More exponent bits give a wider range; bfloat16 matches float32's 8 exponent bits and trades away mantissa</text><text x="20" y="303" font-size="13" fill="#666" text-anchor="start">(precision) instead, which makes it more stable for the numbers that arise in training than float16.</text></svg></div>
+<p>The obvious 16-bit format, <code>float16</code>, has 5 exponent bits. This is unstable: with so few exponent bits its largest representable value is around 65,000, and numbers beyond that become infinity — not implausible during training — while near the top of the range the gaps between representable numbers grow large, so a weight of 65,000 cannot be nudged to 64,499. The widely used alternative is <code>bfloat16</code> (“brain float”, from Google Brain), which keeps 8 exponent bits like <code>float32</code> and gives up precision instead, sacrificing mantissa bits for range. For the kinds of numbers that arise in training, <code>bfloat16</code> is more stable.</p>
+<p><strong>Mixed precision.</strong> The parameters are the quantities we are carefully tuning; the activations are transient. So we can keep the sensitive parts in high precision and the rest in low precision. The standard scheme computes the forward pass, the output, and the gradient in <code>float16</code>, then upcasts the gradient to <code>float32</code> and adds it to <code>float32</code> parameters. The quantity we tune stays high-precision, while the bulk of the computation runs at half the storage and roughly twice the speed.</p>
+<p><strong>Gradient accumulation.</strong> A larger batch costs more memory. To use a batch larger than fits on the GPU, split it into <strong>microbatches</strong>: compute the gradient for one microbatch, add it to a running sum (kept, say, in CPU memory), compute the next, add it, and only after enough microbatches update the parameters. Since the batch gradient is a sum over examples, doing the sum sequentially gives an identical result while never holding the full batch at once — an effectively larger batch than memory allows, which matters when a small batch would make training unstable.</p>
+<p><strong>Activation rematerialization.</strong> Backpropagation’s caching of forward-pass activations is an optimization we can decline. If the caches are exhausting memory, we can simply not cache, and instead <strong>recompute</strong> the activations during the backward pass. This trades memory for compute: the backward pass, normally about twice the cost of the forward pass, grows more expensive — in the extreme, roughly quadratically. It is usually an act of desperation to fit a larger batch, but it is available. (Most people call this <em>checkpointing</em> or <em>gradient checkpointing</em>; <em>rematerialization</em> is a more descriptive name for recomputing rather than caching.)</p>
+<hr>
+</section>
+</section>
+<section id="sec-fairness" class="level2">
+<h2 class="anchored" data-anchor-id="sec-fairness">Fairness, Accountability, and Transparency</h2>
+<p>The rest of the course studied the technology itself. We now turn to its impact — what can go right and wrong when these models are applied to real problems. There is no settled name for this cluster of concerns; we use the standard term <strong>fairness, accountability, and transparency</strong>.</p>
+<p>The setting to keep in mind is classifying people. Many applications are not about people — house prices, cats versus dogs, machine translation — but many are, and there the central fact is this: a machine learning model can have <strong>different performance on different subgroups</strong> of its data. A cat-versus-dog classifier might simply be worse at Pomeranians. When the data is people, “subgroup” can mean a demographic group, and the differing performance can do real harm. Three examples run through this part.</p>
+<ul>
+<li><strong>Skin cancer.</strong> Suppose we build a convolutional network that diagnoses skin cancer from a photo of a skin lesion, classifying it as cancer to be treated or a benign mole. The characteristics of the image depend on skin color, so the model can perform differently across skin colors. If it works worse on some, and a health system adopts it, people with those skin colors face more misdiagnoses — cancers missed — and worse outcomes.</li>
+<li><strong>Facial recognition.</strong> Early commercial facial-recognition APIs were shown to be dramatically less accurate for dark-skinned women — a disparity along both skin color and gender at once <span class="citation" data-cites="buolamwini2018gender">(<a href="02-mlp-backprop.html#ref-buolamwini2018gender" role="doc-biblioref">Buolamwini and Gebru 2018</a>)</span>.</li>
+<li><strong>Prison sentencing.</strong> Suppose a model predicts a prison sentence from a written description of a case. If it is trained on historical data in which some demographic groups received harsher sentences, then — as we discuss below — the correct behavior of the model, in the machine learning sense, is to reproduce that bias.</li>
+</ul>
+<p>We carry the skin-cancer classifier through the rest of this part as the running example.</p>
+<section id="sec-measuring" class="level3">
+<h3 class="anchored" data-anchor-id="sec-measuring">Measuring the problem</h3>
+<p>The simplest way to detect differing performance is to stop reporting a single accuracy over all data and instead <strong>measure performance separately on each subgroup</strong>. This is exactly how the facial-recognition disparity was found: rather than one accuracy number, accuracy was reported for each combination of skin color and gender, and the gaps became visible.</p>
+<p>The difficulty is doing this objectively. To measure accuracy per subgroup we must assign examples to subgroups, and deciding whether a person is, say, light- or dark-skinned is itself a subjective judgment. The measurement we need in order to see the problem carries a value judgment inside it.</p>
+</section>
+<section id="sec-where" class="level3">
+<h3 class="anchored" data-anchor-id="sec-where">Where does this come from?</h3>
+<p>Why might a model perform differently across groups? Several sources.</p>
+<p><strong>Distribution shift.</strong> The broadest source is that we train on data from one distribution but deploy on another. We collect input–output pairs from a distribution <span class="math inline">p(\bm{x}, y)</span> and then test on a different distribution <span class="math inline">\hat{p}(\bm{x}, y)</span>. This violates the assumption, standing since Lecture 1, that training and test data are drawn independently from the <em>same</em> distribution (the i.i.d. assumption). In practice that assumption almost never holds exactly, because the world changes over time: data collected in 2010 and a model deployed in 2020 will generally see different distributions. Distribution shift is the norm, not the exception.</p>
+<p><strong>Issues with the dataset.</strong> The data may carry patterns we do not want the model to reproduce. A language model scraped from the internet is trained on text written from an enormous variety of perspectives, some of which a given user will find problematic — meaning, in the end, that it does not reflect that user’s values. A model trained on such data can, and in the maximum-likelihood sense <em>should</em>, mimic it: if a pattern is in the data, the model learns it. The natural response — inspect the data and remove or edit what conflicts with our values — runs into scale. These datasets are often unfathomably large, tens of trillions of tokens, far too large to audit by hand. So the auditing is offloaded to a program, which may itself be imprecise.</p>
+<p><strong>Representativeness.</strong> A related question is who a dataset represents — who participated in creating it, whose values it encodes, and who decided how to collect and curate it. Some demographic groups and geographic regions are better represented on the internet than others. And in a task like the skin-cancer classifier, if we gather lesion photos from one hospital serving one population but deploy globally, the local skin characteristics will not match the world’s. Two concrete cases:</p>
+<ul>
+<li><strong>Wikipedia.</strong> Wikipedia is often used as a source of clean, grammatical, factual text — for instance, to train a classifier that keeps web text resembling Wikipedia and discards the rest. But Wikipedia was overwhelmingly written by white men, so treating it as the standard of good text can quietly encode one group’s knowledge and perspective as the norm.</li>
+<li><strong>A bad-words filter.</strong> In building an openly released language model, one team filtered training data by discarding any web page containing a word from an existing list of banned words (a list written for comment moderation, adopted to avoid imposing the team’s own judgments) <span class="citation" data-cites="raffel2020exploring">(<a href="02-mlp-backprop.html#ref-raffel2020exploring" role="doc-biblioref">Raffel et al. 2020</a>)</span>. The filter turned out to remove text unevenly: text written by, for example, authors who are gay was more likely to be discarded, because terms they were more likely to use appeared on the conservative list — so those groups ended up less represented in the data, with downstream effects that are hard to pin down.</li>
+</ul>
+<p><strong>Privacy and consent.</strong> Content scraped from the internet was usually posted without model training in mind. Two problems follow from the fact that models can <strong>memorize</strong> their training data — a trained model can often be induced to emit a training example verbatim, whether a passage of text or an image <span class="citation" data-cites="carlini2021extracting">(<a href="02-mlp-backprop.html#ref-carlini2021extracting" role="doc-biblioref">Carlini et al. 2021</a>)</span>. First, privacy: someone who posted content, perhaps expecting some control over its storage and reproduction, may have that content reproduced by a model. Second, consent: posting to share with friends is not the same as consenting to permanent, unremovable storage in a model’s weights. A third, related question is how much a model <strong>remixes</strong> versus reproduces its training data. Because we lack a precise notion of generalization, it is unclear whether a given generation is genuinely new or closely based on training data — which raises unresolved legal and copyright questions.</p>
+</section>
+<section id="sec-modeling" class="level3">
+<h3 class="anchored" data-anchor-id="sec-modeling">It is not only the data</h3>
+<p>Data clearly shapes a model’s behavior — if it did not, there would be no point in machine learning. It is tempting to conclude that the data is therefore the only thing to fix: clean the data and the model is clean. Data matters, but other choices matter too. Modeling decisions can affect performance across subgroups on their own.</p>
+<p>A deliberately simple example. Take a dataset of 49 light-skinned faces and 50 dark-skinned faces — about as balanced as a 99-image set can be — and two generative models of faces. The first fits a zero-covariance Gaussian, so it always outputs the <em>average</em> face: a single blurry image of intermediate skin tone. The second outputs the <em>median</em> face, which — because the darker-skinned faces are the slight majority — is a dark-skinned face. Same data, two models, two very different behaviors. These toy models are almost useless, but real models do something in the same family: some averaging, some matching of the modes of the data, and some generative models deliberately seek modes, fitting one subpopulation well and another poorly. The choice is a modeling decision, not a property of the data.</p>
+<p>A less toy example is <strong>model compression</strong> — taking a large model and producing a smaller or faster one (by quantizing weights to lower precision, sparsifying, or otherwise shrinking it) with comparable accuracy. When the accuracy is comparable but slightly worse, one can ask which data the compressed model does worse on. Current techniques tend to sacrifice accuracy on the <strong>long tail</strong>: data with less common characteristics is hit harder by compression than typical data <span class="citation" data-cites="hooker2020characterising">(<a href="02-mlp-backprop.html#ref-hooker2020characterising" role="doc-biblioref">Hooker et al. 2020</a>)</span>.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>“Models aren’t biased, data is.”</strong> This is a claim people sometimes make. The examples above are the reply: the generative model’s average-versus-median choice and compression’s effect on the long tail both shift behavior across subgroups through the <em>modeling</em>, with the data held fixed. You cannot fix everything by fixing the data.</p>
+</div>
+</div>
+</section>
+<section id="sec-auditing" class="level3">
+<h3 class="anchored" data-anchor-id="sec-auditing">Who is responsible?</h3>
+<p>Suppose we accept that a model may perform differently across subgroups for some mix of data and modeling reasons. Who should be responsible for <strong>noticing</strong> — not necessarily fixing, but noticing — these issues? Each candidate has a problem.</p>
+<ul>
+<li><strong>Industry</strong> — the companies building and deploying the models — has misaligned incentives. A product making money creates a reason not to take it down even after a harm to some group is found. If the skin-cancer model saves the cost of paying doctors, there is an incentive to keep using it even when it misclassifies.</li>
+<li><strong>A watchdog group</strong> that audits systems and discloses problems, like white-hat hackers, has no control over how models are built or deployed. It can only plug holes in a sinking ship — flagging one problem at a time, unable to fix them or to be comprehensive.</li>
+<li><strong>The impacted people</strong> — “if it does not work for you, tell us” — face a double burden: the model already works worse for them, and now the work of fixing it is placed on them too.</li>
+<li><strong>Researchers</strong>, who develop the technology, should think through its implications, and often can. But nearly every technology here is <strong>dual use</strong> — usable for good or ill.</li>
+</ul>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Dual use.</strong> A generative model of molecules built for drug discovery is, by the same token, good at designing poisons and bioweapons, which has been demonstrated. Convolutional networks that recognize faces make it possible, by scraping named photos from the internet, to identify people in public and end anonymity — a product that exists and that some police forces use. Even a high-school project on the sphere-packing problem, done at a hospital, was eventually cited only in a cigarette company’s patent on fitting more cigarettes in a box. Thinking through positive and negative outcomes is necessary but does not by itself prevent the negative ones; more is needed.</p>
+</div>
+</div>
+</section>
+<section id="sec-alignment" class="level3">
+<h3 class="anchored" data-anchor-id="sec-alignment">Alignment</h3>
+<p>Finally, once a problem is identified, fixing it is not always feasible: re-filtering the data and retraining may be expensive, the problem may not be fixable earlier in the pipeline, and it may be hard to anticipate in advance. Meanwhile models are increasingly deployed in user-facing settings and are expected to do almost anything. A general-purpose model that can do anything can do helpful, harmless things — or unhelpful, harmful ones.</p>
+<p>So it helps to characterize the desired behavior. One starting framework, memorable partly for its alliteration, asks that a model be <span class="citation" data-cites="askell2021general">(<a href="02-mlp-backprop.html#ref-askell2021general" role="doc-biblioref"><span class="nocase">Askell et al.</span> 2021</a>)</span>:</p>
+<ul>
+<li><strong>Helpful</strong> — it does what it is asked, and not something else;</li>
+<li><strong>Harmless</strong> — it does not harm people;</li>
+<li><strong>Honest</strong> — it accurately reflects the information it is given or trained on.</li>
+</ul>
+<p>These principles are plainly too simple to be the whole answer, but they are a place to start. The concern is that failures to be helpful, harmless, or honest can be <strong>exacerbated as the action space expands</strong> — as models are allowed to do more, the downstream consequences of falling short of these principles grow. There is no single answer that makes the technology only helpful, only harmless, and only honest. The point is to keep these questions in view when applying what this course has taught.</p>
+</section>
+</section>
+<section id="sec-summary" class="level2">
+<h2 class="anchored" data-anchor-id="sec-summary">Summary</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Key takeaways from Lecture 12:</strong></p>
+<ul>
+<li>Neural networks run on <strong>accelerators</strong> with fixed memory, and models keep growing (ELMo’s ~100M parameters in 2018 to PaLM’s ~540B in 2022), so training must be <strong>distributed</strong> across many accelerators.</li>
+<li>Abstractly, a network is a stack of matrix–vector products <span class="math inline">\bm{W}\bm{h}</span>; training memory is spent on <strong>parameters, batch size, cached activations, and optimizer states</strong> (Adam needs ~3× the parameters), and compute on the forward pass, the gradient, and the batch sum.</li>
+<li><strong>Data parallelism</strong> replicates the model and splits the batch — simple, low communication, but requires the whole model to fit on each device and depends on batch size. <strong>Tensor parallelism</strong> splits each weight matrix across devices — fits larger models, but communicates every matrix product. <strong>Pipeline parallelism</strong> splits the model by layers — low-ish communication, but leaves devices idle in the <strong>bubble</strong> and gives no speedup on its own.</li>
+<li>Further engineering tricks: lower-precision formats (<code>bfloat16</code> keeps <code>float32</code>’s 8 exponent bits for stability, unlike <code>float16</code>), <strong>mixed precision</strong> (high-precision weights, low-precision everything else), <strong>gradient accumulation</strong> (sum microbatch gradients for a larger effective batch), and <strong>activation rematerialization</strong> (recompute activations to save memory at the cost of compute).</li>
+<li>A model can have <strong>different performance on different subgroups</strong> of people (skin-cancer diagnosis, facial recognition, sentencing); this is detected by <strong>measuring accuracy per subgroup</strong>, which itself requires subjective grouping.</li>
+<li>Disparities arise from <strong>distribution shift</strong> (the i.i.d. assumption rarely holds), <strong>dataset issues and representativeness</strong> (who the data represents, whose values, who curated it — Wikipedia, bad-words filtering), <strong>privacy and consent</strong> (models memorize and remix data), and from <strong>modeling choices</strong>, not data alone (average-versus-median generation, compression sacrificing the long tail).</li>
+<li>No single party is well placed to <strong>audit</strong> (industry’s incentives, watchdogs’ lack of control, the impacted people’s double burden, researchers facing <strong>dual use</strong>), and nearly all of this technology is dual use. A starting framework for desired behavior is that models be <strong>helpful, harmless, and honest</strong>, with the caveat that failures grow as the action space expands.</li>
+</ul>
+</div>
+</div>
+<p><strong>Next lecture:</strong> This is the final lecture of the course. Having covered the architectures, objectives, and optimizers that make up modern deep learning — and now the engineering that makes them run and the questions raised when they are applied to people — you are equipped to build with these tools, and to do so responsibly.</p>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<div id="ref-askell2021general" class="csl-entry" role="listitem">
+<span class="nocase">Askell, Amanda, Yuntao Bai, Anna Chen, et al.</span> 2021. <span>“A General Language Assistant as a Laboratory for Alignment.”</span> <em>arXiv Preprint arXiv:2112.00861</em>.
+</div>
+<div id="ref-buolamwini2018gender" class="csl-entry" role="listitem">
+Buolamwini, Joy, and Timnit Gebru. 2018. <span>“Gender Shades: Intersectional Accuracy Disparities in Commercial Gender Classification.”</span> <em>Conference on Fairness, Accountability and Transparency</em>.
+</div>
+<div id="ref-carlini2021extracting" class="csl-entry" role="listitem">
+Carlini, Nicholas, Florian Tramer, Eric Wallace, et al. 2021. <span>“Extracting Training Data from Large Language Models.”</span> <em>USENIX Security Symposium</em>.
+</div>
+<div id="ref-chowdhery2023palm" class="csl-entry" role="listitem">
+<span class="nocase">Chowdhery, Aakanksha, Sharan Narang, Jacob Devlin, et al.</span> 2023. <span>“<span>PaLM</span>: Scaling Language Modeling with Pathways.”</span> <em>Journal of Machine Learning Research</em> 24 (240).
+</div>
+<div id="ref-hooker2020characterising" class="csl-entry" role="listitem">
+Hooker, Sara, Aaron Courville, Gregory Clark, Yann Dauphin, and Andrea Frome. 2020. <span>“Characterising Bias in Compressed Models.”</span> <em>arXiv Preprint arXiv:2010.03058</em>.
+</div>
+<div id="ref-peters2018deep" class="csl-entry" role="listitem">
+Peters, Matthew E., Mark Neumann, Mohit Iyyer, et al. 2018. <span>“Deep Contextualized Word Representations.”</span> <em>Conference of the North American Chapter of the Association for Computational Linguistics</em>.
+</div>
+<div id="ref-raffel2020exploring" class="csl-entry" role="listitem">
+Raffel, Colin, Noam Shazeer, Adam Roberts, et al. 2020. <span>“Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer.”</span> <em>Journal of Machine Learning Research</em> 21 (140).
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="pagination-link" aria-label="Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer><script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

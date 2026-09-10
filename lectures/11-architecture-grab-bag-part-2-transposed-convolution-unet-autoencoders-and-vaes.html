@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="More architectural ideas: autoencoders and the variational autoencoder for unsupervised representation learning, the transposed convolution as the backward pass of a convolution, and the U-Net for dense image-to-image prediction.">
+
+<title>Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs – Neural Networks and Deep Learning</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" rel="next">
+<link href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-67d765188173d06cfd0f34779d32db47.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&amp;family=Source+Code+Pro:wght@400;500&amp;display=swap" rel="stylesheet">
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles/custom.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Neural Networks and Deep Learning</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <div class="dropdown">
+      <a href="" title="Share" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Share"><i class="bi bi-share"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://twitter.com/intent/tweet?url=|url|">
+              <i class="bi bi-twitter pe-1"></i>
+            Twitter
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://www.linkedin.com/sharing/share-offsite/?url=|url|">
+              <i class="bi bi-linkedin pe-1"></i>
+            LinkedIn
+            </a>
+          </li>
+      </ul>
+    </div>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/01-intro-regression.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 1: Introduction, Linear &amp; Logistic Regression</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/02-mlp-backprop.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/03-regularization.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 3: Under/overfitting, Regularization, Numerical Stability, Autodiff</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/04-gradient-descent-adaptive-gradient-methods.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 4: Gradient Descent, Adaptive Gradient Methods</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#sec-representation" id="toc-sec-representation" class="nav-link active" data-scroll-target="#sec-representation">Representation Learning</a></li>
+  <li><a href="#sec-autoencoder" id="toc-sec-autoencoder" class="nav-link" data-scroll-target="#sec-autoencoder">Autoencoders</a></li>
+  <li><a href="#sec-vae" id="toc-sec-vae" class="nav-link" data-scroll-target="#sec-vae">Variational Autoencoders</a>
+  <ul class="collapse">
+  <li><a href="#sec-vae-objective" id="toc-sec-vae-objective" class="nav-link" data-scroll-target="#sec-vae-objective">The objective</a></li>
+  <li><a href="#sec-vae-elbo" id="toc-sec-vae-elbo" class="nav-link" data-scroll-target="#sec-vae-elbo">A probabilistic model and the ELBO</a></li>
+  <li><a href="#sec-vae-practice" id="toc-sec-vae-practice" class="nav-link" data-scroll-target="#sec-vae-practice">VAEs in practice</a></li>
+  <li><a href="#sec-reparam" id="toc-sec-reparam" class="nav-link" data-scroll-target="#sec-reparam">The reparameterization trick</a></li>
+  </ul></li>
+  <li><a href="#sec-transposed-conv" id="toc-sec-transposed-conv" class="nav-link" data-scroll-target="#sec-transposed-conv">Transposed Convolution</a></li>
+  <li><a href="#sec-unet" id="toc-sec-unet" class="nav-link" data-scroll-target="#sec-unet">The U-Net</a></li>
+  <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</h1>
+</div>
+<p><strong>Overview.</strong> We continue pulling things out of the architecture grab bag. The bulk of this lecture is the <strong>variational autoencoder</strong> (VAE), a deep generative model built on top of the <strong>autoencoder</strong>, which we motivate through unsupervised representation learning. We will build the objective piece by piece — a reconstruction term and a regularization term — then show that the same objective falls out of a probabilistic model when we apply variational inference, and finally work through the practical choices that make it trainable, including the reparameterization trick. After that come two smaller topics that follow from wanting an autoencoder of images: the <strong>transposed convolution</strong>, a convolution-like operation that makes feature maps <em>larger</em>, and the <strong>U-Net</strong>, an encoder-decoder architecture for producing an output image the same size as the input. The variational autoencoder material stands on its own; the transposed convolution then grows out of the idea of a convolutional autoencoder, and the U-Net is built on the transposed convolution.</p>
+<section id="sec-representation" class="level2">
+<h2 class="anchored" data-anchor-id="sec-representation">Representation Learning</h2>
+<p>It helps to motivate the variational autoencoder through representation learning, which has in some sense already been a focus of this course. In old-fashioned machine learning, we design a set of features by hand, collect them on our data, and train a simple classifier on those feature values. In deep learning, we instead feed raw data into a neural network and ask the network to <em>learn</em> features that are useful for the task. When we say we are learning features, we can equally say we are learning <strong>representations</strong> of the data.</p>
+<p>So far, that representation learning has been an accidental side effect of supervised training: we build a network, train it with labels, and useful representations emerge along the way. But we can also pursue representation learning more broadly, and in particular <strong>unsupervised</strong> representation learning, where finding a representation useful for downstream tasks is the <em>explicit</em> goal of a stage that uses no labels at all.</p>
+<p>With unlabeled data it is not obvious what the objective should be. One way to write one down is this: we want a representation that contains <em>as little information as possible</em> about the input, while still allowing us to reconstruct the input. Put differently, we want to compress the salient information about the input into a small representation, so that there is as little information in it as possible, yet still recover the original input in a perceptually accurate way. This pairing — <strong>compression</strong> and <strong>reconstruction</strong> — is the framing we will formalize.</p>
+<p>An example makes the idea concrete. Suppose our data is <span class="math inline">32 \times 32</span> binary images of handwritten digits, each pixel either black (<span class="math inline">0</span>) or white (<span class="math inline">1</span>). How much information does one image contain? We can measure information by storage: there are <span class="math inline">32 \times 32 = 1024</span> bits in each image. The question representation learning asks is whether we can find a representation that takes far fewer than <span class="math inline">1024</span> bits to store, yet still reconstructs the image accurately.</p>
+<p>Consider what such a representation might encode. Which digit is it — a <span class="math inline">0</span> through <span class="math inline">9</span>? That takes about four bits. How thick are the strokes? Perhaps a handful of thickness levels. How slanted is it, left or right? For a <span class="math inline">1</span> specifically, does it have the little flag at the top, or the base at the bottom? Each of these is a salient factor, and if we encode the answers to enough of them, we can produce a reconstruction that looks much like the original — most importantly of the same digit, since an image of a zero is plainly different from an image of a one. Written down and encoded, these factors likely take fewer than <span class="math inline">1024</span> bits.</p>
+<p>The payoff is that a representation which compresses these salient factors is often <em>more useful</em> for downstream tasks than the raw data. If the representation already encodes the digit’s identity — because identity is the most salient factor for reconstruction — then a small classifier reading that representation can classify the digit easily, whereas reading the digit off the raw pixels is exactly the kind of thing that is hard to do by hand (Lecture 1). This can feel like a chicken-and-egg problem: how can a representation encode digit identity without being trained on labels? But clustering is a familiar example of uncovering class structure without supervision, so there is reason to hope that a good compression-and-reconstruction objective can surface salient factors on its own. Informally, then, the most salient factors for reconstruction are often the most useful for downstream tasks.</p>
+<p>This is not the only route to unsupervised representations. Masked language modeling, which produced the BERT embeddings used on an earlier homework (Lecture 8), looks nothing like compression-and-reconstruction and is also unsupervised. But compression-and-reconstruction is one effective way to formalize the problem, and — as we will see — it needs no labeled data.</p>
+</section>
+<section id="sec-autoencoder" class="level2">
+<h2 class="anchored" data-anchor-id="sec-autoencoder">Autoencoders</h2>
+<p>The architecture we use to attempt this is the <strong>autoencoder</strong>. It takes an input <span class="math inline">\bm{x}</span> — say, one of the binary handwritten images — and passes it through a sequence of layers that produce representations which get <em>smaller and smaller</em>, then through a further sequence of layers that make the representations <em>bigger and bigger</em>, until the final layer maps back to the dimensionality of the input. The output is a reconstruction of the input, which we write <span class="math inline">\tilde{\bm{x}}</span>.</p>
+<p>The shrinking half is the <strong>encoder</strong>; the growing half is the <strong>decoder</strong>. The smallest representation in the middle is the <strong>bottleneck</strong>, more commonly called the <strong>latent code</strong>, conventionally written <span class="math inline">\bm{z} \in \mathbb{R}^d</span>.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 680 300" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Autoencoder</text><rect x="30" y="120" width="60" height="60" rx="4" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="60.0" y="156.0" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">x</text><text x="38" y="205" font-size="13" fill="#666">input</text><rect x="130" y="104.0" width="16" height="92" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><rect x="168" y="114.0" width="16" height="72" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><rect x="206" y="124.0" width="16" height="52" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><rect x="244" y="133.0" width="16" height="34" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><line x1="90" y1="150" x2="128" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="146" y1="150" x2="168" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="184" y1="150" x2="206" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="222" y1="150" x2="244" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="260" y1="150" x2="300" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="300" y="130" width="20" height="40" rx="3" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.6"></rect><text x="310" y="200" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">z</text><text x="310" y="218" text-anchor="middle" font-size="11" fill="#442079">latent code</text><text x="310" y="231" text-anchor="middle" font-size="11" fill="#442079">(bottleneck)</text><line x1="320" y1="150" x2="354" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="356" y="133.0" width="16" height="34" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><rect x="394" y="124.0" width="16" height="52" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><rect x="432" y="114.0" width="16" height="72" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><rect x="470" y="104.0" width="16" height="92" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.4"></rect><line x1="372" y1="150" x2="394" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="410" y1="150" x2="432" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="448" y1="150" x2="470" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="486" y1="150" x2="524" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="524" y="120" width="60" height="60" rx="4" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect><text x="554.0" y="156.0" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">x̃</text><text x="510" y="205" font-size="13" fill="#666">reconstruction</text><text x="195" y="95" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">encoder</text><path d="M132,105 Q195,88 258,105" fill="none" stroke="#207965" stroke-width="1.2"></path><text x="425" y="95" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">decoder</text><path d="M358,105 Q425,88 488,105" fill="none" stroke="#207965" stroke-width="1.2"></path><text x="20" y="270" font-size="13" fill="#666">Layers shrink the representation to a latent code z, then grow it back; trained so x̃ ≈ x.</text></svg></div>
+<div class="definition-block">
+<p><strong>Definition.</strong> An <em>autoencoder</em> is a neural network composed of an <em>encoder</em> that maps an input <span class="math inline">\bm{x}</span> to a low-dimensional <em>latent code</em> <span class="math inline">\bm{z}</span> and a <em>decoder</em> that maps <span class="math inline">\bm{z}</span> back to a reconstruction <span class="math inline">\tilde{\bm{x}}</span> of the input. It is trained to make the reconstruction close to the input.</p>
+</div>
+<p>We train the autoencoder with a <strong>reconstruction loss</strong>, for example the squared error between the input and its reconstruction:</p>
+<p><span class="math display">\mathcal{L} = \lVert \bm{x} - \tilde{\bm{x}} \rVert^2.</span></p>
+<p>This is an unsupervised loss: there are no labels involved. Given a data point, we feed it through the autoencoder, obtain an output, and drive down the reconstruction error. If we drive it to zero, we have preserved enough information through the bottleneck to reconstruct the original input.</p>
+<p>Reconstruction was one of our two goals. The other was compression. Are we compressing? A natural thought is that if we make the latent code smaller than the input — <span class="math inline">\bm{x}</span> is <span class="math inline">1024</span>-dimensional, say, and <span class="math inline">\bm{z}</span> only <span class="math inline">16</span>-dimensional — then <span class="math inline">\bm{z}</span> holds fewer numbers, and so surely less information. But is that actually true?</p>
+<p>It is not. Suppose the latent code is real-valued, <span class="math inline">\bm{z} \in \mathbb{R}^d</span>. How much information can a vector of real values hold? In principle, an infinite amount: a single real number can take infinitely many distinct values — there are infinitely many reals between any two — and we have <span class="math inline">d</span> of them. (On a computer we of course use finite-precision floating point, so a <code>float64</code> latent stores at most <span class="math inline">64 d</span> bits. But even setting hardware aside, the conceptual problem stands.) So making <span class="math inline">\dim(\bm{z}) &lt; \dim(\bm{x})</span> does <em>not</em> by itself guarantee compression.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Why not just make the latent discrete?</strong> If real values are the problem, we might make <span class="math inline">\bm{z}</span> binary — say <span class="math inline">16</span> bits, holding at most <span class="math inline">16</span> bits of information. The trouble is that discreteness in the middle of the model blocks gradients: we cannot backpropagate through a hard discrete bottleneck (we will meet the same obstacle with the reparameterization trick below). So we tackle the information problem a different way.</p>
+</div>
+</div>
+</section>
+<section id="sec-vae" class="level2">
+<h2 class="anchored" data-anchor-id="sec-vae">Variational Autoencoders</h2>
+<p>The <strong>variational autoencoder</strong> keeps the reconstruction objective but adds a term that penalizes the amount of information in the latent code. Rather than constrain the latent to be small or discrete, we let it be a large, high-precision, real-valued vector — capable of storing plenty of information — and then <em>regularize</em> the model so it uses as little of that capacity as it can. You may set <span class="math inline">\bm{z}</span> to whatever you like for a given input, but the more information <span class="math inline">\bm{z}</span> carries about <span class="math inline">\bm{x}</span>, the more you are penalized. The question is how to write that penalty down.</p>
+<section id="sec-vae-objective" class="level3">
+<h3 class="anchored" data-anchor-id="sec-vae-objective">The objective</h3>
+<p>To measure and constrain information in the latent, we turn <span class="math inline">\bm{z}</span> into a random variable. The encoder no longer outputs a single latent code; it outputs the <em>parameters of a probability distribution</em> over latent codes, conditioned on the input. We write this distribution <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> and call it the encoder. This is the same move the language model makes when it outputs the parameters of a categorical distribution to sample the next token from (Lecture 6): feed in <span class="math inline">\bm{x}</span>, get a distribution, sample <span class="math inline">\bm{z}</span> from it.</p>
+<p>The decoder is likewise probabilistic. We treat <span class="math inline">\bm{x}</span> as a random variable and let <span class="math inline">p_\theta(\bm{x} \mid \bm{z})</span> be a distribution over inputs given a latent code. So the full path is: take <span class="math inline">\bm{x}</span>, feed it through the encoder <span class="math inline">q_\phi</span> to get a distribution over <span class="math inline">\bm{z}</span>, sample a <span class="math inline">\bm{z}</span>, feed that through the decoder <span class="math inline">p_\theta</span> to get a distribution over <span class="math inline">\bm{x}</span>. For reconstruction, we want that final distribution to place high probability on the <em>original</em> <span class="math inline">\bm{x}</span>.</p>
+<p>The regularization term should measure how much information <span class="math inline">\bm{z}</span> carries about <span class="math inline">\bm{x}</span>. The natural tool is the <strong>KL divergence</strong>, which measures the extra information needed to encode samples from one distribution if you have another. We take the KL divergence between the encoder <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> and a <strong>prior</strong> <span class="math inline">p(\bm{z})</span> — a distribution over latents that is <em>unconditional</em> on <span class="math inline">\bm{x}</span>, carrying no information about any particular input. If this KL divergence is small, then drawing from <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> is nearly the same as drawing from the unconditional prior, so <span class="math inline">q_\phi</span> carries little information about <span class="math inline">\bm{x}</span>. The only additional information in <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> beyond the prior <em>is</em> <span class="math inline">\bm{x}</span>, so this KL is a measure of the information used to encode <span class="math inline">\bm{x}</span>.</p>
+<p>Putting the two terms together — and noting that this is an <em>objective</em> we <strong>maximize</strong>, not a loss we minimize — the VAE objective is:</p>
+<div class="boxed-eq">
+<p><span class="math display">
+\underbrace{\mathbb{E}_{\bm{z} \sim q_\phi(\bm{z} \mid \bm{x})} \big[\log p_\theta(\bm{x} \mid \bm{z})\big]}_{\text{reconstruction}}
+\;-\;
+\underbrace{\operatorname{KL}\!\big(q_\phi(\bm{z} \mid \bm{x}) \,\big\|\, p(\bm{z})\big)}_{\text{regularization}}.
+</span></p>
+</div>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 720 320" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Variational autoencoder and the reparameterization trick</text><rect x="30" y="120" width="58" height="60" rx="4" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="59.0" y="156.0" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">x</text><line x1="88" y1="150" x2="120" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="120" y="116" width="96" height="68" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect><text x="168.0" y="148.0" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">qφ(z|x)</text><text x="168.0" y="165.0" text-anchor="middle" font-size="13" fill="#207965">encoder</text><line x1="216" y1="136" x2="258" y2="136" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="216" y1="164" x2="258" y2="164" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="272" y="140" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">μ</text><text x="272" y="168" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">σ</text><rect x="300" y="110" width="150" height="80" rx="8" fill="#fff" stroke="#8457C7" stroke-width="1.6" stroke-dasharray="5,3"></rect><text x="375" y="128" text-anchor="middle" font-size="12" font-weight="600" fill="#442079">reparameterize</text><text x="375" y="154" text-anchor="middle" font-size="16" font-weight="600" fill="#442079">z = μ + σ⋅ε</text><text x="375" y="176" text-anchor="middle" font-size="12" fill="#442079">ε ~ N(0, I)</text><line x1="286" y1="140" x2="300" y2="134" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><line x1="286" y1="160" x2="300" y2="166" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><circle cx="375" cy="80" r="18" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></circle><text x="375" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">ε</text><line x1="375" y1="98" x2="375" y2="108" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="398" y="86" font-size="13" fill="#666">noise ε ~ N(0, I)</text><text x="398" y="101" font-size="13" fill="#666">(constant w.r.t. gradients)</text><line x1="450" y1="150" x2="486" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="468" y="142" text-anchor="middle" font-size="14" font-weight="600" fill="#442079">z</text><rect x="486" y="116" width="96" height="68" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect><text x="534.0" y="148.0" text-anchor="middle" font-size="15" font-weight="600" fill="#794520">pθ(x|z)</text><text x="534.0" y="165.0" text-anchor="middle" font-size="13" fill="#794520">decoder</text><line x1="582" y1="150" x2="614" y2="150" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="614" y="120" width="58" height="60" rx="4" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="643.0" y="156.0" text-anchor="middle" font-size="18" font-weight="600" fill="#205279">x̃</text><text x="20" y="290" font-size="13" fill="#666">The encoder outputs μ and σ; the latent z is a differentiable function of them plus fixed noise ε,</text><text x="20" y="308" font-size="13" fill="#666">so gradients flow to the encoder. The decoder maps z to a distribution over reconstructions.</text></svg></div>
+<p>The first term is a reconstruction term in disguise. When the decoder <span class="math inline">p_\theta(\bm{x} \mid \bm{z})</span> — also called the <strong>likelihood model</strong> — is an identity-covariance Gaussian, its log density is, up to constants, the negative squared error between <span class="math inline">\bm{x}</span> and the Gaussian’s mean. The density of a Gaussian carries a factor <span class="math inline">e^{-\lVert \bm{x} - \bm{\mu} \rVert^2 / (2\sigma^2)}</span>; with unit variance the exponent is a negative squared error, and taking the log leaves exactly that. So maximizing <span class="math inline">\mathbb{E}[\log p_\theta(\bm{x} \mid \bm{z})]</span> under a Gaussian likelihood <em>is</em> minimizing mean squared error between the input and the decoder’s mean. The second term, as discussed, loosely measures the information in <span class="math inline">\bm{z}</span> about <span class="math inline">\bm{x}</span>.</p>
+<p>The two terms are in genuine tension, which is why this is an objective worth optimizing rather than a triviality. Reconstruction would be easiest if <span class="math inline">\bm{z}</span> carried a great deal of information about <span class="math inline">\bm{x}</span> — in the extreme, if the encoder simply copied <span class="math inline">\bm{x}</span> into <span class="math inline">\bm{z}</span>, reconstruction would be trivial. But then the KL divergence between <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> and the information-free prior would be enormous, and the regularization term would be badly penalized. The objective balances the two.</p>
+<p>At this point, if you are content to take the two terms on faith, you have everything you need to train a VAE: an architecture (two neural networks), an objective (the one above), a dataset, and an optimizer. But we can go deeper and ask what probabilistic model underlies this generative model, and show that the objective is not arbitrary — it falls out of an analysis.</p>
+</section>
+<section id="sec-vae-elbo" class="level3">
+<h3 class="anchored" data-anchor-id="sec-vae-elbo">A probabilistic model and the ELBO</h3>
+<p>By a <strong>probabilistic model</strong> we just mean the process by which we suppose data points are generated. The autoregressive language model’s process was: sample <span class="math inline">x_1</span>, then <span class="math inline">x_2</span> given <span class="math inline">x_1</span>, then <span class="math inline">x_3</span> given <span class="math inline">x_2, x_1</span>, and so on. The VAE’s generative process is:</p>
+<p><span class="math display">\bm{z} \sim p(\bm{z}), \qquad \bm{x} \sim p(\bm{x} \mid \bm{z}).</span></p>
+<p>Conceptually: to draw a new handwritten digit, first sample the salient factors — which digit, how thick the pen, how much slant, whether the <span class="math inline">1</span> has its flag — all encoded in <span class="math inline">\bm{z}</span>, then sample an image conditioned on those factors. This is not so far from how a person decides what to draw before drawing it.</p>
+<p>Having written down a probabilistic model, the maximum-likelihood framework asks us to maximize the probability the model assigns to the data we actually observed. We tune the parameters <span class="math inline">\bm{\theta}</span> of <span class="math inline">p_\theta</span> so that it assigns high probability to the real data points on hand — exactly as the language model was trained to assign high probability to real sequences of text (Lecture 6). Being precise, we maximize <span class="math inline">\mathbb{E}_{\bm{x} \sim p(\bm{x})}[\log p_\theta(\bm{x})]</span> over <span class="math inline">\bm{\theta}</span>; below we use the shorthand <span class="math inline">\log p(\bm{x})</span> for a single data point.</p>
+<p>Under the generative model, we can write <span class="math inline">\log p(\bm{x})</span> by <strong>marginalizing</strong> out the latent:</p>
+<p><span class="math display">\log p(\bm{x}) = \log \int p(\bm{x} \mid \bm{z})\, p(\bm{z}) \, d\bm{z}.</span></p>
+<p>This looks like the start of an objective, but it is intractable. To evaluate it we would have to consider every possible value of <span class="math inline">\bm{z}</span>, compute <span class="math inline">p(\bm{x} \mid \bm{z})</span> for each, weight by <span class="math inline">p(\bm{z})</span>, and sum — and with continuous <span class="math inline">\bm{z}</span> that is a sum over infinitely many possibilities. Much of generative modeling is about approximating this marginalization or constraining the model so that it is tractable. We use one such approximation: <strong>variational inference</strong>.</p>
+<p>Variational inference does something that on its face seems trivial: to maximize a quantity, we instead maximize a <em>lower bound</em> on it. If some other quantity is always <span class="math inline">\le \log p(\bm{x})</span>, then pushing that lower quantity up tends to push <span class="math inline">\log p(\bm{x})</span> up as well. An easy way to build a lower bound on any quantity is to subtract something non-negative from it, and the KL divergence is always non-negative. So we subtract a KL divergence:</p>
+<p><span class="math display">
+\log p(\bm{x}) \;\ge\; \log p(\bm{x}) - \operatorname{KL}\!\big(q_\phi(\bm{z} \mid \bm{x}) \,\big\|\, p(\bm{z} \mid \bm{x})\big).
+</span></p>
+<p>The right-hand side is the <strong>evidence lower bound</strong> (ELBO). The distribution <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> it introduces is the <strong>approximate posterior</strong> — our encoder. Maximizing the ELBO simultaneously pushes up the data probability <span class="math inline">\log p(\bm{x})</span> and pushes the approximate posterior toward the <em>true</em> posterior <span class="math inline">p(\bm{z} \mid \bm{x})</span> <span class="citation" data-cites="kingma2014auto rezende2014stochastic">(<a href="02-mlp-backprop.html#ref-kingma2014auto" role="doc-biblioref">Kingma and Welling 2014</a>; <a href="02-mlp-backprop.html#ref-rezende2014stochastic" role="doc-biblioref">Rezende et al. 2014</a>)</span>.</p>
+<p>As written, the ELBO is still not something we can optimize: it contains <span class="math inline">\log p(\bm{x})</span>, which we cannot compute, and the true posterior <span class="math inline">p(\bm{z} \mid \bm{x})</span>, which we also do not have. The remaining work is algebra — no further approximations. Write the troublesome KL divergence using its definition,</p>
+<p><span class="math display">
+\operatorname{KL}\!\big(q_\phi(\bm{z} \mid \bm{x}) \,\big\|\, p(\bm{z} \mid \bm{x})\big)
+= \mathbb{E}_q\big[\log q_\phi(\bm{z} \mid \bm{x})\big] - \mathbb{E}_q\big[\log p(\bm{z} \mid \bm{x})\big],
+</span></p>
+<p>and rewrite the true posterior with <strong>Bayes’ rule</strong>, <span class="math inline">p(\bm{z} \mid \bm{x}) = \dfrac{p(\bm{x} \mid \bm{z})\, p(\bm{z})}{p(\bm{x})}</span>. Substituting into the second term and using <span class="math inline">\log</span> of a product/quotient as a sum/difference of logs,</p>
+<p><span class="math display">
+\mathbb{E}_q\big[\log p(\bm{z} \mid \bm{x})\big]
+= \mathbb{E}_q\big[\log p(\bm{x} \mid \bm{z})\big] + \mathbb{E}_q\big[\log p(\bm{z})\big] - \underbrace{\mathbb{E}_q\big[\log p(\bm{x})\big]}_{\log p(\bm{x})}.
+</span></p>
+<p>The last term simplifies because <span class="math inline">\log p(\bm{x})</span> has no <span class="math inline">\bm{z}</span> in it, so the expectation over <span class="math inline">\bm{z}</span> leaves it unchanged. Substituting all of this back into the ELBO, the two <span class="math inline">\log p(\bm{x})</span> terms cancel — and <span class="math inline">\log p(\bm{x})</span> was exactly the term we could not compute:</p>
+<p><span class="math display">
+\log p(\bm{x}) \;\ge\;
+\underbrace{\mathbb{E}_q\big[\log p_\theta(\bm{x} \mid \bm{z})\big]}_{\text{reconstruction}}
+\;-\;
+\underbrace{\operatorname{KL}\!\big(q_\phi(\bm{z} \mid \bm{x}) \,\big\|\, p(\bm{z})\big)}_{\text{regularization}}.
+</span></p>
+<p>Every distribution here is one we have access to: the encoder <span class="math inline">q_\phi</span>, the decoder <span class="math inline">p_\theta</span> (which we model, replacing the intractable <span class="math inline">p(\bm{x} \mid \bm{z})</span>), and the prior <span class="math inline">p(\bm{z})</span>. This is exactly the objective we wrote down earlier — applying variational inference to the VAE’s generative model recovers it.</p>
+</section>
+<section id="sec-vae-practice" class="level3">
+<h3 class="anchored" data-anchor-id="sec-vae-practice">VAEs in practice</h3>
+<p>Nothing in the derivation requires neural networks, but in practice the encoder and decoder are neural networks, and we train them by gradient-based learning. Since we are <em>maximizing</em> an objective, this is gradient <strong>ascent</strong> — <span class="math inline">\bm{\theta} \leftarrow \bm{\theta} + \eta \nabla_{\bm{\theta}}(\cdot)</span>, a plus rather than a minus — differentiating the objective with respect to every parameter and stepping to increase it. The standard practical choices are:</p>
+<ol type="1">
+<li><strong>The encoder and decoder <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span>, <span class="math inline">p_\theta(\bm{x} \mid \bm{z})</span> are neural networks.</strong></li>
+<li><strong>The prior <span class="math inline">p(\bm{z})</span> is a zero-mean, identity-covariance Gaussian</strong> — the default uninformative choice.</li>
+<li><strong>The approximate posterior <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> is a diagonal-covariance Gaussian.</strong></li>
+</ol>
+<p>The third choice fixes what “output the parameters of a distribution” means concretely. If <span class="math inline">\dim(\bm{z}) = d</span> and <span class="math inline">q_\phi</span> is a diagonal Gaussian, the encoder must output <span class="math inline">2d</span> numbers: <span class="math inline">d</span> for the mean <span class="math inline">\bm{\mu}</span> and <span class="math inline">d</span> for the diagonal of the covariance. A mean can be any real number, so those <span class="math inline">d</span> units get no output nonlinearity. A variance must be positive, so the <span class="math inline">d</span> variance units pass through a nonlinearity with positive outputs — a standard choice is the <strong>softplus</strong>, which resembles a ReLU but is smooth.</p>
+<p>With a Gaussian prior and a diagonal-Gaussian posterior, the KL term has a closed form. Writing the objective’s regularization term with its sign, it becomes (up to a factor of <span class="math inline">\tfrac{1}{2}</span>)</p>
+<p><span class="math display">
+\tfrac{1}{2}\sum_{j=1}^{d} \Big(1 + \log \sigma_j^2 - \mu_j^2 - \sigma_j^2\Big),
+</span></p>
+<p>which we are maximizing. The <span class="math inline">-\mu_j^2</span> term is maximized at <span class="math inline">\mu_j = 0</span>, pulling each mean toward the zero-mean prior. The remaining <span class="math inline">1 + \log \sigma_j^2 - \sigma_j^2</span> is maximized at <span class="math inline">\sigma_j = 1</span>, pulling each variance toward the identity-covariance prior. So the optimum of the KL term is <span class="math inline">\bm{\mu} = \bm{0}</span>, <span class="math inline">\bm{\sigma} = \bm{1}</span> — exactly the prior, as it should be.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 520 300" width="100%" style="max-width:520px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">KL term per dimension: 1 + log(σ²) − σ²</text><line x1="70" y1="114.41860465116278" x2="480" y2="114.41860465116278" stroke="#ccc" stroke-width="1"></line><line x1="70" y1="240" x2="70" y2="60" stroke="#888" stroke-width="1.3"></line><line x1="70" y1="240" x2="480" y2="240" stroke="#888" stroke-width="1.3"></line><polyline points="82.4,240.0 83.8,240.0 85.1,240.0 86.5,238.0 87.9,232.3 89.3,227.1 90.6,222.1 92.0,217.5 93.4,213.1 94.8,209.0 96.1,205.1 97.5,201.3 98.9,197.8 100.3,194.4 101.6,191.2 103.0,188.2 104.4,185.2 105.8,182.4 107.1,179.7 108.5,177.1 109.9,174.6 111.3,172.2 112.7,169.9 114.0,167.7 115.4,165.6 116.8,163.5 118.2,161.5 119.5,159.6 120.9,157.8 122.3,156.0 123.7,154.2 125.0,152.6 126.4,151.0 127.8,149.4 129.2,147.9 130.5,146.4 131.9,145.0 133.3,143.7 134.7,142.3 136.0,141.1 137.4,139.8 138.8,138.6 140.2,137.5 141.5,136.4 142.9,135.3 144.3,134.2 145.7,133.2 147.0,132.2 148.4,131.3 149.8,130.4 151.2,129.5 152.6,128.7 153.9,127.9 155.3,127.1 156.7,126.3 158.1,125.6 159.4,124.9 160.8,124.2 162.2,123.6 163.6,122.9 164.9,122.3 166.3,121.8 167.7,121.2 169.1,120.7 170.4,120.2 171.8,119.7 173.2,119.3 174.6,118.8 175.9,118.4 177.3,118.0 178.7,117.7 180.1,117.3 181.4,117.0 182.8,116.7 184.2,116.4 185.6,116.1 186.9,115.9 188.3,115.7 189.7,115.5 191.1,115.3 192.4,115.1 193.8,115.0 195.2,114.8 196.6,114.7 198.0,114.6 199.3,114.6 200.7,114.5 202.1,114.5 203.5,114.4 204.8,114.4 206.2,114.4 207.6,114.5 209.0,114.5 210.3,114.6 211.7,114.6 213.1,114.7 214.5,114.8 215.8,114.9 217.2,115.1 218.6,115.2 220.0,115.4 221.3,115.6 222.7,115.8 224.1,116.0 225.5,116.2 226.8,116.5 228.2,116.7 229.6,117.0 231.0,117.3 232.3,117.6 233.7,117.9 235.1,118.2 236.5,118.6 237.9,118.9 239.2,119.3 240.6,119.7 242.0,120.1 243.4,120.5 244.7,120.9 246.1,121.3 247.5,121.8 248.9,122.3 250.2,122.7 251.6,123.2 253.0,123.7 254.4,124.2 255.7,124.8 257.1,125.3 258.5,125.9 259.9,126.4 261.2,127.0 262.6,127.6 264.0,128.2 265.4,128.8 266.7,129.5 268.1,130.1 269.5,130.8 270.9,131.4 272.2,132.1 273.6,132.8 275.0,133.5 276.4,134.2 277.8,134.9 279.1,135.7 280.5,136.4 281.9,137.2 283.3,138.0 284.6,138.8 286.0,139.6 287.4,140.4 288.8,141.2 290.1,142.0 291.5,142.9 292.9,143.7 294.3,144.6 295.6,145.5 297.0,146.4 298.4,147.3 299.8,148.2 301.1,149.1 302.5,150.0 303.9,151.0 305.3,152.0 306.6,152.9 308.0,153.9 309.4,154.9 310.8,155.9 312.1,156.9 313.5,157.9 314.9,159.0 316.3,160.0 317.7,161.1 319.0,162.2 320.4,163.2 321.8,164.3 323.2,165.4 324.5,166.5 325.9,167.7 327.3,168.8 328.7,169.9 330.0,171.1 331.4,172.3 332.8,173.4 334.2,174.6 335.5,175.8 336.9,177.0 338.3,178.2 339.7,179.5 341.0,180.7 342.4,182.0 343.8,183.2 345.2,184.5 346.5,185.8 347.9,187.1 349.3,188.4 350.7,189.7 352.0,191.0 353.4,192.3 354.8,193.7 356.2,195.0 357.6,196.4 358.9,197.8 360.3,199.2 361.7,200.6 363.1,202.0 364.4,203.4 365.8,204.8 367.2,206.3 368.6,207.7 369.9,209.2 371.3,210.6 372.7,212.1 374.1,213.6 375.4,215.1 376.8,216.6 378.2,218.1 379.6,219.6 380.9,221.2 382.3,222.7 383.7,224.3 385.1,225.8 386.4,227.4 387.8,229.0 389.2,230.6 390.6,232.2 391.9,233.8 393.3,235.4 394.7,237.1 396.1,238.7 397.4,240.0 398.8,240.0 400.2,240.0 401.6,240.0 403.0,240.0 404.3,240.0 405.7,240.0 407.1,240.0 408.5,240.0 409.8,240.0 411.2,240.0 412.6,240.0" fill="none" stroke="#4477AA" stroke-width="2.5"></polyline><circle cx="204.83221476510064" cy="114.41860465116278" r="4.5" fill="#EE6677"></circle><line x1="204.83221476510064" y1="114.41860465116278" x2="204.83221476510064" y2="240" stroke="#EE6677" stroke-width="1" stroke-dasharray="3,3"></line><text x="204.83221476510064" y="102.41860465116278" text-anchor="middle" font-size="12" font-weight="600" fill="#EE6677">max at σ=1</text><line x1="136.04026845637583" y1="240" x2="136.04026845637583" y2="244" stroke="#888" stroke-width="1"></line><text x="136.04026845637583" y="258" text-anchor="middle" font-size="11" fill="#666">0.5</text><line x1="204.83221476510064" y1="240" x2="204.83221476510064" y2="244" stroke="#888" stroke-width="1"></line><text x="204.83221476510064" y="258" text-anchor="middle" font-size="11" fill="#666">1</text><line x1="273.6241610738255" y1="240" x2="273.6241610738255" y2="244" stroke="#888" stroke-width="1"></line><text x="273.6241610738255" y="258" text-anchor="middle" font-size="11" fill="#666">1.5</text><line x1="342.41610738255036" y1="240" x2="342.41610738255036" y2="244" stroke="#888" stroke-width="1"></line><text x="342.41610738255036" y="258" text-anchor="middle" font-size="11" fill="#666">2</text><line x1="411.20805369127515" y1="240" x2="411.20805369127515" y2="244" stroke="#888" stroke-width="1"></line><text x="411.20805369127515" y="258" text-anchor="middle" font-size="11" fill="#666">2.5</text><line x1="480.0" y1="240" x2="480.0" y2="244" stroke="#888" stroke-width="1"></line><text x="480.0" y="258" text-anchor="middle" font-size="11" fill="#666">3</text><text x="275.0" y="278" text-anchor="middle" font-size="13" fill="#333">σ (per-dimension standard deviation)</text><line x1="66" y1="72.55813953488374" x2="70" y2="72.55813953488374" stroke="#888" stroke-width="1"></line><text x="61" y="76.55813953488374" text-anchor="end" font-size="11" fill="#666">1</text><line x1="66" y1="114.41860465116278" x2="70" y2="114.41860465116278" stroke="#888" stroke-width="1"></line><text x="61" y="118.41860465116278" text-anchor="end" font-size="11" fill="#666">0</text><line x1="66" y1="156.27906976744185" x2="70" y2="156.27906976744185" stroke="#888" stroke-width="1"></line><text x="61" y="160.27906976744185" text-anchor="end" font-size="11" fill="#666">-1</text><line x1="66" y1="198.13953488372093" x2="70" y2="198.13953488372093" stroke="#888" stroke-width="1"></line><text x="61" y="202.13953488372093" text-anchor="end" font-size="11" fill="#666">-2</text><line x1="66" y1="240.0" x2="70" y2="240.0" stroke="#888" stroke-width="1"></line><text x="61" y="244.0" text-anchor="end" font-size="11" fill="#666">-3</text></svg></div>
+</section>
+<section id="sec-reparam" class="level3">
+<h3 class="anchored" data-anchor-id="sec-reparam">The reparameterization trick</h3>
+<p>There is one subtlety in training. To do gradient ascent we must differentiate the objective back to every parameter, and the parameters live in both the decoder and the encoder. But between them the computational graph contains a <strong>sampling operation</strong>: the decoder is not fed the encoder’s outputs <span class="math inline">\bm{\mu}</span> and <span class="math inline">\bm{\sigma}</span> directly — it is fed a sample <span class="math inline">\bm{z} \sim q_\phi(\bm{z} \mid \bm{x})</span> drawn from the distribution those outputs parameterize. We have never before had a sampling operation inside a computational graph, and it is not obvious how to backpropagate through one.</p>
+<p>The fix is the <strong>reparameterization trick</strong>, and you have likely used its core idea already. If your random number generator only produces samples from the standard normal <span class="math inline">\mathcal{N}(\bm{0}, \bm{I})</span>, how do you sample from a Gaussian with a different mean and covariance? You draw standard-normal noise, scale it by the standard deviation, and shift by the mean. We do exactly that: instead of sampling <span class="math inline">\bm{z}</span> from <span class="math inline">q_\phi(\bm{z} \mid \bm{x})</span> directly, sample noise from the prior and transform it,</p>
+<div class="boxed-eq">
+<p><span class="math display">
+\bm{\epsilon} \sim p(\bm{z}) = \mathcal{N}(\bm{0}, \bm{I}), \qquad z_j \leftarrow \mu_j + \sigma_j\, \epsilon_j.
+</span></p>
+</div>
+<p>This solves the problem by moving the stochasticity <em>out</em> of the path we need to differentiate. The sample <span class="math inline">\bm{\epsilon}</span> is now an input — noise that, as far as the gradients are concerned, is constant — and <span class="math inline">\bm{z}</span> is a deterministic, differentiable function of the encoder’s outputs <span class="math inline">\bm{\mu}</span> and <span class="math inline">\bm{\sigma}</span>. Backpropagating with respect to <span class="math inline">\bm{\mu}</span> and <span class="math inline">\bm{\sigma}</span> is then routine: we are just scaling and shifting noise. We do not ignore the noise — it is what makes the output equivalent to having sampled directly — but it no longer disrupts our ability to compute gradients.</p>
+<p>The reparameterization trick works for Gaussians but not for every distribution. You cannot reparameterize sampling from a discrete distribution this way — the same obstacle that ruled out a discrete bottleneck. When you must differentiate through a discrete sample, you fall back on an approximation such as the Gumbel-softmax (concrete) relaxation <span class="citation" data-cites="jang2017categorical">(<a href="02-mlp-backprop.html#ref-jang2017categorical" role="doc-biblioref">Jang et al. 2017</a>)</span>, which smoothly approximates the discrete sample, or on a score-function estimator of the REINFORCE type; these are <strong>gradient estimators</strong>, trading off bias and variance (Gumbel-softmax is low-variance but biased; REINFORCE is unbiased but high-variance).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>The likelihood model should match the data.</strong> We took the decoder <span class="math inline">p_\theta(\bm{x} \mid \bm{z})</span> to be a Gaussian, which turned reconstruction into mean squared error — a reasonable assumption when the data values are roughly Gaussian. For binary black-and-white images it is a poor fit: a pixel’s values are bimodal (<span class="math inline">0</span> or <span class="math inline">1</span>), not Gaussian. There, the likelihood model should be a Bernoulli distribution, and the reconstruction term becomes a cross-entropy rather than a squared error. The choice of likelihood model is an assumption about the distribution of values in the data.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-transposed-conv" class="level2">
+<h2 class="anchored" data-anchor-id="sec-transposed-conv">Transposed Convolution</h2>
+<p>Suppose we want a convolutional autoencoder of images. In the encoder we replace the sequence of MLPs with convolutional layers — appropriate for images, since convolutions bring translation invariance and locality (Lecture 5) — and with striding or pooling the spatial size shrinks, taking a <span class="math inline">32 \times 32</span> input down to, say, a <span class="math inline">4 \times 4 \times 8</span> activation volume that serves as the latent code. But the decoder must map back up to <span class="math inline">32 \times 32</span>. Every convolution we have seen so far makes feature maps <em>smaller</em> (through striding, padding, and boundary effects); we have no convolution-like operation that makes them <em>bigger</em>. The <strong>transposed convolution</strong> is that operation, and it has been lurking implicitly since we introduced convolutional networks.</p>
+<p>Start from an ordinary convolution. Let <span class="math inline">\bm{x}</span> be a <span class="math inline">4 \times 4</span> image and <span class="math inline">\bm{k}</span> a <span class="math inline">2 \times 2</span> kernel, and apply a stride-<span class="math inline">2</span> convolution to get a <span class="math inline">2 \times 2</span> output <span class="math inline">\bm{y}</span>. A convolution is a linear operation, so it can be written as a matrix multiply. Flatten the input image into a vector with <span class="math inline">\operatorname{vec}(\cdot)</span> (stacking rows, say), and there is a <strong>convolution matrix</strong> <span class="math inline">\bm{C}</span> with</p>
+<p><span class="math display">
+\bm{C}\, \operatorname{vec}(\bm{x}) = \operatorname{vec}(\bm{y}), \qquad \bm{C} \in \mathbb{R}^{4 \times 16}.
+</span></p>
+<p>Here <span class="math inline">\bm{C}</span> maps the <span class="math inline">16</span>-dimensional flattened input to the <span class="math inline">4</span>-dimensional flattened output. Each row of <span class="math inline">\bm{C}</span> holds the kernel entries <span class="math inline">k_{00}, k_{01}, k_{10}, k_{11}</span> placed in the positions that one output pixel reads from, with zeros everywhere else — so <span class="math inline">\bm{C}</span> is mostly zeros. We could implement any convolution this way, as an explicit (if wasteful) matrix-vector product.</p>
+<p>The <strong>transposed convolution</strong> is what happens when we transpose that matrix. Take a <span class="math inline">2 \times 2</span> input <span class="math inline">\bm{z}</span>, and multiply by <span class="math inline">\bm{C}^\top \in \mathbb{R}^{16 \times 4}</span>, which maps a <span class="math inline">4</span>-dimensional input to a <span class="math inline">16</span>-dimensional output — a <span class="math inline">4 \times 4</span> image:</p>
+<div class="boxed-eq">
+<p><span class="math display">
+\bm{C}^\top \operatorname{vec}(\bm{z}) = \operatorname{vec}(\bm{y}), \qquad \bm{C}^\top \in \mathbb{R}^{16 \times 4}.
+</span></p>
+</div>
+<p>So where a stride-<span class="math inline">2</span> convolution took <span class="math inline">4 \times 4</span> to <span class="math inline">2 \times 2</span>, the corresponding transposed convolution takes <span class="math inline">2 \times 2</span> back up to <span class="math inline">4 \times 4</span>. Working out what <span class="math inline">\bm{C}^\top</span> does to <span class="math inline">\bm{z}</span> gives a useful mental picture: each entry <span class="math inline">z_{ij}</span> of the input multiplies the whole kernel, and the result is <strong>pasted into the output</strong> at the corresponding location. Take <span class="math inline">z_{00}</span>, scale the kernel by it, paste; move to <span class="math inline">z_{01}</span>, scale the kernel, paste; and so on across the input.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 680 340" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">Transposed convolution: paste kernel, scaled by input</text><text x="40" y="108" font-size="13" fill="#666">input z (2×2)</text><rect x="40" y="120" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.2"></rect><text x="57.0" y="141.0" text-anchor="middle" font-size="11" fill="#442079">z00</text><rect x="74" y="120" width="34" height="34" fill="#fff" stroke="#8457C7" stroke-width="1.2"></rect><text x="91.0" y="141.0" text-anchor="middle" font-size="11" fill="#442079">z01</text><rect x="40" y="154" width="34" height="34" fill="#fff" stroke="#8457C7" stroke-width="1.2"></rect><text x="57.0" y="175.0" text-anchor="middle" font-size="11" fill="#442079">z10</text><rect x="74" y="154" width="34" height="34" fill="#fff" stroke="#8457C7" stroke-width="1.2"></rect><text x="91.0" y="175.0" text-anchor="middle" font-size="11" fill="#442079">z11</text><text x="170" y="108" font-size="13" fill="#666">kernel k (2×2)</text><rect x="170" y="120" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.2"></rect><text x="187.0" y="141.0" text-anchor="middle" font-size="11" fill="#207965">k00</text><rect x="204" y="120" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.2"></rect><text x="221.0" y="141.0" text-anchor="middle" font-size="11" fill="#207965">k01</text><rect x="170" y="154" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.2"></rect><text x="187.0" y="175.0" text-anchor="middle" font-size="11" fill="#207965">k10</text><rect x="204" y="154" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.2"></rect><text x="221.0" y="175.0" text-anchor="middle" font-size="11" fill="#207965">k11</text><text x="326" y="120" text-anchor="middle" font-size="15" font-weight="600" fill="#796020">z00 × kernel</text><line x1="280" y1="140" x2="372" y2="140" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><text x="380" y="78" font-size="13" fill="#666">output y (4×4), stride 2</text><rect x="380" y="90" width="30" height="30" fill="#C9E4DE" stroke="#C78557" stroke-width="1.1"></rect><text x="395.0" y="109.0" text-anchor="middle" font-size="10" fill="#207965">k00</text><rect x="410" y="90" width="30" height="30" fill="#C9E4DE" stroke="#C78557" stroke-width="1.1"></rect><text x="425.0" y="109.0" text-anchor="middle" font-size="10" fill="#207965">k01</text><rect x="440" y="90" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="470" y="90" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="380" y="120" width="30" height="30" fill="#C9E4DE" stroke="#C78557" stroke-width="1.1"></rect><text x="395.0" y="139.0" text-anchor="middle" font-size="10" fill="#207965">k10</text><rect x="410" y="120" width="30" height="30" fill="#C9E4DE" stroke="#C78557" stroke-width="1.1"></rect><text x="425.0" y="139.0" text-anchor="middle" font-size="10" fill="#207965">k11</text><rect x="440" y="120" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="470" y="120" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="380" y="150" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="410" y="150" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="440" y="150" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="470" y="150" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="380" y="180" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="410" y="180" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="440" y="180" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><rect x="470" y="180" width="30" height="30" fill="#fff" stroke="#C78557" stroke-width="1.1"></rect><text x="440" y="215.0" text-anchor="middle" font-size="11" fill="#794520"></text><text x="20" y="300" font-size="13" fill="#666">Each input entry zᵢⱼ scales a copy of the kernel, pasted at the matching output location; copies</text><text x="20" y="318" font-size="13" fill="#666">sum where they overlap. This is the transpose C⊤ of the convolution matrix C, and it grows the map.</text></svg></div>
+<div class="definition-block">
+<p><strong>Definition.</strong> A <em>transposed convolution</em> applies the transpose <span class="math inline">\bm{C}^\top</span> of a convolution’s matrix <span class="math inline">\bm{C}</span>. Equivalently, it pastes a copy of the kernel into the output for each input entry, scaled by that entry, summing where copies overlap. With a stride, it <em>increases</em> the spatial size — the inverse of the size change a strided convolution produces.</p>
+</div>
+<p>This mental picture extends to channels: a multi-channel transposed convolution pastes each channel’s kernel scaled by that channel’s input and sums the results. If one kernel looks like a cat’s face and another like a cat’s body, then an input that is one at the face location and one at the body location, and zero elsewhere, pastes the face and the body into place and sums them into a cat.</p>
+<p>Where has the transposed convolution been hiding? In the <strong>backward pass</strong>. Recall that a dense layer’s forward pass multiplies by <span class="math inline">\bm{W}</span> and its backward pass multiplies by <span class="math inline">\bm{W}^\top</span>. Since a convolution’s forward pass is a multiply by <span class="math inline">\bm{C}</span>, its backward pass is a multiply by <span class="math inline">\bm{C}^\top</span> — a transposed convolution. It is the operation that computes gradients through a convolution, and it has been there implicitly all along.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>A puzzle.</strong> Given the <span class="math inline">2 \times 2</span> kernel and a transposed-convolution output, can we construct an input — a few nonzero entries, the rest zero — such that an <em>ordinary</em> (not transposed) convolution with the same kernel produces that same output? There is an easier version where we may rearrange the kernel’s entries and a harder one where we may not. Working it through sharpens the distinction between a transposed convolution and an ordinary convolution that merely shares its kernel.</p>
+</div>
+</div>
+</section>
+<section id="sec-unet" class="level2">
+<h2 class="anchored" data-anchor-id="sec-unet">The U-Net</h2>
+<p>For images we have mostly built networks that take an image in and produce a classification. It is also useful to take an image in and produce an <em>image</em> out — for example, <strong>semantic segmentation</strong>, where we classify every pixel (these pixels are people, those are chairs), producing an output the same shape as the input.</p>
+<p>Here the tension between the two size changes is exactly the point. A convolutional network that shrinks the representation is good for aggregating <em>global</em> information and growing the receptive field — we would like to know the scene is a classroom before deciding which pixels are people and which are chairs. But to make a dense, per-pixel prediction we then need to grow the representation back up to full resolution, which is what the transposed convolution provides. The standard architecture for aggregating global information and then upsampling to the input’s size is the <strong>U-Net</strong> <span class="citation" data-cites="ronneberger2015unet">(<a href="02-mlp-backprop.html#ref-ronneberger2015unet" role="doc-biblioref">Ronneberger et al. 2015</a>)</span>.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 760 340" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;"><defs><marker id="a" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs><text x="20" y="30" font-size="22" font-weight="600" fill="#333">U-Net</text><rect x="40" y="70" width="62" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect><text x="71.0" y="89.66666666666667" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">image</text><rect x="130" y="70" width="62" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect><text x="161.0" y="89.66666666666667" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text><line x1="102" y1="85.0" x2="130" y2="85.0" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="140" y="110" width="62" height="30" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"></rect><text x="171.0" y="129.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#666666">pool</text><line x1="161.0" y1="100" x2="171.0" y2="110" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="230" y="150" width="62" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect><text x="261.0" y="169.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text><line x1="171.0" y1="140" x2="230" y2="165.0" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="240" y="190" width="62" height="30" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"></rect><text x="271.0" y="209.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#666666">pool</text><line x1="261.0" y1="180" x2="271.0" y2="190" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="330" y="230" width="62" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect><text x="361.0" y="249.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text><line x1="271.0" y1="220" x2="330" y2="245.0" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="340" y="270" width="62" height="30" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"></rect><text x="371.0" y="289.6666666666667" text-anchor="middle" font-size="14" font-weight="600" fill="#666666">pool</text><line x1="361.0" y1="260" x2="371.0" y2="270" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="430" y="270" width="62" height="30" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect><text x="461.0" y="289.6666666666667" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">conv⊤</text><line x1="402" y1="285.0" x2="430" y2="285.0" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="430" y="230" width="62" height="30" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect><text x="461.0" y="249.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">concat</text><line x1="461.0" y1="270" x2="461.0" y2="260" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><path d="M392,245.0 L430,245.0" fill="none" stroke="#5795C7" stroke-width="1.6"></path><rect x="530" y="150" width="62" height="30" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect><text x="561.0" y="169.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">conv⊤</text><line x1="461.0" y1="230" x2="561.0" y2="180" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="620" y="150" width="62" height="30" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect><text x="651.0" y="169.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">concat</text><line x1="592" y1="165.0" x2="620" y2="165.0" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><path d="M292,165.0 L292,134 L651.0,134 L651.0,150" fill="none" stroke="#5795C7" stroke-width="1.6"></path><rect x="620" y="110" width="62" height="30" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect><text x="651.0" y="129.66666666666666" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text><line x1="651.0" y1="150" x2="651.0" y2="140" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="620" y="70" width="62" height="30" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect><text x="651.0" y="89.66666666666667" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">concat</text><line x1="651.0" y1="110" x2="651.0" y2="100" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><path d="M192,85.0 L192,54 L651.0,54 L651.0,70" fill="none" stroke="#5795C7" stroke-width="1.6"></path><line x1="682" y1="85.0" x2="700" y2="85.0" stroke="#888" stroke-width="1.5" marker-end="url(#a)"></line><rect x="700" y="70" width="52" height="30" rx="4" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect><text x="726" y="89.0" text-anchor="middle" font-size="11" font-weight="600" fill="#792051">output</text><line x1="40" y1="318" x2="70" y2="318" stroke="#5795C7" stroke-width="1.6"></line><text x="76" y="322" font-size="13" fill="#666">skip connection: concatenate feature maps</text><text x="400" y="322" font-size="13" fill="#666">down: conv + pool  |  up: conv⊤ (transposed) + concat</text></svg></div>
+<p>The U-Net has a down path of convolutions and pooling that produces smaller and smaller feature maps, and an up path of transposed convolutions that grows them back. The essential ingredient is <strong>concatenation</strong>: the feature volume produced by a convolutional layer on the down path is concatenated, along the channel axis, with the same-shaped feature volume produced by the transposed convolution on the up path. As long as the shapes match going down and coming back up, we can concatenate at each level.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> A <em>U-Net</em> is an encoder-decoder for images: a down path of convolution and pooling that shrinks feature maps while widening the receptive field, an up path of transposed convolutions that restores the spatial size, and <strong>skip connections</strong> that concatenate each down-path feature volume with the matching up-path feature volume. It maps an input image to an output image of the same size.</p>
+</div>
+<p>The reason for the concatenation is that the down path discards local, high-resolution information as it aggregates global context. The skip connections carry that local information from the down path across to the up path, so the final layers can combine global context with local detail to make sharp per-pixel predictions. The architecture is named for its U shape when drawn. Beyond dense prediction like segmentation, the U-Net is also a workhorse of diffusion models, another family of generative models.</p>
+</section>
+<section id="sec-summary" class="level2">
+<h2 class="anchored" data-anchor-id="sec-summary">Summary</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Key takeaways from Lecture 11:</strong></p>
+<ul>
+<li><strong>Unsupervised representation learning</strong> can be framed as <strong>compression plus reconstruction</strong>: encode the input with as little information as possible while still being able to reconstruct it. The salient factors for reconstruction are often the most useful for downstream tasks.</li>
+<li>An <strong>autoencoder</strong> pairs an encoder <span class="math inline">\bm{x} \to \bm{z}</span> with a decoder <span class="math inline">\bm{z} \to \tilde{\bm{x}}</span>, trained by a reconstruction loss such as <span class="math inline">\lVert \bm{x} - \tilde{\bm{x}}\rVert^2</span>. A smaller latent does <em>not</em> guarantee compression, because a real-valued vector can hold unbounded information; a discrete latent would fix that but blocks gradients.</li>
+<li>A <strong>variational autoencoder</strong> makes the latent stochastic and adds a KL regularizer, maximizing <span class="math inline">\mathbb{E}_{q_\phi(\bm{z} \mid \bm{x})}[\log p_\theta(\bm{x} \mid \bm{z})] - \operatorname{KL}(q_\phi(\bm{z} \mid \bm{x}) \,\|\, p(\bm{z}))</span>. A Gaussian likelihood makes the reconstruction term a squared error (Bernoulli for binary pixels makes it a cross-entropy); the KL term measures the information the latent carries about the input.</li>
+<li>The same objective is the <strong>evidence lower bound</strong>, obtained by applying <strong>variational inference</strong> to the VAE’s generative model <span class="math inline">\bm{z} \sim p(\bm{z})</span>, <span class="math inline">\bm{x} \sim p(\bm{x} \mid \bm{z})</span> and cancelling the intractable <span class="math inline">\log p(\bm{x})</span> and true posterior <span class="math inline">p(\bm{z} \mid \bm{x})</span> via Bayes’ rule.</li>
+<li>In practice the prior is <span class="math inline">\mathcal{N}(\bm{0}, \bm{I})</span>, the encoder is a diagonal Gaussian outputting <span class="math inline">2d</span> numbers (means, and variances through a softplus), and the KL term has a closed form optimized at <span class="math inline">\bm{\mu} = \bm{0}</span>, <span class="math inline">\bm{\sigma} = \bm{1}</span>. The <strong>reparameterization trick</strong> <span class="math inline">z_j = \mu_j + \sigma_j \epsilon_j</span>, <span class="math inline">\bm{\epsilon} \sim \mathcal{N}(\bm{0}, \bm{I})</span>, moves the sampling out of the differentiated path; it does not work for discrete latents.</li>
+<li>A <strong>transposed convolution</strong> applies <span class="math inline">\bm{C}^\top</span>, the transpose of a convolution’s matrix — equivalently, it pastes the kernel into the output scaled by each input entry, and it <em>grows</em> feature maps. It is the backward pass of a convolution.</li>
+<li>A <strong>U-Net</strong> combines a shrinking convolutional down path, a growing transposed-convolution up path, and <strong>skip connections</strong> that concatenate matching feature maps, producing an output image the same size as the input. It is used for dense prediction such as semantic segmentation, and in diffusion models.</li>
+</ul>
+</div>
+</div>
+<p><strong>Next lecture:</strong> Deep learning engineering; fairness, accountability, and transparency.</p>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<div id="ref-jang2017categorical" class="csl-entry" role="listitem">
+Jang, Eric, Shixiang Gu, and Ben Poole. 2017. <span>“Categorical Reparameterization with <span>G</span>umbel-Softmax.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-kingma2014auto" class="csl-entry" role="listitem">
+Kingma, Diederik P., and Max Welling. 2014. <span>“Auto-Encoding Variational <span>B</span>ayes.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-rezende2014stochastic" class="csl-entry" role="listitem">
+Rezende, Danilo Jimenez, Shakir Mohamed, and Daan Wierstra. 2014. <span>“Stochastic Backpropagation and Approximate Inference in Deep Generative Models.”</span> <em>International Conference on Machine Learning</em>.
+</div>
+<div id="ref-ronneberger2015unet" class="csl-entry" role="listitem">
+Ronneberger, Olaf, Philipp Fischer, and Thomas Brox. 2015. <span>“<span>U-Net</span>: Convolutional Networks for Biomedical Image Segmentation.”</span> <em>International Conference on Medical Image Computing and Computer-Assisted Intervention</em>.
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="pagination-link" aria-label="Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="pagination-link" aria-label="Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency">
+        <span class="nav-page-text"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer><script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

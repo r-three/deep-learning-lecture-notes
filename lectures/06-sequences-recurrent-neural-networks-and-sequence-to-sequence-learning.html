@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Modeling sequential data: the chain-rule decomposition and autoregressive sampling, representing text with embeddings, the vanilla recurrent neural network and backpropagation through time, the LSTM, and encoder–decoder models for sequence-to-sequence problems.">
+
+<title>Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning – Neural Networks and Deep Learning</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../lectures/07-attention.html" rel="next">
+<link href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-67d765188173d06cfd0f34779d32db47.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&amp;family=Source+Code+Pro:wght@400;500&amp;display=swap" rel="stylesheet">
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles/custom.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Neural Networks and Deep Learning</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <div class="dropdown">
+      <a href="" title="Share" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Share"><i class="bi bi-share"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://twitter.com/intent/tweet?url=|url|">
+              <i class="bi bi-twitter pe-1"></i>
+            Twitter
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://www.linkedin.com/sharing/share-offsite/?url=|url|">
+              <i class="bi bi-linkedin pe-1"></i>
+            LinkedIn
+            </a>
+          </li>
+      </ul>
+    </div>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/01-intro-regression.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 1: Introduction, Linear &amp; Logistic Regression</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/02-mlp-backprop.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/03-regularization.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 3: Under/overfitting, Regularization, Numerical Stability, Autodiff</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/04-gradient-descent-adaptive-gradient-methods.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 4: Gradient Descent, Adaptive Gradient Methods</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#sec-sequences" id="toc-sec-sequences" class="nav-link active" data-scroll-target="#sec-sequences">Sequences</a>
+  <ul class="collapse">
+  <li><a href="#sec-autoregressive" id="toc-sec-autoregressive" class="nav-link" data-scroll-target="#sec-autoregressive">Autoregressive sampling</a></li>
+  </ul></li>
+  <li><a href="#sec-text" id="toc-sec-text" class="nav-link" data-scroll-target="#sec-text">Representing Text</a></li>
+  <li><a href="#sec-vanilla-rnn" id="toc-sec-vanilla-rnn" class="nav-link" data-scroll-target="#sec-vanilla-rnn">The Vanilla Recurrent Neural Network</a></li>
+  <li><a href="#sec-bptt" id="toc-sec-bptt" class="nav-link" data-scroll-target="#sec-bptt">Backpropagation Through Time</a>
+  <ul class="collapse">
+  <li><a href="#sec-bptt-term" id="toc-sec-bptt-term" class="nav-link" data-scroll-target="#sec-bptt-term">The recurrent term</a></li>
+  <li><a href="#sec-exploding-vanishing" id="toc-sec-exploding-vanishing" class="nav-link" data-scroll-target="#sec-exploding-vanishing">Why recurrent networks are hard to train</a></li>
+  </ul></li>
+  <li><a href="#sec-lstm" id="toc-sec-lstm" class="nav-link" data-scroll-target="#sec-lstm">Long Short-Term Memory</a></li>
+  <li><a href="#sec-deep-bidirectional" id="toc-sec-deep-bidirectional" class="nav-link" data-scroll-target="#sec-deep-bidirectional">Deep and Bidirectional RNNs</a></li>
+  <li><a href="#sec-uses" id="toc-sec-uses" class="nav-link" data-scroll-target="#sec-uses">Uses of Sequence Models</a>
+  <ul class="collapse">
+  <li><a href="#sec-language-modeling" id="toc-sec-language-modeling" class="nav-link" data-scroll-target="#sec-language-modeling">Language modeling</a></li>
+  <li><a href="#sec-sequence-classification" id="toc-sec-sequence-classification" class="nav-link" data-scroll-target="#sec-sequence-classification">Sequence classification</a></li>
+  </ul></li>
+  <li><a href="#sec-seq2seq" id="toc-sec-seq2seq" class="nav-link" data-scroll-target="#sec-seq2seq">Sequence-to-Sequence Learning</a></li>
+  <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</h1>
+</div>
+<p><strong>Overview.</strong> So far every architecture in this course has been designed to predict an output from a single input. This lecture turns to data with a different structure: sequences, whose elements come in an order. We first describe what a sequence is, how the chain rule of probability decomposes the joint distribution over a sequence, and how a single model that predicts the next element from a variable-length prefix lets us both score and generate sequences. We then represent text with embeddings, build the vanilla recurrent neural network as the smallest change to a one-hidden-layer network that can process a sequence, and work through backpropagation through time, which exposes why recurrent networks are hard to train. That difficulty motivates the LSTM, and we close with two uses of sequence models — language modeling and sequence classification — and with encoder–decoder models for sequence-to-sequence problems such as machine translation. Recurrent networks are no longer common in practice, having largely been replaced by attention-based models, so this treatment is brief.</p>
+<section id="sec-sequences" class="level2">
+<h2 class="anchored" data-anchor-id="sec-sequences">Sequences</h2>
+<p>Almost every problem we have discussed fits one paradigm: predicting the probability of an output <span class="math inline">\bm{y}</span> given an input <span class="math inline">\bm{x}</span>, where <span class="math inline">\bm{y}</span> is often a class and <span class="math inline">\bm{x}</span> is some features or an image. Many kinds of data fit this paradigm, but some data has other structure. One notable case is when the input is a <strong>sequence</strong>.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> A <em>sequence</em> is a series of random variables <span class="math inline">\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T</span> that have an <em>order</em> — an ordering that dictates a dependency between the elements. Here <span class="math inline">T</span> denotes the length of the sequence.</p>
+</div>
+<p>By <em>order</em> we mean that there is a natural way to decompose the joint distribution over the sequence into a set of dependencies, and that any other order feels unnatural. A clear example is a sequence whose elements are measurements taken at successive points in time: time itself induces the order, because whether something happened earlier or later is a fact we cannot rearrange. If we took a series of measurements over time and then shuffled or reversed them, they would be in the wrong order.</p>
+<p>Why does the order matter? Beyond letting us write the sequence down, it lets us use the <strong>chain rule of probability</strong> to express the joint probability of the whole sequence as a product of conditional probabilities:</p>
+<div class="boxed-eq">
+<p><span class="math display">p(\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T) = p(\bm{x}_1)\, p(\bm{x}_2 \mid \bm{x}_1)\, p(\bm{x}_3 \mid \bm{x}_2, \bm{x}_1) \cdots</span></p>
+</div>
+<p>Any set of random variables can be decomposed this way; nothing about it is special to sequences. But because a sequence has a natural order, this particular decomposition makes sense: if the first element we observe is <span class="math inline">\bm{x}_1</span>, we can express <span class="math inline">p(\bm{x}_1)</span>; if the next is <span class="math inline">\bm{x}_2</span>, we can ask for its probability given <span class="math inline">\bm{x}_1</span>; and so on. Asking instead for the probability of <span class="math inline">\bm{x}_3</span> given <span class="math inline">\bm{x}_{10}</span> would be awkward, because we would be conditioning on something we have not observed yet. Text is the main example we will use, but there are many others — a spectrogram is a sequence of spectra over time, a video is a sequence of images.</p>
+<section id="sec-autoregressive" class="level3">
+<h3 class="anchored" data-anchor-id="sec-autoregressive">Autoregressive sampling</h3>
+<p>Why model the joint probability of a sequence at all? Each factor in the decomposition — <span class="math inline">p(\bm{x}_1)</span>, <span class="math inline">p(\bm{x}_2 \mid \bm{x}_1)</span>, <span class="math inline">p(\bm{x}_3 \mid \bm{x}_2, \bm{x}_1)</span> — is a conditional probability of something given something else, which looks like the classifiers we have already built. If we have a model that estimates these probabilities, we can do something a classifier cannot: <strong>sample</strong> from the distributions to generate sequences.</p>
+<p>We sample <strong>autoregressively</strong>. First draw <span class="math inline">\bm{x}_1 \sim p(\bm{x}_1)</span>. Then draw <span class="math inline">\bm{x}_2 \sim p(\bm{x}_2 \mid \bm{x}_1)</span>, using the <span class="math inline">\bm{x}_1</span> we just sampled. Then feed both back in to get a distribution over <span class="math inline">\bm{x}_3</span>, and continue until a full sequence is produced. This is the first generative model we have seen: rather than predicting <span class="math inline">\bm{y}</span> given <span class="math inline">\bm{x}</span>, it learns a distribution over sequences, and one thing that allows is sampling new ones. Given a distribution over natural text we can generate text; given a distribution over images we can generate images.</p>
+<p>For this to be practical we do not want a separate model for each factor — one model for <span class="math inline">p(\bm{x}_1)</span>, another for <span class="math inline">p(\bm{x}_2 \mid \bm{x}_1)</span>, and so on. Instead we want a single model that, given a variable-length prefix of everything that came before, predicts what comes next:</p>
+<div class="boxed-eq">
+<p><span class="math display">p(\bm{x}_t \mid \bm{x}_{t-1}, \bm{x}_{t-2}, \dots, \bm{x}_1).</span></p>
+</div>
+<p>Such a model produces every term in the chain-rule decomposition and lets us sample autoregressively. Recurrent neural networks give us this, and later transformers will too.</p>
+<hr>
+</section>
+</section>
+<section id="sec-text" class="level2">
+<h2 class="anchored" data-anchor-id="sec-text">Representing Text</h2>
+<p>Text is a sequence of words (or characters, or something else). Take the sentence “the cat sat,” so that <span class="math inline">\bm{x}_1 = \text{the}</span>, <span class="math inline">\bm{x}_2 = \text{cat}</span>, <span class="math inline">\bm{x}_3 = \text{sat}</span>. Its probability decomposes as</p>
+<p><span class="math display">p(\text{the cat sat}) = p(\text{the})\, p(\text{cat} \mid \text{the})\, p(\text{sat} \mid \text{the, cat}),</span></p>
+<p>which respects the natural left-to-right order in which we read and write English.</p>
+<p>There is a problem: a word is a string, and we cannot multiply a string by a weight matrix. We need a way to represent words as numbers to feed into a network. Mapping text to something a network can ingest is one of the many subproblems of natural language processing; since this is not a natural language processing course, we treat it only briefly.</p>
+<p>The standard approach is a <strong>tokenizer</strong>, which begins by defining a <strong>vocabulary</strong> <span class="math inline">V</span>. For a word-level vocabulary, this is a set of words we will treat as tokens. Ideally we would have an entry for every word in the language, which is not quite possible — people invent and misspell words constantly — but suppose we have a large vocabulary of the words we care about. We associate each word with an integer index, its <strong>token</strong>: perhaps “the” is <span class="math inline">1</span>, “a” is <span class="math inline">2</span>, “dog” is <span class="math inline">3</span>, “cat” is <span class="math inline">4</span>, “sat” is <span class="math inline">395</span>, “box” is <span class="math inline">2973</span>, and so on. The particular index does not matter.</p>
+<p>Feeding these indices in directly would be odd. If “the” is <span class="math inline">1</span> and “a” is <span class="math inline">2</span>, then multiplying each by a weight matrix produces the same result for “a” as for “the,” only scaled by two — as if “a” were twice as large as “the.” Words have no such relative size or natural order. We faced the same issue with class labels, and the remedy is the same: represent each token as a <strong>one-hot vector</strong>. One-hot vectors impose no order — no one-hot vector is larger than another, they all have the same norm, and they are all equidistant. The dimension of these vectors is the size of the vocabulary <span class="math inline">|V|</span>, so a vocabulary of <span class="math inline">100{,}000</span> words gives <span class="math inline">100{,}000</span>-dimensional one-hot vectors.</p>
+<p>Now consider what happens when a one-hot vector meets the first weight matrix <span class="math inline">\bm{W}</span> of the model. Every entry of the product is zero except the one corresponding to the token’s index, so the product simply selects one column of <span class="math inline">\bm{W}</span>.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 660 300" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="eA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="24" y="30" font-size="24" font-weight="600" fill="#333">Word embeddings: a one-hot indexes a column</text>
+<text x="40" y="66" font-size="16" fill="#205279" font-weight="600">"cat"</text>
+<line x1="78" y1="61" x2="110" y2="61" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<text x="120" y="66" font-size="16" fill="#205279" font-weight="600">index 4</text>
+<line x1="196" y1="61" x2="228" y2="61" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<text x="238" y="66" font-size="16" fill="#205279" font-weight="600">one-hot</text>
+<rect x="40" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="74" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="108" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="142" y="100" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"></rect>
+<rect x="176" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="210" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="40" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="74" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="108" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="142" y="134" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"></rect>
+<rect x="176" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="210" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="40" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="74" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="108" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="142" y="168" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"></rect>
+<rect x="176" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="210" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="40" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="74" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="108" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="142" y="202" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"></rect>
+<rect x="176" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="210" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"></rect>
+<rect x="142" y="100" width="34" height="136" fill="none" stroke="#e53935" stroke-width="2.5"></rect>
+<text x="142" y="258" text-anchor="middle" font-size="14" fill="#666">embedding matrix W  (d × |V|, learned)</text>
+<text x="270" y="174" text-anchor="middle" font-size="24" fill="#555">×</text>
+<rect x="292" y="66" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"></rect>
+<text x="309" y="83" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="94" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"></rect>
+<text x="309" y="112" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="122" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"></rect>
+<text x="309" y="140" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="151" width="34" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"></rect>
+<text x="309" y="168" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">1</text>
+<rect x="292" y="179" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"></rect>
+<text x="309" y="196" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<rect x="292" y="207" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"></rect>
+<text x="309" y="225" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<text x="309" y="253" text-anchor="middle" font-size="14" fill="#666">one-hot (|V|)</text>
+<text x="370" y="174" text-anchor="middle" font-size="24" fill="#555">=</text>
+<rect x="412" y="100" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<rect x="412" y="134" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<rect x="412" y="168" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<rect x="412" y="202" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<rect x="412" y="100" width="34" height="136" fill="none" stroke="#e53935" stroke-width="2.5"></rect>
+<text x="429" y="258" text-anchor="middle" font-size="14" fill="#207965" font-weight="600">word embedding</text>
+<text x="24" y="288" font-size="14" fill="#666">The product selects the column of W indexed by the token — its learned word embedding.</text>
+</svg></div>
+<p>Multiplying a weight matrix by a one-hot vector indexes out a column of that matrix. The matrix <span class="math inline">\bm{W}</span> has as many columns as there are vocabulary entries, and it is learned by gradient descent like any other weight matrix. The selected column is the <strong>word embedding</strong> (or <strong>token embedding</strong>) of that word, and <span class="math inline">\bm{W}</span> is the <strong>embedding matrix</strong>.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Why embeddings are useful.</strong> Because embeddings are vectors, they can have rich relationships. If two words have identical embeddings, the model is fed the same vector for both, so they are interchangeable to it; if two embeddings are close, the words are treated similarly. Relationships that resemble arithmetic can also emerge — for example, the embedding of “king” minus “man” plus “woman” landing near “queen” <span class="citation" data-cites="mikolov2013distributed">(<a href="02-mlp-backprop.html#ref-mikolov2013distributed" role="doc-biblioref">Mikolov et al. 2013</a>)</span>. These relationships are not hand-specified; they arise through learning, because they happen to help the model process text.</p>
+</div>
+</div>
+<p>We have gone from words, which we cannot feed into a model, to a learned vector for each word. Returning to our goal of modeling <span class="math inline">p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1)</span>: since each element is a token drawn from the vocabulary, this conditional distribution is just <strong><span class="math inline">|V|</span>-way classification</strong> — classification over as many classes as there are vocabulary entries. We know how to do classification: a softmax output trained with cross-entropy. There is one important difference, though — the input has <strong>variable length</strong>.</p>
+<p>A plain multilayer perceptron cannot handle that. Its first weight matrix accepts a fixed input dimensionality. If we concatenate the sequence elements, the concatenated vector’s size varies with the sequence length; if we feed them in independently, we lose the conditioning on the past. We need an architecture that can ingest a variable-length prefix, which motivates the recurrent neural network.</p>
+<hr>
+</section>
+<section id="sec-vanilla-rnn" class="level2">
+<h2 class="anchored" data-anchor-id="sec-vanilla-rnn">The Vanilla Recurrent Neural Network</h2>
+<p>The first recurrent architecture we study is the <strong>vanilla recurrent neural network</strong>. The name is retrospective: it was not called “vanilla” when introduced, but once fancier variants appeared, this plainest one took the plainest flavor’s name. We build it by taking the simplest nonlinear model we have — a multilayer perceptron with one hidden layer — and making the smallest change that lets it process a variable-length sequence.</p>
+<p>Recall the one-hidden-layer network, written with a small change of notation (<span class="math inline">\bm{W}_x</span> for the input weights, to distinguish it from the recurrent weights we are about to add):</p>
+<p><span class="math display">\bm{h} = \sigma(\bm{W}_x \bm{x} + \bm{b}_h), \qquad \bm{o} = \bm{W}_o \bm{h} + \bm{b}_o.</span></p>
+<p>To process a sequence rather than a single input, we make the hidden state a sequence too, and add a <strong>recurrent connection</strong> so that the hidden state at step <span class="math inline">t</span> depends on the hidden state at the previous step:</p>
+<div class="boxed-eq">
+<p><span class="math display">\bm{h}_t = \sigma(\bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h), \qquad \bm{o}_t = \bm{W}_o \bm{h}_t + \bm{b}_o.</span></p>
+</div>
+<p>The only structural change is the term <span class="math inline">\bm{W}_h \bm{h}_{t-1}</span>, a recurrent connection from <span class="math inline">\bm{h}_{t-1}</span> to <span class="math inline">\bm{h}_t</span> through a learned weight matrix <span class="math inline">\bm{W}_h</span>. To use the model, we feed in <span class="math inline">\bm{x}_1</span> to get <span class="math inline">\bm{h}_1</span>, use <span class="math inline">\bm{h}_1</span> to produce <span class="math inline">\bm{o}_1</span> and hence a distribution over <span class="math inline">\bm{x}_2</span>; then feed in <span class="math inline">\bm{x}_2</span> together with the retained <span class="math inline">\bm{h}_1</span> to get <span class="math inline">\bm{h}_2</span> and a distribution over <span class="math inline">\bm{x}_3</span>; and so on. We carry the hidden state from one step to the next.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 620 344" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="rA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="24" y="30" font-size="24" font-weight="600" fill="#333">The vanilla RNN, unrolled</text>
+<text x="60" y="169" font-size="15" fill="#207965" font-weight="600">h₀</text>
+<line x1="80" y1="164.0" x2="120" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<rect x="120" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="155" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₁</text>
+<rect x="120" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="155" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₁</text>
+<line x1="155.0" y1="236" x2="155.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<rect x="120" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="155" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₁</text>
+<line x1="155.0" y1="140" x2="155.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<line x1="190" y1="164.0" x2="300" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<rect x="300" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="335" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₂</text>
+<rect x="300" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="335" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₂</text>
+<line x1="335.0" y1="236" x2="335.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<rect x="300" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="335" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₂</text>
+<line x1="335.0" y1="140" x2="335.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<line x1="370" y1="164.0" x2="480" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<rect x="480" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="515" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₃</text>
+<rect x="480" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="515" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₃</text>
+<line x1="515.0" y1="236" x2="515.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<rect x="480" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="515" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₃</text>
+<line x1="515.0" y1="140" x2="515.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"></line>
+<text x="245" y="156" text-anchor="middle" font-size="13" fill="#666">W_h</text>
+<text x="169" y="216" font-size="13" fill="#666">W_x</text>
+<text x="169" y="100" font-size="13" fill="#666">W_o</text>
+<text x="24" y="312" font-size="14" fill="#666">The same weights W_x, W_h, W_o are reused at every step;</text>
+<text x="24" y="332" font-size="14" fill="#666">hₜ summarizes the sequence up to step t.</text>
+</svg></div>
+<p>Because <span class="math inline">\bm{h}_t</span> is computed from <span class="math inline">\bm{x}_t</span> and <span class="math inline">\bm{h}_{t-1}</span>, and <span class="math inline">\bm{h}_{t-1}</span> from <span class="math inline">\bm{x}_{t-1}</span> and <span class="math inline">\bm{h}_{t-2}</span>, and so on, <span class="math inline">\bm{h}_t</span> depends on every past input. We can think of <span class="math inline">\bm{h}_t</span> as <strong>summarizing</strong> the sequence up to step <span class="math inline">t</span> — not in any literal sense, but in that it carries information about all the inputs so far.</p>
+<p>Two properties are worth stating. The model can process an input of any length: to handle a longer sequence, we keep feeding in elements, updating <span class="math inline">\bm{h}_t</span>, and producing <span class="math inline">\bm{o}_t</span> where we want predictions. And the number of parameters does not change with the sequence length. As with a convolutional network, we reuse the same template everywhere — always <span class="math inline">\bm{W}_x</span> for the current input and always <span class="math inline">\bm{W}_h</span> for the previous hidden state — so whether <span class="math inline">T</span> grows or shrinks, the parameters remain <span class="math inline">\bm{W}_x</span>, <span class="math inline">\bm{W}_h</span>, <span class="math inline">\bm{b}_h</span>, <span class="math inline">\bm{W}_o</span>, and <span class="math inline">\bm{b}_o</span>. (The vocabulary size, by contrast, is fixed once chosen: <span class="math inline">\bm{x}_t</span> has dimension <span class="math inline">|V|</span>, so <span class="math inline">\bm{W}_x</span> has a matching dimension, and changing the vocabulary would require altering the weight matrix.)</p>
+<p>One note on the outputs: as written, we produce an <span class="math inline">\bm{o}_t</span> at every step, which is what we want for predicting the next element. But we could instead feed in the whole sequence and produce a single output <span class="math inline">\bm{o}_T</span> from the final hidden state <span class="math inline">\bm{h}_T</span>, for example to classify a sequence — a case we return to below.</p>
+<p>The tools for training this model are the ones we already have. A recurrent network introduces no new operations: only nonlinearities, additions of bias vectors, and multiplications by weight matrices. As long as we can differentiate each operation and specify the computational graph, automatic differentiation and backpropagation compute the gradients, and gradient descent trains the model, exactly as before. There is, however, a conceptual tweak worth working through, because it reveals what makes recurrent networks hard to train.</p>
+<hr>
+</section>
+<section id="sec-bptt" class="level2">
+<h2 class="anchored" data-anchor-id="sec-bptt">Backpropagation Through Time</h2>
+<p>One way to picture backpropagation in a recurrent network is to <strong>unroll</strong> it: apply the same layer over and over, feeding in <span class="math inline">\bm{x}_t</span> at each step to update <span class="math inline">\bm{h}_t</span>, and then backpropagate from the outputs back to the inputs. To keep the notation manageable, write the hidden-state update as a function <span class="math inline">f</span> and the output as a function <span class="math inline">g</span>:</p>
+<p><span class="math display">\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h), \qquad \bm{o}_t = g(\bm{h}_t, \bm{W}_o).</span></p>
+<p>We focus on <span class="math inline">\bm{W}_h</span>, the recurrent weights, since they are what make this case different. Suppose we incur a loss at every step, averaging a per-step loss <span class="math inline">\ell</span> between the target <span class="math inline">\bm{y}_t</span> and the output <span class="math inline">\bm{o}_t</span>:</p>
+<p><span class="math display">\mathcal{L} = \frac{1}{T} \sum_{t=1}^{T} \ell(\bm{y}_t, \bm{o}_t).</span></p>
+<p>By linearity of the derivative and then the chain rule,</p>
+<p><span class="math display">\frac{d\mathcal{L}}{d\bm{W}_h} = \frac{1}{T} \sum_{t=1}^{T} \frac{d\ell(\bm{y}_t, \bm{o}_t)}{d\bm{W}_h} = \frac{1}{T} \sum_{t=1}^{T} \frac{d\ell(\bm{y}_t, \bm{o}_t)}{d\bm{o}_t}\, \frac{d\bm{o}_t}{d\bm{h}_t}\, \frac{d\bm{h}_t}{d\bm{W}_h}.</span></p>
+<p>The first factor is the gradient of a softmax cross-entropy loss, which we have handled before. The second, <span class="math inline">d\bm{o}_t / d\bm{h}_t</span>, is <span class="math inline">\bm{W}_o</span>, since <span class="math inline">g</span> is a dense layer. The third factor, <span class="math inline">d\bm{h}_t / d\bm{W}_h</span>, is the hard one.</p>
+<section id="sec-bptt-term" class="level3">
+<h3 class="anchored" data-anchor-id="sec-bptt-term">The recurrent term</h3>
+<p>What makes <span class="math inline">d\bm{h}_t / d\bm{W}_h</span> hard is that <span class="math inline">\bm{W}_h</span> affects <span class="math inline">\bm{h}_t</span> through two paths. It contributes <strong>directly</strong>, because <span class="math inline">\bm{h}_t</span> is computed using <span class="math inline">\bm{W}_h</span>; and it contributes <strong>indirectly</strong>, because <span class="math inline">\bm{h}_t</span> depends on <span class="math inline">\bm{h}_{t-1}</span>, which itself depends on <span class="math inline">\bm{W}_h</span>, which depends on <span class="math inline">\bm{h}_{t-2}</span>, and so on back to the start. When a variable reaches another through two paths, we sum the derivative along each:</p>
+<p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h} + \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{h}_{t-1}}\, \frac{d\bm{h}_{t-1}}{d\bm{W}_h}.</span></p>
+<p>The final factor <span class="math inline">d\bm{h}_{t-1}/d\bm{W}_h</span> has the same form as the term we started with, one step earlier — a recursion. To see its solution, abbreviate</p>
+<p><span class="math display">a_t = \frac{d\bm{h}_t}{d\bm{W}_h}, \qquad b_t = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h}, \qquad c_t = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{h}_{t-1}},</span></p>
+<p>so that the recursion is <span class="math inline">a_t = b_t + c_t\, a_{t-1}</span>. Since there is no <span class="math inline">\bm{h}_{-1}</span> to depend on, <span class="math inline">a_0 = 0</span>. Unrolling,</p>
+<p><span class="math display">a_1 = b_1, \quad a_2 = b_2 + c_2 b_1, \quad a_3 = b_3 + c_3 b_2 + c_3 c_2 b_1, \quad a_4 = b_4 + c_4 b_3 + c_4 c_3 b_2 + c_4 c_3 c_2 b_1.</span></p>
+<p>The pattern is an always-present <span class="math inline">b_t</span> plus a sum of terms, each a product of <span class="math inline">c</span>’s counting down to a <span class="math inline">b_i</span>:</p>
+<p><span class="math display">a_t = b_t + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} c_j \right) b_i.</span></p>
+<p>Substituting the definitions back in gives the recurrent term in full:</p>
+<div class="boxed-eq">
+<p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h} + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} \frac{d f(\bm{x}_j, \bm{h}_{j-1}, \bm{W}_h)}{d\bm{h}_{j-1}} \right) \frac{d f(\bm{x}_i, \bm{h}_{i-1}, \bm{W}_h)}{d\bm{W}_h}.</span></p>
+</div>
+</section>
+<section id="sec-exploding-vanishing" class="level3">
+<h3 class="anchored" data-anchor-id="sec-exploding-vanishing">Why recurrent networks are hard to train</h3>
+<p>To see what this means, take a linear vanilla RNN, where <span class="math inline">f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h) = \bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h</span>. Then the direct term <span class="math inline">d f / d\bm{W}_h</span> is <span class="math inline">\bm{h}_{t-1}</span> (and each <span class="math inline">\bm{b}_i = \bm{h}_{i-1}</span>), while each factor <span class="math inline">d f / d\bm{h}_{j-1}</span> is <span class="math inline">\bm{W}_h</span>, so</p>
+<p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \bm{h}_{t-1} + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} \bm{W}_h \right) \bm{h}_{i-1}.</span></p>
+<p>Everything here is mild except the product <span class="math inline">\prod_{j=i+1}^{t} \bm{W}_h</span>, which is the same matrix <span class="math inline">\bm{W}_h</span> multiplied by itself over and over. As we saw earlier in the course with exploding and vanishing gradients, a chain of weight-matrix multiplications can grow without bound or shrink toward zero depending on the eigenvalues of the matrix — and here the matrices are not merely similar but identical. As a result, <span class="math inline">d\bm{h}_t / d\bm{W}_h</span> can <strong>explode or vanish</strong>. Viewing a recurrent network as a deep network whose layers all share one weight matrix, backpropagation produces exactly these repeated multiplications by the same matrix, which makes exploding and vanishing gradients especially severe for recurrent networks.</p>
+<hr>
+</section>
+</section>
+<section id="sec-lstm" class="level2">
+<h2 class="anchored" data-anchor-id="sec-lstm">Long Short-Term Memory</h2>
+<p>How do we deal with this? The main historical response, for those who still wanted to use recurrent networks, was to design variants less sensitive to exploding and vanishing gradients. One reason the vanilla network is so sensitive to <span class="math inline">\bm{W}_h</span> is that how much it remembers from the past, and how strongly, depends entirely on that one weight matrix. The more effective variants add explicit mechanisms for remembering and forgetting information in the hidden state. The most prominent is the <strong>long short-term memory</strong> network, or <strong>LSTM</strong> <span class="citation" data-cites="hochreiter1997long">(<a href="02-mlp-backprop.html#ref-hochreiter1997long" role="doc-biblioref">Hochreiter and Schmidhuber 1997</a>)</span>.</p>
+<p>Concretely, we want explicit mechanisms to remember or ignore the previous state, to update or not update the state based on the new input, and to forget the past completely. In a vanilla network all of this is controlled only by <span class="math inline">\bm{W}_h</span> and how it interacts with the state, which is a coarse instrument. The LSTM adds a <strong>cell</strong>, a separate recurrent state, with explicit mechanisms for reading, writing, and updating it. These mechanisms are governed by <strong>gates</strong> — values that would ideally be binary (read or not, write or not), and which we make soft by computing them with a sigmoid nonlinearity so they lie between <span class="math inline">0</span> and <span class="math inline">1</span>.</p>
+<p>There are three gates, each computed like a dense layer with a sigmoid, plus a candidate cell update computed with a <span class="math inline">\tanh</span> (it is not a gate, so it need not lie in <span class="math inline">[0,1]</span>):</p>
+<section id="lstm-cell" class="level4 algorithm">
+<h4 class="anchored" data-anchor-id="lstm-cell">LSTM cell</h4>
+<p><span class="math display">\bm{i}_t = \sigma(\bm{W}_{xi} \bm{x}_t + \bm{W}_{hi} \bm{h}_{t-1} + \bm{b}_i) \qquad \text{(input gate)}</span> <span class="math display">\bm{f}_t = \sigma(\bm{W}_{xf} \bm{x}_t + \bm{W}_{hf} \bm{h}_{t-1} + \bm{b}_f) \qquad \text{(forget gate)}</span> <span class="math display">\bm{o}_t = \sigma(\bm{W}_{xo} \bm{x}_t + \bm{W}_{ho} \bm{h}_{t-1} + \bm{b}_o) \qquad \text{(output gate)}</span> <span class="math display">\tilde{\bm{c}}_t = \tanh(\bm{W}_{xc} \bm{x}_t + \bm{W}_{hc} \bm{h}_{t-1} + \bm{b}_c) \qquad \text{(candidate cell)}</span> <span class="math display">\bm{c}_t = \bm{f}_t \odot \bm{c}_{t-1} + \bm{i}_t \odot \tilde{\bm{c}}_t</span> <span class="math display">\bm{h}_t = \bm{o}_t \odot \tanh(\bm{c}_t)</span></p>
+</section>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 660 360" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="lA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="24" y="30" font-size="24" font-weight="600" fill="#333">LSTM cell: gated read / write / forget</text>
+<rect x="390" y="48" width="80" height="44" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="430" y="75" text-anchor="middle" font-size="16" font-weight="600" fill="#207965">hₜ</text>
+<text x="430" y="124" text-anchor="middle" font-size="13" fill="#666">tanh, × oₜ</text>
+<line x1="430" y1="140" x2="430" y2="96" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"></line>
+<rect x="40" y="140" width="86" height="44" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="83" y="167" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">cₜ₋₁</text>
+<circle cx="210" cy="162" r="16" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></circle>
+<text x="210" y="168" text-anchor="middle" font-size="18" font-weight="600" fill="#792051">×</text>
+<line x1="126" y1="162" x2="194" y2="162" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"></line>
+<circle cx="350" cy="162" r="16" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="350" y="168" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">+</text>
+<line x1="226" y1="162" x2="334" y2="162" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"></line>
+<rect x="390" y="140" width="80" height="44" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="430" y="167" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">cₜ</text>
+<line x1="366" y1="162" x2="390" y2="162" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"></line>
+<rect x="168" y="228" width="84" height="34" rx="7" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
+<text x="210" y="249" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">forget fₜ</text>
+<line x1="210" y1="228" x2="210" y2="178" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"></line>
+<rect x="294" y="228" width="112" height="34" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="350" y="249" text-anchor="middle" font-size="13" font-weight="600" fill="#207965">iₜ × c̃ₜ</text>
+<line x1="350" y1="228" x2="350" y2="178" stroke="#888" stroke-width="1.5" marker-end="url(#lA)"></line>
+<text x="24" y="302" font-size="14" fill="#666">Gates iₜ, fₜ, oₜ = σ(W·xₜ + W·hₜ₋₁ + b) are computed from the input xₜ and previous state hₜ₋₁;</text>
+<text x="24" y="324" font-size="14" fill="#666">the candidate cell c̃ₜ uses tanh. The cell cₜ carries information across time with gated updates.</text>
+</svg></div>
+<p>Reading the cell update: the <strong>forget gate</strong> <span class="math inline">\bm{f}_t</span> multiplies the old cell <span class="math inline">\bm{c}_{t-1}</span>, determining how much of the previous cell is kept; the <strong>input gate</strong> <span class="math inline">\bm{i}_t</span> multiplies the candidate cell <span class="math inline">\tilde{\bm{c}}_t</span>, determining how much of the new information is written in (the candidate cell is what ingests the current input, which <span class="math inline">\bm{c}_{t-1}</span> knows nothing about). Finally the <strong>output gate</strong> <span class="math inline">\bm{o}_t</span> determines how much of the updated cell is read out to form the hidden state <span class="math inline">\bm{h}_t</span>. The weight matrices <span class="math inline">\bm{W}_{xi}, \bm{W}_{hi}, \bm{W}_{xf}, \dots</span> are all separate.</p>
+<p>Why this specific design — these gates, the separate cell, the <span class="math inline">\tanh</span> on the candidate — rather than some other? As with much of deep learning, it was motivated heuristically by the goal above, validated empirically by finding that such models train more effectively, and then studied: the gradient dynamics of an LSTM do not suffer from exploding and vanishing gradients in the same way. If you wanted to train a recurrent network today, an LSTM would give you a considerably easier time than a vanilla one.</p>
+<hr>
+</section>
+<section id="sec-deep-bidirectional" class="level2">
+<h2 class="anchored" data-anchor-id="sec-deep-bidirectional">Deep and Bidirectional RNNs</h2>
+<p>Two extensions are worth noting.</p>
+<p>First, we can have <strong>deep RNNs</strong>. Rather than a single hidden layer, we stack layers: the first computes a hidden state from the input, and each subsequent layer takes as input the hidden state of the layer below it (at the same step) together with its own previous hidden state:</p>
+<p><span class="math display">\bm{h}_t^{(1)} = f^{(1)}\!\big(\bm{x}_t, \bm{h}_{t-1}^{(1)}\big), \qquad \bm{h}_t^{(2)} = f^{(2)}\!\big(\bm{h}_t^{(1)}, \bm{h}_{t-1}^{(2)}\big), \quad \dots</span></p>
+<p>Just as we stack layers in a feedforward network, we can stack them in a recurrent one; there are simply more indices.</p>
+<p>Second, we can have <strong>bidirectional RNNs</strong>. So far we have processed the sequence from left to right, but we can process it in any order, and a common choice is to run two layers in parallel with separate parameters — one forward and one backward:</p>
+<p><span class="math display">\overrightarrow{\bm{h}}_t = \overrightarrow{f}\!\big(\bm{x}_t, \overrightarrow{\bm{h}}_{t-1}\big), \qquad \overleftarrow{\bm{h}}_t = \overleftarrow{f}\!\big(\bm{x}_{T-t}, \overleftarrow{\bm{h}}_{t-1}\big).</span></p>
+<p>Concatenating the forward and backward states at a step gives a representation with information about the full past and the full future. This would not make sense for predicting the next element — we cannot look ahead at what we are trying to predict — but it does make sense when we already have the whole input sequence and want to, for example, classify it.</p>
+<hr>
+</section>
+<section id="sec-uses" class="level2">
+<h2 class="anchored" data-anchor-id="sec-uses">Uses of Sequence Models</h2>
+<section id="sec-language-modeling" class="level3">
+<h3 class="anchored" data-anchor-id="sec-language-modeling">Language modeling</h3>
+<p>The task we have been describing — predicting <span class="math inline">p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1)</span> — is called <strong>language modeling</strong>, and a model trained to do it is a <strong>language model</strong>. To train one, we collect sequences and use <strong>teacher forcing</strong>.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> <em>Teacher forcing</em> trains a sequence model by always conditioning on the ground-truth prefix. To predict <span class="math inline">\bm{x}_t</span>, we feed in the true sequence up to <span class="math inline">\bm{x}_{t-1}</span> — regardless of what the model predicted for earlier elements — and train it to predict the true <span class="math inline">\bm{x}_t</span>.</p>
+</div>
+<p>A language model is useful in two ways. Because it gives the probability of the next element given the history, we can sample new sequences from scratch, as described earlier; and we can take an existing sequence and ask how probable it is under the model — whether it looks like a normal sequence.</p>
+</section>
+<section id="sec-sequence-classification" class="level3">
+<h3 class="anchored" data-anchor-id="sec-sequence-classification">Sequence classification</h3>
+<p>A different use is <strong>sequence classification</strong>: predicting a single class from a full input sequence, <span class="math inline">p(\bm{y} \mid \bm{x}_1, \dots, \bm{x}_T)</span>. Here we do not care about predicting each element; we take the whole sequence and make one prediction. We iterate the recurrent update to the end and feed the final hidden state through a single dense layer to get the scores:</p>
+<p><span class="math display">\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1}), \qquad \bm{o} = \bm{W}_o \bm{h}_T + \bm{b}_o.</span></p>
+<p>Since we have the full sequence when making the prediction, a bidirectional RNN can make sense here. The final hidden state <span class="math inline">\bm{h}_T</span> should carry information about the entire input. Sequence classification covers tasks such as predicting the topic of a document, whether a movie review is positive or negative, or whether an email — a sequence of words fed through the RNN, with the final state passed to a classifier — is spam.</p>
+<hr>
+</section>
+</section>
+<section id="sec-seq2seq" class="level2">
+<h2 class="anchored" data-anchor-id="sec-seq2seq">Sequence-to-Sequence Learning</h2>
+<p>A further class of problems is <strong>sequence-to-sequence</strong> (or “seq2seq”): given an input sequence, generate a related output sequence. We predict elements of the output sequence autoregressively, but conditioned on both the past output elements and the full input sequence. Writing output indices as <span class="math inline">t'</span> to keep them distinct from the input indices,</p>
+<div class="boxed-eq">
+<p><span class="math display">p(\bm{y}_{t'} \mid \bm{y}_{t'-1}, \bm{y}_{t'-2}, \dots, \bm{y}_1, \; \bm{x}_T, \bm{x}_{T-1}, \dots, \bm{x}_1).</span></p>
+</div>
+<p>The standard example is <strong>machine translation</strong>: <span class="math inline">\bm{x}</span> is an English sentence and <span class="math inline">\bm{y}</span> is its French translation. We already have the tools we need. We build a seq2seq model from two RNNs <span class="citation" data-cites="sutskever2014sequence">(<a href="02-mlp-backprop.html#ref-sutskever2014sequence" role="doc-biblioref">Sutskever et al. 2014</a>)</span>:</p>
+<ol type="1">
+<li>An <strong>encoder</strong> RNN reads the input sequence, <span class="math inline">\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1})</span>, producing a sequence of hidden states.</li>
+<li>The <strong>context</strong> is the encoder’s final hidden state, <span class="math inline">\bm{c} = \bm{h}_T</span>, which summarizes the whole input.</li>
+<li>A <strong>decoder</strong> RNN generates the output, <span class="math inline">\bm{s}_{t'} = g(\bm{y}_{t'-1}, \bm{s}_{t'-1}, \bm{c})</span>, using the previous output element, its own previous state, and the context; its state is used to predict <span class="math inline">\bm{y}_{t'}</span>.</li>
+</ol>
+<p>How do we make the decoder <span class="math inline">g</span> a function of the context <span class="math inline">\bm{c}</span>? There are several options. One is to concatenate <span class="math inline">\bm{c}</span> with the embedding of the previous output element at every step, <span class="math inline">\operatorname{concat}(\operatorname{embed}(\bm{y}_{t'-1}), \bm{c})</span>, injecting the context throughout. Another is to set the decoder’s initial hidden state to the context, <span class="math inline">\bm{s}_0 = \bm{c}</span>. (This raises a question we had not addressed: what to initialize a hidden state to. The usual choices are all zeros, or a learned vector treated as a parameter; in a seq2seq model, the decoder can instead be initialized to the context.)</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 720 320" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="sA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Sequence-to-sequence: encoder → context → decoder</text>
+<rect x="40" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="66" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₁</text>
+<rect x="40" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="66" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₁</text>
+<line x1="66.0" y1="230" x2="66.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<line x1="92" y1="171.0" x2="120" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="120" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="146" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₂</text>
+<rect x="120" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="146" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₂</text>
+<line x1="146.0" y1="230" x2="146.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<line x1="172" y1="171.0" x2="200" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="200" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="226" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₃</text>
+<rect x="200" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="226" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₃</text>
+<line x1="226.0" y1="230" x2="226.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<line x1="252" y1="171.0" x2="280" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="280" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="306" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">h₄</text>
+<rect x="280" y="230" width="52" height="42" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="306" y="256" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">x₄</text>
+<line x1="306.0" y1="230" x2="306.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<text x="186" y="136" text-anchor="middle" font-size="14" fill="#666">encoder</text>
+<text x="186" y="290" text-anchor="middle" font-size="14" fill="#666">input sequence</text>
+<line x1="332" y1="171.0" x2="420" y2="171.0" stroke="#8457C7" stroke-width="2" marker-end="url(#sA)"></line>
+<text x="376" y="163" text-anchor="middle" font-size="15" fill="#442079" font-weight="600">c</text>
+<rect x="420" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="446" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">s₁</text>
+<rect x="414" y="230" width="64" height="42" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="446" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#796020">&lt;bos&gt;</text>
+<line x1="446.0" y1="230" x2="446.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="414" y="78" width="64" height="42" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="446" y="103" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">y₁</text>
+<line x1="446.0" y1="150" x2="446.0" y2="120" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<line x1="472" y1="171.0" x2="510" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="510" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="536" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">s₂</text>
+<rect x="504" y="230" width="64" height="42" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="536" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#796020">y₁</text>
+<line x1="536.0" y1="230" x2="536.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="504" y="78" width="64" height="42" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="536" y="103" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">y₂</text>
+<line x1="536.0" y1="150" x2="536.0" y2="120" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<line x1="562" y1="171.0" x2="600" y2="171.0" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="600" y="150" width="52" height="42" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="626" y="176" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">s₃</text>
+<rect x="594" y="230" width="64" height="42" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="626" y="255" text-anchor="middle" font-size="13" font-weight="600" fill="#796020">y₂</text>
+<line x1="626.0" y1="230" x2="626.0" y2="192" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<rect x="594" y="78" width="64" height="42" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="626" y="103" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">&lt;eos&gt;</text>
+<line x1="626.0" y1="150" x2="626.0" y2="120" stroke="#888" stroke-width="1.5" marker-end="url(#sA)"></line>
+<text x="536" y="66" text-anchor="middle" font-size="14" fill="#666">output sequence</text>
+<text x="536" y="290" text-anchor="middle" font-size="14" fill="#666">decoder (autoregressive)</text>
+</svg></div>
+<p>The diagram shows the full model. The encoder ingests the input sequence <span class="math inline">\bm{x}_1, \dots, \bm{x}_4</span>, updating its state at each step; its final state <span class="math inline">\bm{h}_4</span> becomes the context <span class="math inline">\bm{c}</span>, which initializes the decoder. The encoder can be bidirectional, since the whole input is available. The decoder is not: it predicts left to right. To start generation we feed in a special <strong>beginning-of-sequence</strong> token, <code>&lt;bos&gt;</code> — a token with no meaning in the language, but a meaning to the model. The decoder then proceeds autoregressively, each step taking the previous state and the previously generated element, until it produces a special <strong>end-of-sequence</strong> token, <code>&lt;eos&gt;</code>, signaling that it is done. Stitching two RNNs together this way is how we tackle sequence-to-sequence problems such as machine translation.</p>
+<hr>
+</section>
+<section id="sec-summary" class="level2">
+<h2 class="anchored" data-anchor-id="sec-summary">Summary</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Key takeaways from Lecture 6:</strong></p>
+<ul>
+<li>A <strong>sequence</strong> is an ordered series of random variables. The <strong>chain rule of probability</strong> decomposes the joint distribution into conditionals <span class="math inline">p(\bm{x}_1)\, p(\bm{x}_2 \mid \bm{x}_1) \cdots</span>, and a single model of <span class="math inline">p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1)</span> lets us score sequences and <strong>sample autoregressively</strong>.</li>
+<li>Text is represented by mapping tokens to indices, then to <strong>one-hot vectors</strong>; multiplying a one-hot vector by the <strong>embedding matrix</strong> selects a learned <strong>word embedding</strong>. Next-element prediction is then <span class="math inline">|V|</span>-way classification with a variable-length input.</li>
+<li>A <strong>vanilla RNN</strong> is a one-hidden-layer network made recurrent: <span class="math inline">\bm{h}_t = \sigma(\bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h)</span>. It processes any length with a fixed number of parameters, and <span class="math inline">\bm{h}_t</span> summarizes the sequence up to step <span class="math inline">t</span>.</li>
+<li><strong>Backpropagation through time</strong> unrolls the network. The recurrent term <span class="math inline">d\bm{h}_t/d\bm{W}_h</span> involves repeated multiplication by <span class="math inline">\bm{W}_h</span>, so gradients can <strong>explode or vanish</strong>, making recurrent networks hard to train.</li>
+<li>The <strong>LSTM</strong> adds a cell with input, forget, and output gates that give explicit control over remembering, updating, and forgetting, and it trains more reliably than a vanilla RNN.</li>
+<li>RNNs can be made <strong>deep</strong> (stacked layers) or <strong>bidirectional</strong> (parallel forward and backward passes, when the full sequence is available).</li>
+<li>Sequence models support <strong>language modeling</strong> (trained with <strong>teacher forcing</strong>), <strong>sequence classification</strong> (from the final hidden state), and <strong>sequence-to-sequence</strong> learning via an <strong>encoder–decoder</strong> architecture, where the encoder’s final state is the context that conditions the decoder.</li>
+</ul>
+</div>
+</div>
+<p><strong>Next lecture:</strong> Attention and the transformer - the mechanism that lets a model condition directly on every element of a sequence, avoiding the single-context bottleneck and the sequential recurrence of RNNs, and that has largely replaced them.</p>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<div id="ref-hochreiter1997long" class="csl-entry" role="listitem">
+Hochreiter, Sepp, and Jürgen Schmidhuber. 1997. <span>“Long Short-Term Memory.”</span> <em>Neural Computation</em> 9 (8): 1735–80.
+</div>
+<div id="ref-mikolov2013distributed" class="csl-entry" role="listitem">
+Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg S Corrado, and Jeff Dean. 2013. <span>“Distributed Representations of Words and Phrases and Their Compositionality.”</span> <em>Advances in Neural Information Processing Systems</em> 26.
+</div>
+<div id="ref-sutskever2014sequence" class="csl-entry" role="listitem">
+Sutskever, Ilya, Oriol Vinyals, and Quoc V Le. 2014. <span>“Sequence to Sequence Learning with Neural Networks.”</span> <em>Advances in Neural Information Processing Systems</em> 27.
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="pagination-link" aria-label="Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../lectures/07-attention.html" class="pagination-link" aria-label="Lecture 7: Attention">
+        <span class="nav-page-text"><span class="chapter-title">Lecture 7: Attention</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer><script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

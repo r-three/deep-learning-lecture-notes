@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Assembling the transformer from familiar ingredients: self-attention, layer normalization, residual connections, and position-wise feed-forward networks; the transformer layer block and five common modifications; encoder-only transformers; and pre-training with masked language modeling (BERT).">
+
+<title>Lecture 8: Transformers, Part 1 – Neural Networks and Deep Learning</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../lectures/09-transformers-part-2-large-language-models.html" rel="next">
+<link href="../lectures/07-attention.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-67d765188173d06cfd0f34779d32db47.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&amp;family=Source+Code+Pro:wght@400;500&amp;display=swap" rel="stylesheet">
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles/custom.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../lectures/08-transformers-part-1.html"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Neural Networks and Deep Learning</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <div class="dropdown">
+      <a href="" title="Share" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Share"><i class="bi bi-share"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://twitter.com/intent/tweet?url=|url|">
+              <i class="bi bi-twitter pe-1"></i>
+            Twitter
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://www.linkedin.com/sharing/share-offsite/?url=|url|">
+              <i class="bi bi-linkedin pe-1"></i>
+            LinkedIn
+            </a>
+          </li>
+      </ul>
+    </div>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/01-intro-regression.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 1: Introduction, Linear &amp; Logistic Regression</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/02-mlp-backprop.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/03-regularization.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 3: Under/overfitting, Regularization, Numerical Stability, Autodiff</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/04-gradient-descent-adaptive-gradient-methods.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 4: Gradient Descent, Adaptive Gradient Methods</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#sec-ingredients" id="toc-sec-ingredients" class="nav-link active" data-scroll-target="#sec-ingredients">The Transformer’s Ingredients</a>
+  <ul class="collapse">
+  <li><a href="#sec-layernorm" id="toc-sec-layernorm" class="nav-link" data-scroll-target="#sec-layernorm">Layer normalization</a></li>
+  <li><a href="#sec-remaining" id="toc-sec-remaining" class="nav-link" data-scroll-target="#sec-remaining">The remaining ingredients</a></li>
+  </ul></li>
+  <li><a href="#sec-block" id="toc-sec-block" class="nav-link" data-scroll-target="#sec-block">The Transformer Layer Block</a></li>
+  <li><a href="#sec-modifications" id="toc-sec-modifications" class="nav-link" data-scroll-target="#sec-modifications">Transformer Block Modifications</a>
+  <ul class="collapse">
+  <li><a href="#sec-mod-ln" id="toc-sec-mod-ln" class="nav-link" data-scroll-target="#sec-mod-ln">1. Layer norm position</a></li>
+  <li><a href="#sec-mod-bias" id="toc-sec-mod-bias" class="nav-link" data-scroll-target="#sec-mod-bias">2. Removal of biases</a></li>
+  <li><a href="#sec-mod-glu" id="toc-sec-mod-glu" class="nav-link" data-scroll-target="#sec-mod-glu">3. Gated feed-forward networks</a></li>
+  <li><a href="#sec-mod-subquadratic" id="toc-sec-mod-subquadratic" class="nav-link" data-scroll-target="#sec-mod-subquadratic">4. Sub-quadratic self-attention</a></li>
+  <li><a href="#sec-mod-gqa" id="toc-sec-mod-gqa" class="nav-link" data-scroll-target="#sec-mod-gqa">5. Grouped-query attention</a></li>
+  </ul></li>
+  <li><a href="#sec-encoder-only" id="toc-sec-encoder-only" class="nav-link" data-scroll-target="#sec-encoder-only">Encoder-Only Transformers</a></li>
+  <li><a href="#sec-pretraining" id="toc-sec-pretraining" class="nav-link" data-scroll-target="#sec-pretraining">Pre-Training</a>
+  <ul class="collapse">
+  <li><a href="#sec-pretraining-how" id="toc-sec-pretraining-how" class="nav-link" data-scroll-target="#sec-pretraining-how">Pre-training on text with language modeling</a></li>
+  <li><a href="#sec-bert" id="toc-sec-bert" class="nav-link" data-scroll-target="#sec-bert">BERT</a></li>
+  </ul></li>
+  <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 8: Transformers, Part 1</h1>
+</div>
+<p><strong>Overview.</strong> Self-attention (Lecture 7) is associated with a neural network architecture in the same way a convolution is associated with a convolutional network: the architecture is the <strong>transformer</strong> <span class="citation" data-cites="vaswani2017attention">(<a href="02-mlp-backprop.html#ref-vaswani2017attention" role="doc-biblioref">Vaswani et al. 2017</a>)</span>. We have already seen almost all of its ingredients, so we first list them — adding one new piece, layer normalization — and describe how they are stitched into a repeating transformer layer block. We then survey five modifications to that block that have become common since the transformer was proposed. Finally we turn to what a transformer can do: the encoder-only transformer for classifying, labeling, and extracting from sequences, and the idea of pre-training, culminating in masked language modeling and BERT.</p>
+<section id="sec-ingredients" class="level2">
+<h2 class="anchored" data-anchor-id="sec-ingredients">The Transformer’s Ingredients</h2>
+<p>We already know almost everything needed to build a transformer, so much of this section is a review; we mainly need to write the pieces down and add one new one. The first ingredient is <strong>self-attention</strong>, covered at the end of Lecture 7. Given an input sequence <span class="math inline">\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T \in \mathbb{R}^d</span>, self-attention projects each element three ways, using learned matrices, into queries, keys, and values:</p>
+<p><span class="math display">\bm{q}_t = \bm{W}_Q \bm{x}_t, \qquad \bm{k}_t = \bm{W}_K \bm{x}_t, \qquad \bm{v}_t = \bm{W}_V \bm{x}_t,</span></p>
+<p>with <span class="math inline">\bm{W}_Q, \bm{W}_K \in \mathbb{R}^{d_k \times d}</span> and <span class="math inline">\bm{W}_V \in \mathbb{R}^{d_v \times d}</span>; these three matrices are the only trainable parameters. Each projection is applied independently to every element of the sequence, so the whole operation is parallel across positions. The comparison function is the scaled dot product,</p>
+<p><span class="math display">a_{ij} = \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top \bm{k}_j}{\sqrt{d_k}},</span></p>
+<p>and the reduction function applies a softmax to the scores and averages the values, <span class="math inline">\operatorname{softmax}(\bm{a}) \cdot V</span>. Every output element is a softmax-weighted average of the values.</p>
+<p>Because self-attention is a set operation, it ignores the order of the input sequence, so the second ingredient is a <strong>position encoding</strong> to inject order — absolute learned embeddings, relative encodings with an embedding or a bias, or rotary encodings (RoPE), all from Lecture 7. The third ingredient is <strong>multi-headed self-attention</strong>: rather than one self-attention, apply <span class="math inline">H</span> in parallel with independent query, key, and value matrices and project the concatenated results back to <span class="math inline">\mathbb{R}^{d_v}</span> with an output matrix <span class="math inline">\bm{W}_O</span>, much as a convolutional network uses multiple channels.</p>
+<section id="sec-layernorm" class="level3">
+<h3 class="anchored" data-anchor-id="sec-layernorm">Layer normalization</h3>
+<p>The fourth ingredient, and the one genuinely new one, is <strong>layer normalization</strong> <span class="citation" data-cites="ba2016layer">(<a href="02-mlp-backprop.html#ref-ba2016layer" role="doc-biblioref">Ba et al. 2016</a>)</span>. Recall batch normalization (Lecture 5): it made a layer’s activations approximately zero-mean and unit-variance so their scale would not grow or shrink through the forward and backward passes, but it computed the mean and variance over the batch — so the processing of one example depended on the others in the batch, which is undesirable. Layer normalization makes a very small change: normalize each activation by the statistics of its own feature vector rather than the batch.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> <em>Layer normalization</em> normalizes each element of a sequence over its feature dimension. Given a length-<span class="math inline">T</span> sequence <span class="math inline">\bm{h}_1, \dots, \bm{h}_T \in \mathbb{R}^d</span>, it computes, for each step <span class="math inline">t</span>, <span class="math display">\mu_t = \frac{1}{d} \sum_{i=1}^{d} h_{t,i}, \qquad \sigma_t = \sqrt{\frac{1}{d} \sum_{i=1}^{d} (h_{t,i} - \mu_t)^2},</span> the mean and standard deviation over the <span class="math inline">d</span> feature values, and outputs <span class="math display">\operatorname{layernorm}(\bm{h})_t = \bm{\gamma} \odot \frac{\bm{h}_t - \mu_t}{\sigma_t} + \bm{\beta}.</span></p>
+</div>
+<p>As in batch normalization, <span class="math inline">\bm{\gamma}</span> and <span class="math inline">\bm{\beta}</span> are learned parameters that let the model rescale and shift the normalized activation rather than forcing it to be exactly zero-mean and unit-variance. The only difference from batch normalization is the axis over which the statistics are computed — the feature axis instead of the batch axis. This normalizing each feature vector on its own assumes the features are distributed the same way; that assumption is not really valid, but the normalization is helpful for training, and normalizing over the batch is the alternative we already rejected.</p>
+</section>
+<section id="sec-remaining" class="level3">
+<h3 class="anchored" data-anchor-id="sec-remaining">The remaining ingredients</h3>
+<p>The fifth ingredient is the <strong>residual connection</strong> from Lecture 5: for a transformation <span class="math inline">f</span>, replace <span class="math inline">f(\bm{x})</span> with <span class="math inline">f(\bm{x}) + \bm{x}</span>, adding a skip path from input to output that helps stabilize training and lets gradients flow.</p>
+<p>The sixth is the <strong>position-wise feed-forward network</strong>. Just as the query, key, and value projections are applied independently to each element of the sequence, a position-wise feed-forward network applies a whole small MLP independently to each element. Using a single hidden layer,</p>
+<p><span class="math display">\bm{h}_t = \bm{W}_2\, \phi(\bm{W}_1 \bm{x}_t + \bm{b}_1) + \bm{b}_2,</span></p>
+<p>with a nonlinearity <span class="math inline">\phi</span> such as a ReLU, which is what the original transformer used. This is an ordinary MLP; the only twist is that we feed each sequence element through it separately, hence “position-wise.”</p>
+<p>The last ingredients are the <strong>embeddings</strong> for the input (Lecture 6) and, since we usually do something classification-like, a <strong>classifier</strong> on the output.</p>
+<p>That is the full set. Layer normalization is a small tweak on batch normalization, and the position-wise feed-forward network is a small tweak on an ordinary MLP; everything else we have seen before.</p>
+<hr>
+</section>
+</section>
+<section id="sec-block" class="level2">
+<h2 class="anchored" data-anchor-id="sec-block">The Transformer Layer Block</h2>
+<p>As with the ResNet block (Lecture 5), we assemble the ingredients into a block and repeat it. The transformer is unusually uniform: where a convolutional network began with a large convolution and pooling and ended with global pooling, the transformer is just the same block, in the same dimensions, over and over, between input embeddings and an output.</p>
+<section id="transformer-layer-block" class="level4 algorithm">
+<h4 class="anchored" data-anchor-id="transformer-layer-block">Transformer layer block</h4>
+<p><strong>Input:</strong> a sequence. Apply, in order:</p>
+<ol type="1">
+<li>Multi-headed self-attention, wrapped in a residual connection, then layer normalization.</li>
+<li>A position-wise feed-forward network, wrapped in a residual connection, then layer normalization.</li>
+</ol>
+<p><strong>Output:</strong> a sequence of the same length. Repeat the block <span class="math inline">L</span> times, each with its own parameters.</p>
+</section>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 760 220" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="bA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Transformer layer block</text>
+<text x="24" y="119" font-size="14" fill="#205279" font-weight="600">input</text>
+<line x1="66" y1="114.0" x2="88" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"></line>
+<rect x="88" y="90" width="92" height="48" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="134" y="119" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">MHSA</text>
+<line x1="180" y1="114.0" x2="198" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"></line>
+<circle cx="211" cy="114.0" r="13" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="211" y="119" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="224" y1="114.0" x2="242" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"></line>
+<rect x="242" y="90" width="70" height="48" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="277" y="118" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">layer norm</text>
+<line x1="312" y1="114.0" x2="330" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"></line>
+<rect x="330" y="90" width="88" height="48" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="374" y="119" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">FFN</text>
+<line x1="418" y1="114.0" x2="436" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"></line>
+<circle cx="449" cy="114.0" r="13" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="449" y="119" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="462" y1="114.0" x2="480" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"></line>
+<rect x="480" y="90" width="70" height="48" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="515" y="118" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">layer norm</text>
+<line x1="550" y1="114.0" x2="574" y2="114.0" stroke="#888" stroke-width="1.5" marker-end="url(#bA)"></line>
+<text x="576" y="119" font-size="14" fill="#794520" font-weight="600">out</text>
+<path d="M80,84 Q80,60 146,60 Q211,60 211,101.0" fill="none" stroke="#8457C7" stroke-width="1.6" marker-end="url(#bA)"></path>
+<path d="M322,84 Q322,60 386,60 Q449,60 449,101.0" fill="none" stroke="#8457C7" stroke-width="1.6" marker-end="url(#bA)"></path>
+<path d="M66,150 L66,160 L550,160 L550,150" fill="none" stroke="#888" stroke-width="1.2"></path>
+<text x="308" y="178" text-anchor="middle" font-size="14" fill="#666">repeat L times</text>
+<text x="20" y="200" font-size="13" fill="#666">Purple arcs are residual (skip) connections. Only self-attention mixes information across positions.</text>
+</svg></div>
+<p>Stacking <span class="math inline">L</span> blocks gives the transformer. Each block has its own parameters — the query/key/value projections and output matrix of multi-headed self-attention, the <span class="math inline">\bm{\gamma}</span> and <span class="math inline">\bm{\beta}</span> of the layer norms, and the weights and biases of the feed-forward network — but the structure is identical, and the dimension along the stack, often called <span class="math inline">d_{\text{model}}</span>, does not change. Why residual connections and layer norms sit exactly where they do is a matter of trial and error and empirical results; this is the original arrangement, and we return to variations below.</p>
+<p>What does the transformer actually do? Of its parts, only self-attention combines information across positions — through the softmax-weighted average, it mixes information over time. The layer norm and the position-wise feed-forward network do not: each acts on one position independently, so shuffling their input sequence would simply shuffle the output the same way. The residual connections and layer norms are there mainly for stability, to let us stack many blocks and still backpropagate gradients effectively; the feed-forward networks transform each activation independently.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>On the name.</strong> “Transformer” is a generic name — many things transform things. The explanation offered for it is that the architecture transforms sequences: self-attention mixes information across a sequence to produce a new one.</p>
+</div>
+</div>
+<p>Every part of the block is parallelizable over time. The position-wise feed-forward network and the layer norm compute each position independently, and multi-headed self-attention computes each output position independently as well: to produce output <span class="math inline">\bm{h}_t</span> one does not need any other output position, only the full input sequence. The transformer was introduced as an alternative to recurrent networks precisely for this reason. A recurrent network is inherently sequential — computing <span class="math inline">\bm{h}_t</span> requires <span class="math inline">\bm{h}_{t-1}</span>, and so on — which limits parallelism and makes propagating information over time require repeated recurrent steps, whereas a transformer bridges positions with a single application of self-attention.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>A stable architecture.</strong> The transformer was proposed in 2017. In the years since, the architecture has changed remarkably little — a transformer trained today looks much like the original, in contrast to the rapid churn of convolutional and recurrent architectures in the years before it. The modifications below are the changes that have gained traction; even so, a transformer built exactly as originally proposed would still work.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="sec-modifications" class="level2">
+<h2 class="anchored" data-anchor-id="sec-modifications">Transformer Block Modifications</h2>
+<p>Five modifications to the transformer block have become common enough to be worth knowing. Together they cover most of the differences between the original transformer and current models.</p>
+<section id="sec-mod-ln" class="level3">
+<h3 class="anchored" data-anchor-id="sec-mod-ln">1. Layer norm position</h3>
+<p>In the original block, each layer norm comes <em>after</em> a residual connection wrapped around some nonlinear processing; this is now called <strong>post-layer norm</strong>. The alternative, <strong>pre-layer norm</strong>, puts the layer norm <em>before</em> the processing. The consequential part is not the reordering itself but that the residual connection is then routed <em>around</em> the layer norm.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 760 300" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="pA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Layer norm position: post-LN vs pre-LN</text>
+<text x="20" y="78" font-size="14" font-weight="600" fill="#792051">post-LN</text>
+<line x1="92" y1="80.0" x2="108" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="108" y="60" width="72" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="144" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">MHSA</text>
+<line x1="180" y1="80.0" x2="194" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<circle cx="206" cy="80.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="206" y="85" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="218" y1="80.0" x2="232" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="232" y="60" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="264" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="296" y1="80.0" x2="310" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="310" y="60" width="64" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="342" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">FFN</text>
+<line x1="374" y1="80.0" x2="388" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<circle cx="400" cy="80.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="400" y="85" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="412" y1="80.0" x2="426" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="426" y="60" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="458" y="85" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="490" y1="80.0" x2="506" y2="80.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<path d="M100,56 Q100,38 153,38 Q206,38 206,69.0" fill="none" stroke="#8457C7" stroke-width="1.5" marker-end="url(#pA)"></path>
+<path d="M302,56 Q302,38 351,38 Q400,38 400,69.0" fill="none" stroke="#8457C7" stroke-width="1.5" marker-end="url(#pA)"></path>
+<text x="20" y="208" font-size="14" font-weight="600" fill="#207965">pre-LN</text>
+<line x1="92" y1="210.0" x2="108" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="108" y="190" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="140" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="172" y1="210.0" x2="186" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="186" y="190" width="72" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="222" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">MHSA</text>
+<line x1="258" y1="210.0" x2="272" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<circle cx="284" cy="210.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="284" y="215" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="296" y1="210.0" x2="310" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="310" y="190" width="64" height="40" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="342" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">LN</text>
+<line x1="374" y1="210.0" x2="388" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<rect x="388" y="190" width="64" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="420" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">FFN</text>
+<line x1="452" y1="210.0" x2="466" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<circle cx="478" cy="210.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="478" y="215" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<line x1="490" y1="210.0" x2="506" y2="210.0" stroke="#888" stroke-width="1.5" marker-end="url(#pA)"></line>
+<path d="M98,186 Q98,166 191,166 Q284,166 284,199.0" fill="none" stroke="#8457C7" stroke-width="2" marker-end="url(#pA)"></path>
+<path d="M298,186 Q298,166 388,166 Q478,166 478,199.0" fill="none" stroke="#8457C7" stroke-width="2" marker-end="url(#pA)"></path>
+<text x="20" y="285" font-size="13" fill="#666">Pre-LN routes the residual around the layer norm, leaving an uninterrupted residual stream (bold purple).</text>
+</svg></div>
+<p>With pre-layer norm there is a path from the output all the way back to the input with no processing on it at all — an <strong>uninterrupted residual stream</strong>. This relies on a convention we have only stated in passing: the output dimension of multi-headed self-attention is set equal to the input dimension <span class="math inline">d</span> (the <span class="math inline">d_{\text{model}}</span> above), so, together with layer norm and a feed-forward network that also preserve the dimension, no projection is needed on the residual path and it stays clean. A clean residual path lets gradients backpropagate from output to input directly, which may help train deeper and more stable models. Whether pre- or post-layer norm trains better is hard to state definitively, since training stability depends on initialization, optimizer, and hyperparameters; but pre-layer norm blocks have become more common. One consequence is worth noting: since the residual stream is uninterrupted and begins at the embeddings, the transformer effectively takes the embeddings, computes something from them, adds it back, and repeats — incremental processing of a running representation rather than wholesale replacement.</p>
+</section>
+<section id="sec-mod-bias" class="level3">
+<h3 class="anchored" data-anchor-id="sec-mod-bias">2. Removal of biases</h3>
+<p>The block has biases in two places: the feed-forward network and the layer norm. Dropping the feed-forward biases gives <span class="math inline">\bm{W}_2\, \phi(\bm{W}_1 \bm{x}_t)</span>; dropping the layer-norm bias <span class="math inline">\bm{\beta}</span> gives <span class="math inline">\bm{\gamma} \odot (\bm{h}_t - \mu_t)/\sigma_t</span>, which is called <strong>RMSNorm</strong> <span class="citation" data-cites="zhang2019root">(<a href="02-mlp-backprop.html#ref-zhang2019root" role="doc-biblioref">Zhang and Sennrich 2019</a>)</span>, since it divides by a root-mean-square quantity. If a model with biases and a model without them work about the same, the one without is preferable — fewer parameters and slightly cheaper. In practice removing the biases does not hurt, plausibly because a transformer can build a constant feature that acts as a bias when it meets a weight matrix, or because the many layer norms make biases redundant. This change is widespread.</p>
+</section>
+<section id="sec-mod-glu" class="level3">
+<h3 class="anchored" data-anchor-id="sec-mod-glu">3. Gated feed-forward networks</h3>
+<p>The third change replaces the feed-forward network’s nonlinearity with a <strong>gated linear unit</strong>, a class of nonlinearities rather than a single one. Assuming no biases, the gated feed-forward network is</p>
+<div class="boxed-eq">
+<p><span class="math display">\bm{W}_3\big(\phi(\bm{W}_2 \bm{x}_t) \odot \bm{W}_1 \bm{x}_t\big),</span></p>
+</div>
+<p>where <span class="math inline">\bm{W}_1 \bm{x}_t</span> is a plain linear transformation, <span class="math inline">\phi(\bm{W}_2 \bm{x}_t)</span> is a second linear transformation passed through a nonlinearity, the two are multiplied element-wise (the “gating”), and <span class="math inline">\bm{W}_3</span> projects the result to the output <span class="citation" data-cites="shazeer2020glu">(<a href="02-mlp-backprop.html#ref-shazeer2020glu" role="doc-biblioref">Shazeer 2020</a>)</span>. The nonlinearity people most often use is <strong>Swish</strong>, applied element-wise as <span class="math inline">\phi(x) = x\,\sigma(x)</span>. Recall that multiplying <span class="math inline">x</span> by the Heaviside step function would give a ReLU; a sigmoid is a soft step, so Swish looks like a soft ReLU — dipping slightly negative before rising. A gated feed-forward network with a Swish nonlinearity is often called a <strong>SwiGLU</strong>. Unlike the previous two changes, switching to a gated linear unit does seem to produce better models, so it is now widely used.</p>
+</section>
+<section id="sec-mod-subquadratic" class="level3">
+<h3 class="anchored" data-anchor-id="sec-mod-subquadratic">4. Sub-quadratic self-attention</h3>
+<p>Self-attention is quadratic in the sequence length: it computes a query–key dot product for every pair of positions, <span class="math inline">T \times T</span> of them. This is a modification people sometimes make and sometimes do not, and it helps to see why it is often unnecessary before seeing what it is.</p>
+<p>Two observations temper the concern. First, for typical transformer dimensions — the width <span class="math inline">d_{\text{model}}</span> along the residual stream and the hidden width <span class="math inline">d_{\text{ff}}</span> of the feed-forward networks — and modest sequence lengths (say <span class="math inline">T &lt; 1000</span>), the compute spent in the feed-forward networks is much greater than the compute spent in multi-headed self-attention; the quadratic term is not where most of the cost is. Second, the quadratic <em>memory</em> cost of materializing the <span class="math inline">T \times T</span> attention matrices — <span class="math inline">L \times H \times T \times T</span> values across <span class="math inline">L</span> blocks and <span class="math inline">H</span> heads — can be avoided by being careful about where intermediate values are stored on the hardware. On a GPU, moving data between the large VRAM and the small on-chip SRAM is far more expensive than the arithmetic itself, and by never materializing the full attention matrices — computing serially and keeping the working set small — the communication cost is controlled. This is <strong>Flash Attention</strong> <span class="citation" data-cites="dao2022flashattention">(<a href="02-mlp-backprop.html#ref-dao2022flashattention" role="doc-biblioref">Dao et al. 2022</a>)</span>.</p>
+<p>For sequences that are not modest — a document of many thousands of words — the quadratic time cost does matter, and there are many approaches to it. The simplest is <strong>local self-attention</strong>: rather than attending globally, where every output depends on every input, attend only over a window around the current position. Drawn as a <span class="math inline">T \times T</span> attention matrix, only a band around the diagonal is computed, so the cost becomes roughly <span class="math inline">K \cdot T</span> for a window of width <span class="math inline">K</span> — linear. This resembles a convolution, though it is not one: within the window it still computes a softmax-weighted average over query–key dot products rather than applying a fixed kernel. What is lost is global visibility: the path length is no longer <span class="math inline">1</span> but grows as in a convolutional network. To keep long-range dependencies reachable, a common pattern interleaves mostly local blocks with the occasional global one.</p>
+</section>
+<section id="sec-mod-gqa" class="level3">
+<h3 class="anchored" data-anchor-id="sec-mod-gqa">5. Grouped-query attention</h3>
+<p>Recall that multi-headed self-attention gives every head its own queries, keys, and values, via <span class="math inline">H</span> separate query, key, and value matrices. Two relaxations reduce the number of distinct keys and values.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 720 300" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Multi-head → multi-query → grouped-query attention</text>
+<text x="24" y="91" font-size="13" fill="#207965" font-weight="600">values</text>
+<text x="24" y="143" font-size="13" fill="#205279" font-weight="600">keys</text>
+<text x="24" y="195" font-size="13" fill="#442079" font-weight="600">queries</text>
+<text x="140" y="56" text-anchor="middle" font-size="16" font-weight="600" fill="#333">MHSA</text>
+<rect x="96" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"></rect>
+<rect x="118" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"></rect>
+<rect x="140" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"></rect>
+<rect x="162" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"></rect>
+<rect x="96" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="118" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="140" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="162" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="96" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="118" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="140" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="162" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<text x="140" y="226" text-anchor="middle" font-size="12" fill="#666">heads</text>
+<text x="374" y="56" text-anchor="middle" font-size="16" font-weight="600" fill="#333">MQA</text>
+<rect x="363.0" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"></rect>
+<rect x="363.0" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="330" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="352" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="374" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="396" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<text x="374" y="226" text-anchor="middle" font-size="12" fill="#666">heads</text>
+<text x="596" y="56" text-anchor="middle" font-size="16" font-weight="600" fill="#333">GQA</text>
+<rect x="563.0" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"></rect>
+<rect x="607.0" y="74" width="14" height="26" rx="2" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.3"></rect>
+<rect x="563.0" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="607.0" y="126" width="14" height="26" rx="2" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="552" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="574" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="596" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<rect x="618" y="178" width="14" height="26" rx="2" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.3"></rect>
+<text x="596" y="226" text-anchor="middle" font-size="12" fill="#666">heads</text>
+<text x="20" y="290" font-size="13" fill="#666">GQA uses G groups of keys/values (here 2) with a separate query per head; G=1 is MQA, G=H is MHSA.</text>
+</svg></div>
+<p><strong>Multi-query attention</strong> keeps a different query per head but shares a single set of keys and values across all heads <span class="citation" data-cites="shazeer2019fast">(<a href="02-mlp-backprop.html#ref-shazeer2019fast" role="doc-biblioref">Shazeer 2019</a>)</span>. This saves some compute, since the input is projected to keys and values only once, and — more importantly on hardware — it reduces how many distinct objects must be stored and moved in memory, which is especially beneficial for autoregressive prediction (Lecture 9). It does produce models that work slightly worse, since sharing all keys and values may be too strong an assumption. <strong>Grouped-query attention</strong> relaxes this: instead of one shared set of keys and values, use <span class="math inline">G</span> groups, each with its own keys and values, while keeping a separate query per head <span class="citation" data-cites="ainslie2023gqa">(<a href="02-mlp-backprop.html#ref-ainslie2023gqa" role="doc-biblioref">Ainslie et al. 2023</a>)</span>. With <span class="math inline">H</span> heads and <span class="math inline">G</span> groups (where <span class="math inline">G</span> divides <span class="math inline">H</span>), <span class="math inline">G = 1</span> is multi-query attention and <span class="math inline">G = H</span> is ordinary multi-headed self-attention, so the number of groups interpolates between them, recovering most of the speed and memory benefit with less loss in quality.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>A common origin.</strong> Several of these modifications — gated linear units, RMSNorm, multi-query attention, and relative attention biases — trace to the same researcher, Noam Shazeer.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="sec-encoder-only" class="level2">
+<h2 class="anchored" data-anchor-id="sec-encoder-only">Encoder-Only Transformers</h2>
+<p>We can now build transformers, but not yet do anything with them. The transformer was originally proposed with an encoder–decoder architecture, like the encoder–decoder RNN of Lecture 6, but the simplest way to use one is the <strong>encoder-only transformer</strong> — so named because it uses only the encoder part of that original design.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> An <em>encoder-only transformer</em>, or <em>encoder</em>, is a transformer layer block repeated <span class="math inline">L</span> times. It takes an input sequence of length <span class="math inline">T</span> and produces an output sequence of length <span class="math inline">T</span>.</p>
+</div>
+<p>Because the input and output sequences have the same length, with a one-to-one correspondence between positions, an encoder supports the same kinds of tasks as a recurrent network that maps a length-<span class="math inline">T</span> sequence to a length-<span class="math inline">T</span> sequence.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 720 340" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="tA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Uses of an encoder-only transformer</text>
+<rect x="40" y="64" width="250" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="165" y="91" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<text x="48" y="126" font-size="12" fill="#205279">the</text>
+<line x1="56" y1="108" x2="56" y2="110" stroke="#bbb" stroke-width="1"></line>
+<text x="96" y="126" font-size="12" fill="#205279">food</text>
+<line x1="104" y1="108" x2="104" y2="110" stroke="#bbb" stroke-width="1"></line>
+<text x="144" y="126" font-size="12" fill="#205279">was</text>
+<line x1="152" y1="108" x2="152" y2="110" stroke="#bbb" stroke-width="1"></line>
+<text x="192" y="126" font-size="12" fill="#205279">good</text>
+<line x1="200" y1="108" x2="200" y2="110" stroke="#bbb" stroke-width="1"></line>
+<text x="240" y="126" font-size="12" fill="#205279">[CLS]</text>
+<line x1="248" y1="108" x2="248" y2="110" stroke="#bbb" stroke-width="1"></line>
+<rect x="232" y="30" width="70" height="26" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
+<text x="267" y="47" text-anchor="middle" font-size="11" font-weight="600" fill="#792051">classifier</text>
+<line x1="280" y1="64" x2="280" y2="56" stroke="#888" stroke-width="1.5" marker-end="url(#tA)"></line>
+<text x="330" y="90" font-size="15" fill="#333">sequence classification</text>
+<rect x="40" y="170" width="250" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="165" y="197" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<text x="150" y="160" font-size="12" fill="#794520">start   end</text>
+<line x1="52" y1="170" x2="52" y2="162" stroke="#bbb" stroke-width="1"></line>
+<line x1="82" y1="170" x2="82" y2="162" stroke="#bbb" stroke-width="1"></line>
+<line x1="112" y1="170" x2="112" y2="162" stroke="#bbb" stroke-width="1"></line>
+<line x1="142" y1="170" x2="142" y2="162" stroke="#bbb" stroke-width="1"></line>
+<line x1="172" y1="170" x2="172" y2="162" stroke="#bbb" stroke-width="1"></line>
+<line x1="202" y1="170" x2="202" y2="162" stroke="#bbb" stroke-width="1"></line>
+<line x1="232" y1="170" x2="232" y2="162" stroke="#bbb" stroke-width="1"></line>
+<line x1="262" y1="170" x2="262" y2="162" stroke="#bbb" stroke-width="1"></line>
+<text x="48" y="232" font-size="12" fill="#205279">question</text>
+<text x="160" y="232" font-size="12" fill="#205279">context</text>
+<line x1="52" y1="214" x2="52" y2="216" stroke="#bbb" stroke-width="1"></line>
+<line x1="82" y1="214" x2="82" y2="216" stroke="#bbb" stroke-width="1"></line>
+<line x1="112" y1="214" x2="112" y2="216" stroke="#bbb" stroke-width="1"></line>
+<line x1="142" y1="214" x2="142" y2="216" stroke="#bbb" stroke-width="1"></line>
+<line x1="172" y1="214" x2="172" y2="216" stroke="#bbb" stroke-width="1"></line>
+<line x1="202" y1="214" x2="202" y2="216" stroke="#bbb" stroke-width="1"></line>
+<line x1="232" y1="214" x2="232" y2="216" stroke="#bbb" stroke-width="1"></line>
+<line x1="262" y1="214" x2="262" y2="216" stroke="#bbb" stroke-width="1"></line>
+<text x="330" y="196" font-size="15" fill="#333">span extraction</text>
+<rect x="40" y="276" width="250" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="165" y="303" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<text x="52" y="268" font-size="11" fill="#794520">article</text>
+<line x1="58" y1="276" x2="58" y2="270" stroke="#bbb" stroke-width="1"></line>
+<text x="108" y="268" font-size="11" fill="#794520">noun</text>
+<line x1="114" y1="276" x2="114" y2="270" stroke="#bbb" stroke-width="1"></line>
+<text x="164" y="268" font-size="11" fill="#794520">verb</text>
+<line x1="170" y1="276" x2="170" y2="270" stroke="#bbb" stroke-width="1"></line>
+<text x="220" y="268" font-size="11" fill="#794520">adj</text>
+<line x1="226" y1="276" x2="226" y2="270" stroke="#bbb" stroke-width="1"></line>
+<text x="52" y="338" font-size="12" fill="#205279">the</text>
+<line x1="58" y1="320" x2="58" y2="322" stroke="#bbb" stroke-width="1"></line>
+<text x="108" y="338" font-size="12" fill="#205279">food</text>
+<line x1="114" y1="320" x2="114" y2="322" stroke="#bbb" stroke-width="1"></line>
+<text x="164" y="338" font-size="12" fill="#205279">was</text>
+<line x1="170" y1="320" x2="170" y2="322" stroke="#bbb" stroke-width="1"></line>
+<text x="220" y="338" font-size="12" fill="#205279">good</text>
+<line x1="226" y1="320" x2="226" y2="322" stroke="#bbb" stroke-width="1"></line>
+<text x="330" y="302" font-size="15" fill="#333">sequence labeling</text>
+</svg></div>
+<ul>
+<li><strong>Sequence classification.</strong> Append a special <strong>CLS token</strong> to the input — for example, “the food was good <code>&lt;CLS&gt;</code>” — and feed the output vector at that position into a classifier. The CLS position acts as a summary of the whole sequence, as the final hidden state did for a recurrent classifier (Lecture 6). This supports tasks such as sentiment analysis.</li>
+<li><strong>Span extraction.</strong> Given a question followed by a context paragraph, and knowing the answer appears in the context, classify each output position as the start of the answer span, the end, or neither. For “so-and-so was born in 1953” with the question “when was so-and-so born?”, the model marks the start and end of “1953.” Nothing new is generated; a region of the input is identified.</li>
+<li><strong>Sequence labeling.</strong> Output a label for every input position — for instance, part-of-speech tags: “the” is an article, “food” a noun, “was” a verb, “good” an adjective.</li>
+</ul>
+<p>An encoder-only transformer cannot generate a new sequence of a different length, but it can classify a whole sequence, label each position, or extract a span.</p>
+<hr>
+</section>
+<section id="sec-pretraining" class="level2">
+<h2 class="anchored" data-anchor-id="sec-pretraining">Pre-Training</h2>
+<p>One more ingredient matters when working with transformers, though it is not architectural: <strong>pre-training</strong>. Suppose we care about a task, such as sentiment classification, and can collect some labeled data for it. Language is complicated, and even all the labeled data we have may not be enough to train a good model. Pre-training improves performance without collecting more labeled data for the target task.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> <em>Pre-training</em> is the first step of <em>transfer learning</em>: train the model on one task, then continue training — <em>fine-tune</em> — on the target task, which may have far less labeled data.</p>
+</div>
+<p>Why should this help? The transformer has a <strong>limited inductive bias</strong>. A convolutional network’s inductive bias is locality and translation invariance; a recurrent network’s is that each position depends on everything before it. The transformer says only that every output may depend on every input — a weak assumption. Whatever structure the target problem has, the model must learn it from the target data: for sentiment analysis on English text, it would have to learn the grammar of English and the meaning of words from the labeled sentiment data alone. Pre-training can instead teach that structure — the meaning of words, how grammar works — beforehand, relieving the pressure on the small target dataset. Often this structure can be learned from a large, data-rich, and possibly <strong>unlabeled</strong> task, where “unlabeled” means we did not pay anyone to annotate it — text collected from the internet, for instance. Empirically, pre-training done well can improve performance, use less labeled data, and converge faster.</p>
+<section id="sec-pretraining-how" class="level3">
+<h3 class="anchored" data-anchor-id="sec-pretraining-how">Pre-training on text with language modeling</h3>
+<p>For images, the long-standing recipe was to pre-train a convolutional network on a large generic classification task such as ImageNet — around a million images across a thousand classes — then discard the classification head, attach a new one, and fine-tune on the target task. Text has no such giant labeled dataset, but there is an enormous amount of unlabeled text. We have already seen a way to train a model on unlabeled text: <strong>language modeling</strong> (Lecture 6), predicting the next token,</p>
+<p><span class="math display">p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1),</span></p>
+<p>which conditions on the past and requires no additional labels — given a trillion words of text, we can train a language model on all of them.</p>
+<p>Autoregressive next-token prediction is not the only option. Since the joint probability of a sequence can be decomposed in any order (Lecture 6), we can train a model to condition on more of the sequence. In the extreme, we predict a token given <em>every other token</em> in the sequence — the full past and future, everything except the token itself — which is <strong>masked language modeling</strong>:</p>
+<div class="boxed-eq">
+<p><span class="math display">p(\bm{x}_t \mid \bm{x}_T, \bm{x}_{T-1}, \dots, \bm{x}_{t+1}, \bm{x}_{t-1}, \dots, \bm{x}_1).</span></p>
+</div>
+<p>This is a valid distribution to model and needs no additional labels. Modeling it requires bidirectionality — conditioning on both sides of a position — which an encoder-only transformer has built in, since every output position already depends on every input position.</p>
+</section>
+<section id="sec-bert" class="level3">
+<h3 class="anchored" data-anchor-id="sec-bert">BERT</h3>
+<p>There is a wrinkle: if we feed the full input sequence in and ask the model to predict a token given every other token, the model can see the answer, because we fed it in. The model that popularized masked language modeling for pre-training, <strong>BERT</strong> (Bidirectional Encoder Representations from Transformers) <span class="citation" data-cites="devlin2019bert">(<a href="02-mlp-backprop.html#ref-devlin2019bert" role="doc-biblioref">Devlin et al. 2019</a>)</span>, addresses this by corrupting the input first.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 680 270" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="mkA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">BERT: masked language modeling</text>
+<rect x="60" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="100" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">the</text>
+<rect x="155" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="195" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">cat</text>
+<rect x="250" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="290" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">sat</text>
+<rect x="345" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="385" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">on</text>
+<rect x="440" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="480" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">the</text>
+<rect x="535" y="60" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="575" y="79" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">mat</text>
+<text x="345" y="104" text-anchor="middle" font-size="15" fill="#555">mask 15%</text>
+<rect x="60" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="100" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">the</text>
+<rect x="155" y="112" width="80" height="30" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="195" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">[MASK]</text>
+<rect x="250" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="290" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">sat</text>
+<rect x="345" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="385" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">on</text>
+<rect x="440" y="112" width="80" height="30" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="480" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">[MASK]</text>
+<rect x="535" y="112" width="80" height="30" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="575" y="131" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">mat</text>
+<rect x="60" y="176" width="560" height="40" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="340" y="201" text-anchor="middle" font-size="15" font-weight="600" fill="#207965">Encoder</text>
+<line x1="100" y1="142" x2="100" y2="176" stroke="#bbb" stroke-width="1"></line>
+<line x1="195" y1="142" x2="195" y2="176" stroke="#bbb" stroke-width="1"></line>
+<line x1="290" y1="142" x2="290" y2="176" stroke="#bbb" stroke-width="1"></line>
+<line x1="385" y1="142" x2="385" y2="176" stroke="#bbb" stroke-width="1"></line>
+<line x1="480" y1="142" x2="480" y2="176" stroke="#bbb" stroke-width="1"></line>
+<line x1="575" y1="142" x2="575" y2="176" stroke="#bbb" stroke-width="1"></line>
+<rect x="155" y="232" width="80" height="30" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="195" y="251" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">cat</text>
+<line x1="195" y1="216" x2="195" y2="232" stroke="#bbb" stroke-width="1"></line>
+<rect x="440" y="232" width="80" height="30" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="480" y="251" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">the</text>
+<line x1="480" y1="216" x2="480" y2="232" stroke="#bbb" stroke-width="1"></line>
+<text x="528" y="254" font-size="13" fill="#666">predict masked tokens</text>
+</svg></div>
+<p>BERT masks some input tokens and trains the model to predict them. Given “the cat sat on the mat,” it masks tokens to produce “the [MASK] sat on [MASK] mat,” and trains the encoder to maximize the probability of the missing tokens — that <span class="math inline">\bm{x}_2</span> is “cat” and <span class="math inline">\bm{x}_5</span> is “the” — given the corrupted sequence. This is not quite the masked language modeling objective above, which conditions on <em>every</em> other token: because more than one token is masked at a time, each prediction conditions on almost all the others. Masking one token at a time would match the objective exactly but would train the model to predict only one token per sequence, which is inefficient; masking more lets each sequence supply more predictions. BERT masks 15% of tokens.</p>
+<p>In implementation this is exactly the <strong>sequence labeling</strong> task from above, applied at the masked positions: with a vocabulary of <span class="math inline">|V|</span> words, predicting the missing token is <span class="math inline">|V|</span>-way classification, one label per masked position. Pre-training an encoder this way yields parameters that serve as an initialization for fine-tuning on a target task — sentiment analysis, span extraction, part-of-speech tagging — with better performance, less labeled data, and faster convergence.</p>
+<p>Why does masked language modeling teach the structure of language? To fill in a missing word, the model must use the meaning of the surrounding words: to complete “the [MASK] was fluffy and purring,” it needs to know that a fluffy, purring thing is likely a cat; to recover “on” in “the cat sat [MASK] the mat,” it needs to know that a mat is something things sit <em>on</em>. Filling in words thus forces the model to learn about word meaning and grammar. Analyses of a pre-trained BERT bear this out: individual attention heads learn interpretable patterns — one head has direct objects attending to their verbs, another has noun modifiers attending to their nouns — accurate enough that thresholding the attention weights recovers such relations well above chance <span class="citation" data-cites="clark2019what">(<a href="02-mlp-backprop.html#ref-clark2019what" role="doc-biblioref">Clark et al. 2019</a>)</span>. None of this is supervised; it emerges from masked language modeling alone.</p>
+<hr>
+</section>
+</section>
+<section id="sec-summary" class="level2">
+<h2 class="anchored" data-anchor-id="sec-summary">Summary</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Key takeaways from Lecture 8:</strong></p>
+<ul>
+<li>The <strong>transformer</strong> is built from self-attention, position encodings, multi-headed self-attention, <strong>layer normalization</strong> (which normalizes over the feature axis rather than the batch axis, unlike batch norm), residual connections, position-wise feed-forward networks, and embeddings plus a classifier.</li>
+<li>The <strong>transformer layer block</strong> applies multi-headed self-attention (with a residual connection and layer norm) then a position-wise feed-forward network (with a residual connection and layer norm), and is repeated <span class="math inline">L</span> times. Only self-attention mixes information across positions; the whole block is parallelizable over time, which motivated the transformer as an alternative to recurrent networks.</li>
+<li>Five common <strong>modifications</strong>: pre-layer norm (an uninterrupted residual stream), removing biases (<strong>RMSNorm</strong>), gated feed-forward networks (<strong>SwiGLU</strong>), sub-quadratic self-attention (Flash Attention for memory, local attention for long sequences), and <strong>grouped-query attention</strong> (interpolating between multi-head and multi-query).</li>
+<li>An <strong>encoder-only transformer</strong> maps a length-<span class="math inline">T</span> sequence to a length-<span class="math inline">T</span> sequence and supports sequence classification (via a CLS token), span extraction, and sequence labeling.</li>
+<li><strong>Pre-training</strong> is the first step of transfer learning; it helps because the transformer has a limited inductive bias, and structure can be learned from large, possibly unlabeled data. For text, one pre-trains with <strong>language modeling</strong> or <strong>masked language modeling</strong>.</li>
+<li><strong>BERT</strong> implements masked language modeling by masking 15% of tokens and predicting them — sequence labeling on the masked positions — teaching the model word meaning and grammar without supervision.</li>
+</ul>
+</div>
+</div>
+<p><strong>Next lecture:</strong> Transformers, part 2 - encoder–decoder and decoder-only transformers, and how they are used for autoregressive language modeling and generation.</p>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<div id="ref-ainslie2023gqa" class="csl-entry" role="listitem">
+Ainslie, Joshua, James Lee-Thorp, Michiel de Jong, Yury Zemlyanskiy, Federico Lebrón, and Sumit Sanghai. 2023. <span>“GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints.”</span> <em>Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing</em>.
+</div>
+<div id="ref-ba2016layer" class="csl-entry" role="listitem">
+Ba, Jimmy Lei, Jamie Ryan Kiros, and Geoffrey E Hinton. 2016. <span>“Layer Normalization.”</span> <em>arXiv Preprint arXiv:1607.06450</em>.
+</div>
+<div id="ref-clark2019what" class="csl-entry" role="listitem">
+Clark, Kevin, Urvashi Khandelwal, Omer Levy, and Christopher D Manning. 2019. <span>“What Does BERT Look at? An Analysis of BERT’s Attention.”</span> <em>Proceedings of the 2019 ACL Workshop BlackboxNLP</em>.
+</div>
+<div id="ref-dao2022flashattention" class="csl-entry" role="listitem">
+Dao, Tri, Dan Fu, Stefano Ermon, Atri Rudra, and Christopher Ré. 2022. <span>“FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness.”</span> <em>Advances in Neural Information Processing Systems</em> 35.
+</div>
+<div id="ref-devlin2019bert" class="csl-entry" role="listitem">
+Devlin, Jacob, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. <span>“BERT: Pre-Training of Deep Bidirectional Transformers for Language Understanding.”</span> <em>Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics</em>.
+</div>
+<div id="ref-shazeer2019fast" class="csl-entry" role="listitem">
+Shazeer, Noam. 2019. <span>“Fast Transformer Decoding: One Write-Head Is All You Need.”</span> <em>arXiv Preprint arXiv:1911.02150</em>.
+</div>
+<div id="ref-shazeer2020glu" class="csl-entry" role="listitem">
+Shazeer, Noam. 2020. <span>“GLU Variants Improve Transformer.”</span> <em>arXiv Preprint arXiv:2002.05202</em>.
+</div>
+<div id="ref-vaswani2017attention" class="csl-entry" role="listitem">
+Vaswani, Ashish, Noam Shazeer, Niki Parmar, et al. 2017. <span>“Attention Is All You Need.”</span> <em>Advances in Neural Information Processing Systems</em> 30.
+</div>
+<div id="ref-zhang2019root" class="csl-entry" role="listitem">
+Zhang, Biao, and Rico Sennrich. 2019. <span>“Root Mean Square Layer Normalization.”</span> <em>Advances in Neural Information Processing Systems</em> 32.
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../lectures/07-attention.html" class="pagination-link" aria-label="Lecture 7: Attention">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-title">Lecture 7: Attention</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../lectures/09-transformers-part-2-large-language-models.html" class="pagination-link" aria-label="Lecture 9: Transformers, Part 2, Large Language Models">
+        <span class="nav-page-text"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer><script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

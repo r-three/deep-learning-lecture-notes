@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="The decoder-only transformer for autoregressive generation, the causal mask and KV caching, the scaling and text-to-text framing behind large language models, prompting and in-context learning, post-training, the encoder-decoder transformer, architecture conventions, and the vision transformer.">
+
+<title>Lecture 9: Transformers, Part 2, Large Language Models – Neural Networks and Deep Learning</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" rel="next">
+<link href="../lectures/08-transformers-part-1.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-67d765188173d06cfd0f34779d32db47.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&amp;family=Source+Code+Pro:wght@400;500&amp;display=swap" rel="stylesheet">
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script><script src="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.js"></script>
+  <script>document.addEventListener("DOMContentLoaded", function () {
+ var mathElements = document.getElementsByClassName("math");
+ var macros = [];
+ for (var i = 0; i < mathElements.length; i++) {
+  var texText = mathElements[i].firstChild;
+  if (mathElements[i].tagName == "SPAN") {
+   katex.render(texText.data, mathElements[i], {
+    displayMode: mathElements[i].classList.contains('display'),
+    throwOnError: false,
+    macros: macros,
+    fleqn: false
+   });
+}}});
+  </script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@latest/dist/katex.min.css">
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../styles/custom.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../lectures/09-transformers-part-2-large-language-models.html"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">Neural Networks and Deep Learning</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <div class="dropdown">
+      <a href="" title="Share" id="quarto-navigation-tool-dropdown-0" class="quarto-navigation-tool dropdown-toggle px-1" data-bs-toggle="dropdown" aria-expanded="false" role="link" aria-label="Share"><i class="bi bi-share"></i></a>
+      <ul class="dropdown-menu" aria-labelledby="quarto-navigation-tool-dropdown-0">
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://twitter.com/intent/tweet?url=|url|">
+              <i class="bi bi-twitter pe-1"></i>
+            Twitter
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item sidebar-tools-main-item" href="https://www.linkedin.com/sharing/share-offsite/?url=|url|">
+              <i class="bi bi-linkedin pe-1"></i>
+            LinkedIn
+            </a>
+          </li>
+      </ul>
+    </div>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Introduction</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/01-intro-regression.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 1: Introduction, Linear &amp; Logistic Regression</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/02-mlp-backprop.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/03-regularization.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 3: Under/overfitting, Regularization, Numerical Stability, Autodiff</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/04-gradient-descent-adaptive-gradient-methods.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 4: Gradient Descent, Adaptive Gradient Methods</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#sec-decoder-only" id="toc-sec-decoder-only" class="nav-link active" data-scroll-target="#sec-decoder-only">The Decoder-Only Transformer</a>
+  <ul class="collapse">
+  <li><a href="#sec-causal-mask" id="toc-sec-causal-mask" class="nav-link" data-scroll-target="#sec-causal-mask">Training with a causal mask</a></li>
+  <li><a href="#sec-kv-cache" id="toc-sec-kv-cache" class="nav-link" data-scroll-target="#sec-kv-cache">KV caching</a></li>
+  </ul></li>
+  <li><a href="#sec-llm" id="toc-sec-llm" class="nav-link" data-scroll-target="#sec-llm">Scaling Up: Large Language Models</a>
+  <ul class="collapse">
+  <li><a href="#sec-scaling" id="toc-sec-scaling" class="nav-link" data-scroll-target="#sec-scaling">Unlabeled text and predictable scaling</a></li>
+  <li><a href="#sec-text-to-text" id="toc-sec-text-to-text" class="nav-link" data-scroll-target="#sec-text-to-text">Every text task is text-to-text</a></li>
+  <li><a href="#sec-prompting" id="toc-sec-prompting" class="nav-link" data-scroll-target="#sec-prompting">Prompting and in-context learning</a></li>
+  <li><a href="#sec-post-training" id="toc-sec-post-training" class="nav-link" data-scroll-target="#sec-post-training">Post-training</a></li>
+  </ul></li>
+  <li><a href="#sec-encoder-decoder" id="toc-sec-encoder-decoder" class="nav-link" data-scroll-target="#sec-encoder-decoder">The Encoder-Decoder Transformer</a></li>
+  <li><a href="#sec-conventions" id="toc-sec-conventions" class="nav-link" data-scroll-target="#sec-conventions">Transformer Architecture Conventions</a></li>
+  <li><a href="#sec-vit" id="toc-sec-vit" class="nav-link" data-scroll-target="#sec-vit">The Vision Transformer</a></li>
+  <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<style>#title-block-header { display: none; }</style>
+<div class="lecture-header">
+  <h1>Lecture 9: Transformers, Part 2, Large Language Models</h1>
+</div>
+<p><strong>Overview.</strong> In the previous lecture we built the encoder-only transformer. Here we cover two further variants and what transformers are used for. We start with the decoder-only transformer, which performs autoregressive next-token generation using the same architecture we already have, trained efficiently with a causal mask. This leads into large language models: language modeling on unlabeled text scales predictably, every text task can be cast as next-token prediction, and models are steered through prompting, in-context learning, and post-training. We then build the encoder-decoder transformer with cross-attention, note the standard conventions for a transformer’s dimensions, and close with the vision transformer, which applies the same architecture to images.</p>
+<section id="sec-decoder-only" class="level2">
+<h2 class="anchored" data-anchor-id="sec-decoder-only">The Decoder-Only Transformer</h2>
+<p>The encoder-only transformer of Lecture 8 could classify, label, and extract from sequences, but not generate a new one. We now use a transformer for <strong>sequence generation</strong>, which in this course we have called language modeling. Earlier this meant masked language modeling, filling in blanks; here we return to the older form seen with recurrent networks — given the previous words, predict the next one.</p>
+<p>Consider generating a sequence autoregressively. We begin with a beginning-of-sequence token, <code>&lt;bos&gt;</code>, since we need to feed the model something to start. Suppose it then predicts “the.” The only token it could have attended to when producing “the” is <code>&lt;bos&gt;</code> — nothing else exists yet. If it next produces “cat,” it could attend only to <code>&lt;bos&gt;</code> and “the”; producing “sat,” only to <code>&lt;bos&gt;</code>, “the,” and “cat.” Could it have attended to “on” while producing “sat”? No — “on” had not been generated yet. When a model with self-attention generates autoregressively, each generated token can attend only to past tokens, because the future tokens do not yet exist. (Contrast this with an encoder processing a full input sequence given up front, where any position can attend to any other, in any order — the encoder-only case.)</p>
+<p>Drawing this as an attention matrix, where a cell is filled if that attention is allowed, gives a lower-triangular pattern: the token generated at each row attends only to itself and the tokens before it.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 520 358" width="100%" style="max-width:520px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Decoder-only: each token attends to the past</text>
+<text x="152" y="80" text-anchor="middle" font-size="14" fill="#205279">&lt;bos&gt;</text>
+<text x="216" y="80" text-anchor="middle" font-size="14" fill="#205279">the</text>
+<text x="280" y="80" text-anchor="middle" font-size="14" fill="#205279">cat</text>
+<text x="344" y="80" text-anchor="middle" font-size="14" fill="#205279">sat</text>
+<text x="408" y="80" text-anchor="middle" font-size="14" fill="#205279">on</text>
+<text x="280" y="58" text-anchor="middle" font-size="13" fill="#666">attended-to token</text>
+<text x="50" y="194" text-anchor="middle" font-size="13" fill="#666" transform="rotate(-90 50 194)">generated token</text>
+<text x="108" y="121" text-anchor="end" font-size="14" fill="#207965">the</text>
+<rect x="120" y="90" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="184" y="90" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="248" y="90" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="312" y="90" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="376" y="90" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<text x="108" y="173" text-anchor="end" font-size="14" fill="#207965">cat</text>
+<rect x="120" y="142" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="184" y="142" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="248" y="142" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="312" y="142" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="376" y="142" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<text x="108" y="225" text-anchor="end" font-size="14" fill="#207965">sat</text>
+<rect x="120" y="194" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="184" y="194" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="248" y="194" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="312" y="194" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="376" y="194" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<text x="108" y="277" text-anchor="end" font-size="14" fill="#207965">on</text>
+<rect x="120" y="246" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="184" y="246" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="248" y="246" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="312" y="246" width="64" height="52" fill="#C9E4DE" stroke="#5795C7" stroke-width="1.2"></rect>
+<rect x="376" y="246" width="64" height="52" fill="#fff" stroke="#5795C7" stroke-width="1.2"></rect>
+<text x="20" y="322" font-size="13" fill="#666">Filled cells are allowed attention — a lower-triangular (causal) pattern.</text>
+<text x="20" y="340" font-size="13" fill="#666">No modification to the architecture.</text>
+</svg></div>
+<p>We have not changed the transformer at all. We feed in <code>&lt;bos&gt;</code>, run self-attention over that one token and the position-wise feed-forward networks, take the output representation, feed it into a classifier over the <span class="math inline">|V|</span> vocabulary entries, sample from the resulting distribution, and feed the sampled token back in. We then feed in both tokens, take the output representation at the last position, sample the next token, and repeat. The architecture is untouched; only the way we use it differs.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>There is no mask here (yet).</strong> One sometimes hears that a decoder-only transformer is “an encoder-only transformer with a causal mask.” That is misleading. A decoder-only transformer is the <em>same</em> architecture used for autoregressive generation; the causal mask, described next, is a trick for <em>training</em> it efficiently, not part of the architecture. Generation itself needs no mask — feeding tokens back in one at a time already attends only to the past.</p>
+</div>
+</div>
+<section id="sec-causal-mask" class="level3">
+<h3 class="anchored" data-anchor-id="sec-causal-mask">Training with a causal mask</h3>
+<p>We have shown how to generate from the model but not how to train it. One could train it exactly as it is used: feed in the first token, predict the second with a cross-entropy loss, feed in the first two, predict the third, and so on. This works but is sequential, processing one token at a time. There is a trick that lets us train a decoder-only transformer for autoregressive generation entirely in parallel across sequence positions — not strictly necessary, but no one omits it, since the sequential version is far less efficient.</p>
+<p>Suppose we feed in the full ground-truth sequence — say “the cat sat on the mat” — take the output activations, and train the model to predict “cat” at the second position. If we did this in an ordinary encoder-only transformer, the model could attend to the very word it is trying to predict and drive the loss to zero, but it would then fail at generation time, where the next word is not available. So we cannot simply feed in the full sequence and train for next-step prediction. Instead we force the model to have the attention pattern from the generation case above, by zeroing out the attention weights into the future.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> A <em>causal mask</em> zeroes out the attention weights to future positions in self-attention. Feeding in the full sequence and applying the causal mask lets a decoder-only transformer be trained for next-step prediction in parallel across all positions, since no position can access information from the future.</p>
+</div>
+<p>Because the position-wise feed-forward networks act on each position independently, zeroing the future attention weights is enough to prevent any position from seeing the future. Training a decoder-only transformer this way is completely parallelizable across time. This is unlike a recurrent network, whose architecture is inherently sequential — computing the hidden state <span class="math inline">\bm{h}_t</span> requires <span class="math inline">\bm{h}_{t-1}</span> — and it was one of the properties that drew people to transformers, since the hardware we train on is built for parallel computation.</p>
+</section>
+<section id="sec-kv-cache" class="level3">
+<h3 class="anchored" data-anchor-id="sec-kv-cache">KV caching</h3>
+<p>A second observation concerns generation. Do the keys and values change as more of the sequence is generated? If we have computed the keys and values for positions <span class="math inline">1</span> through <span class="math inline">3</span> and then generate position <span class="math inline">4</span>, the keys and values for <span class="math inline">1</span> through <span class="math inline">3</span> do not change: they are computed from the representations at those positions, and because the causal mask prevents positions <span class="math inline">1</span>–<span class="math inline">3</span> from attending to anything at position <span class="math inline">4</span> or beyond, those representations are unaffected by whatever comes later. So the keys and values do not change as the sequence grows, and we can <strong>cache</strong> them at test time — storing each key and value vector in memory and growing the cache with each new token, rather than recomputing the past. This is <strong>KV caching</strong>, and it saves computation during generation. The caveat is memory: for a very long sequence, each head in each layer must store key and value vectors as long as the sequence, which can become large.</p>
+<hr>
+</section>
+</section>
+<section id="sec-llm" class="level2">
+<h2 class="anchored" data-anchor-id="sec-llm">Scaling Up: Large Language Models</h2>
+<p>The next several ideas concern language models specifically and are, in a sense, somewhat apart from core deep learning — which is about optimizers and architectures like Adam and the transformer, rather than the language model itself. But language modeling has become influential enough to be worth covering.</p>
+<section id="sec-scaling" class="level3">
+<h3 class="anchored" data-anchor-id="sec-scaling">Unlabeled text and predictable scaling</h3>
+<p>To train a language model for next-token prediction, all we need is text: a textbook’s text is the training data, with no annotation of sentiment, topic, or translation required. We often call such data <strong>unlabeled</strong>, though the term is a slight misnomer, since the next word is in effect the label and a human did write the text. The point is that there is an enormous amount of it — people have been writing, and especially typing onto the internet, for a long time. Where an image-classification dataset might reach ten million labeled pairs with effort, in language modeling every next word is a target, and it is not hard to gather a trillion tokens of text, or ten trillion — six orders of magnitude more.</p>
+<p>This matters because of a theme from the start of the course: deep learning’s promise is to train larger models on larger datasets. Scaling up recurrent networks was hard — vanishing and exploding gradients made larger, deeper networks unstable, and sequential training could not be mapped efficiently onto parallel hardware. Transformers tend to be more stable, for two reasons seen earlier: the path length is always one, so mixing information across time takes a single application of self-attention rather than a repeated recurrent update; and the residual connections and layer norms help stability.</p>
+<p>So people trained transformers on text, and since there was more text, trained larger models on more of it — and the models kept improving. The finding was that scaling the model and the data leads not merely to improvement but to <em>predictable</em> improvement:</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 460 328" width="100%" style="max-width:460px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Scaling is predictable</text>
+<line x1="90" y1="70" x2="90" y2="250" stroke="#555" stroke-width="1.6"></line>
+<line x1="90" y1="250" x2="410" y2="250" stroke="#555" stroke-width="1.6"></line>
+<line x1="108" y1="92" x2="396" y2="230" stroke="#4477AA" stroke-width="3"></line>
+<text x="80" y="160" text-anchor="end" font-size="14" fill="#555">test</text>
+<text x="80" y="178" text-anchor="end" font-size="14" fill="#555">loss</text>
+<text x="80" y="196" text-anchor="end" font-size="13" fill="#888">(log)</text>
+<text x="250" y="278" text-anchor="middle" font-size="14" fill="#555">parameters (log)</text>
+<text x="20" y="298" font-size="13" fill="#666">Across many orders of magnitude, larger model and more data</text>
+<text x="20" y="316" font-size="13" fill="#666">give a lower, predictable test loss.</text>
+</svg></div>
+<p>Plotting test loss against the number of parameters, both on log scales, gives close to a straight line, and it holds across many orders of magnitude. This is unlike most of the modeling in this course, where one cannot say in advance what the validation loss will be. It amounts to a recipe: with the compute and the data to train a larger model, one can confidently expect a lower test loss. Ongoing research largely concerns changing the <em>slope</em> of this line, but the line itself is a striking regularity <span class="citation" data-cites="kaplan2020scaling">(<a href="02-mlp-backprop.html#ref-kaplan2020scaling" role="doc-biblioref">Kaplan et al. 2020</a>)</span>.</p>
+</section>
+<section id="sec-text-to-text" class="level3">
+<h3 class="anchored" data-anchor-id="sec-text-to-text">Every text task is text-to-text</h3>
+<p>A lower loss on held-out data means the model is better able to predict the next token. Consider what predicting the next token can express. Given “When was Wayne Gretzky born?” a natural continuation is his birth year, so a model that predicts the next token well, in some sense, knows it. Given two sentences and “Do these two sentences mean the same thing?” the continuation “yes” or “no” is paraphrase identification. Given a long article followed by “tl;dr” — “too long; didn’t read” — the continuation is a summary, which is document summarization. Given “‘I like cheese’ in French is,” the continuation is a translation.</p>
+<div class="boxed-eq">
+<p>Any text-based task can be formulated as a <strong>text-to-text</strong> task: conditioned on a prefix <span class="math inline">\bm{x}_1, \dots, \bm{x}_{t-1}</span>, predict the next token <span class="math inline">\bm{x}_t</span>.</p>
+</div>
+<p>If predicting the next token can express every text-based task, then a lower loss on the full distribution of held-out text means being better at, in effect, every task — a striking implication of the scaling regularity above.</p>
+</section>
+<section id="sec-prompting" class="level3">
+<h3 class="anchored" data-anchor-id="sec-prompting">Prompting and in-context learning</h3>
+<p>There is a complication. These models are trained on unlabeled web text, where a prefix often has many reasonable continuations. “When was Wayne Gretzky born?” might be followed by “I don’t know”; “Do these two sentences mean the same thing?” by “I don’t care”; the translation prompt by an unrelated but common continuation. A lower test loss does not guarantee that the most probable continuation is the one we want. This is the importance of <strong>prompting</strong>: how we formulate the request so that the desired continuation is the most probable under the training distribution. We can try different phrasings — “[sentence] in French is…” versus “The French translation of [sentence] is…” For classification tasks, rather than generating, we can inspect the probabilities the model assigns to the tokens for each answer choice — for example, comparing the probability of “yes” to that of “no.”</p>
+<p>A third approach is <strong>few-shot in-context learning</strong>. The examples so far were <strong>zero-shot</strong>: we describe a task and ask the model to perform it with no worked examples. If instead we can gather a small task-specific dataset, we can provide it as part of the prefix. For instance, a two-shot prompt might read “Who played Batman in the Dark Knight? Christian Bale. Who was the lead singer of the Foo Fighters? Dave Grohl. When was Wayne Gretzky born?” — the earlier question–answer pairs make the answer, rather than “I don’t know,” the more probable continuation.</p>
+<div class="definition-block">
+<p><strong>Definition.</strong> <em>In-context learning</em> provides labeled examples of a task within the prefix, so the model performs the task without any update to its parameters <span class="citation" data-cites="brown2020language">(<a href="02-mlp-backprop.html#ref-brown2020language" role="doc-biblioref"><span class="nocase">Brown et al.</span> 2020</a>)</span>.</p>
+</div>
+<p>In-context learning resembles learning — supplying question-answering examples improves question answering — but it does not update parameters, so the same model can be adapted to any task by changing the prompt. Its drawbacks are that the cost of prediction grows with the number of in-context examples (a longer prompt means more tokens to process), that it works only with large-ish models, and that it often works worse than fine-tuning on the same examples.</p>
+</section>
+<section id="sec-post-training" class="level3">
+<h3 class="anchored" data-anchor-id="sec-post-training">Post-training</h3>
+<p>Many uses of a large language model do not require careful prompting — one states a request and the model complies. Getting from a base model, pre-trained on web text, to one that reliably follows instructions takes further training. This class of methods is called <strong>post-training</strong> (an odd name, since a model that is pre-trained and then post-trained is never simply “trained”); these are language-model techniques rather than core deep learning, so we cover them briefly.</p>
+<p>One common step is <strong>instruction tuning</strong>, also called supervised fine-tuning: train the model on a mixture of diverse query–response pairs spanning many tasks — writing a story, answering a homework question, classifying a tweet’s sentiment. In classical terms, if the training data samples many tasks, the test data samples other tasks, and instruction tuning improves generalization to new tasks, that is, instruction-following <span class="citation" data-cites="wei2022finetuned">(<a href="02-mlp-backprop.html#ref-wei2022finetuned" role="doc-biblioref">Wei et al. 2022</a>)</span>.</p>
+<p>A second step is <strong>learning from feedback</strong>. Given a good and a bad response to the same input, train the model to make the good response more likely and the bad one less likely. This differs from ordinary fine-tuning, which only supplies good responses; here the model is told what to do more of and what to do less of. The techniques used come from reinforcement learning, so this is often called reinforcement learning from human feedback <span class="citation" data-cites="ouyang2022training">(<a href="02-mlp-backprop.html#ref-ouyang2022training" role="doc-biblioref"><span class="nocase">Ouyang et al.</span> 2022</a>)</span>. Prompting, in-context learning, instruction tuning, and learning from feedback are all ways to elicit the behavior we want from a model whose next-token predictions were shaped by language modeling on web text.</p>
+<hr>
+</section>
+</section>
+<section id="sec-encoder-decoder" class="level2">
+<h2 class="anchored" data-anchor-id="sec-encoder-decoder">The Encoder-Decoder Transformer</h2>
+<p>We can now build encoder-only and decoder-only transformers. The <strong>encoder-decoder transformer</strong> combines them, and was in fact the first transformer proposed, as an alternative to the encoder–decoder RNN with attention (Lecture 6). The encoder-only transformer plays the role of that RNN’s encoder — processing an input sequence with full visibility into a sequence of hidden states — and the decoder-only transformer plays the role of its decoder, autoregressively generating an output conditioned on the input.</p>
+<p>The question is how to feed the encoder’s outputs to the decoder. In the encoder–decoder RNN we used attention, and we do the same here, adding one more attention mechanism — the <strong>encoder-decoder attention</strong>, or <strong>cross-attention</strong> — into the decoder. Filling in the five ingredients (Lecture 7):</p>
+<ul>
+<li><strong>Queries:</strong> the decoder states.</li>
+<li><strong>Keys:</strong> the encoder outputs.</li>
+<li><strong>Values:</strong> the encoder outputs.</li>
+<li><strong>Comparison:</strong> scaled dot product.</li>
+<li><strong>Reduction:</strong> softmax-weighted average.</li>
+</ul>
+<p>This is the same as the encoder–decoder attention of the sequence-to-sequence RNN. We insert it into each decoder block, between the multi-headed self-attention and the feed-forward network, each sublayer wrapped in a residual connection and followed by a layer norm as before.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 780 240" width="100%" style="max-width:780px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="eA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Encoder-decoder transformer: cross-attention in the decoder</text>
+<rect x="20" y="150" width="86" height="42" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="63" y="175" text-anchor="middle" font-size="11" font-weight="600" fill="#207965">Encoder stack</text>
+<text x="112" y="146" font-size="12" fill="#794520">in</text>
+<line x1="130" y1="142.0" x2="144" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<rect x="144" y="120" width="66" height="44" rx="6" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect>
+<text x="177" y="146" text-anchor="middle" font-size="12" font-weight="600" fill="#442079">MHSA</text>
+<line x1="210" y1="142.0" x2="222" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<circle cx="233" cy="142.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="233" y="147" text-anchor="middle" font-size="15" font-weight="600" fill="#794520">+</text>
+<line x1="244" y1="142.0" x2="256" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<rect x="256" y="120" width="44" height="44" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="278" y="146" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">LN</text>
+<line x1="300" y1="142.0" x2="312" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<rect x="312" y="120" width="88" height="44" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
+<text x="356" y="139" text-anchor="middle" font-size="12" font-weight="600" fill="#792051">cross-</text>
+<text x="356" y="155" text-anchor="middle" font-size="12" font-weight="600" fill="#792051">attn</text>
+<line x1="400" y1="142.0" x2="412" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<circle cx="423" cy="142.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="423" y="147" text-anchor="middle" font-size="15" font-weight="600" fill="#794520">+</text>
+<line x1="434" y1="142.0" x2="446" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<rect x="446" y="120" width="44" height="44" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="468" y="146" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">LN</text>
+<line x1="490" y1="142.0" x2="502" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<rect x="502" y="120" width="54" height="44" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="529" y="146" text-anchor="middle" font-size="12" font-weight="600" fill="#207965">FFN</text>
+<line x1="556" y1="142.0" x2="568" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<circle cx="579" cy="142.0" r="11" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="579" y="147" text-anchor="middle" font-size="15" font-weight="600" fill="#794520">+</text>
+<line x1="590" y1="142.0" x2="602" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<rect x="602" y="120" width="44" height="44" rx="6" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="624" y="146" text-anchor="middle" font-size="12" font-weight="600" fill="#796020">LN</text>
+<line x1="646" y1="142.0" x2="660" y2="142.0" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"></line>
+<path d="M134,116 Q134,100 184,100 Q233,100 233,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"></path>
+<path d="M502,116 Q502,100 540,100 Q579,100 579,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"></path>
+<path d="M305,116 Q305,88 364,88 Q423,88 423,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"></path>
+<path d="M63,192 L63,186 L356,186 L356,164" fill="none" stroke="#57C7AE" stroke-width="1.8" marker-end="url(#eA)"></path>
+<text x="364" y="194" font-size="12" fill="#207965">encoder outputs (keys, values)</text>
+<text x="20" y="228" font-size="13" fill="#666">Cross-attention: queries from the decoder, keys and values from the encoder outputs; inserted between self-attention and the FFN.</text>
+</svg></div>
+<p>The encoder is unchanged, and the decoder differs from a decoder-only transformer only by the added cross-attention sublayer, which takes the encoder outputs as its keys and values. To train an encoder-decoder transformer, we can always use supervised sequence-to-sequence data — feed the English sentence into the encoder and train the decoder to generate the French translation, as with the sequence-to-sequence RNN. To train on unlabeled data, we use an objective similar to masked language modeling: corrupt some text by masking spans, and train the model to predict the missing parts <span class="citation" data-cites="raffel2020exploring">(<a href="02-mlp-backprop.html#ref-raffel2020exploring" role="doc-biblioref">Raffel et al. 2020</a>)</span>. Given “Thank you for inviting me to your party,” we might mask “for inviting” and “party” to get “Thank you <code>&lt;mask&gt;</code> me to your <code>&lt;mask&gt;</code>,” with target “for inviting <code>&lt;sep&gt;</code> party” — the two recovered spans separated by a <code>&lt;sep&gt;</code> token. Because the missing spans are generated autoregressively as an output sequence, a masked span can cover several tokens — unlike masked language modeling in an encoder-only model, where each masked position corresponds to a single token.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Decoder-only or encoder-decoder for sequence-to-sequence?</strong> A decoder-only transformer can also do sequence-to-sequence tasks — the prompting above feeds in a prefix and generates a continuation. The difference is that an encoder-decoder transformer has a separate encoder stack, with its own parameters, that processes the input with full visibility, whereas a decoder-only transformer’s causal mask limits how the prefix is attended to. Both work; the encoder-decoder arrangement is arguably a more natural fit for sequence-to-sequence tasks.</p>
+</div>
+</div>
+<hr>
+</section>
+<section id="sec-conventions" class="level2">
+<h2 class="anchored" data-anchor-id="sec-conventions">Transformer Architecture Conventions</h2>
+<p>A transformer has several shape hyperparameters, and there are standard conventions for them. The main quantities are:</p>
+<ul>
+<li><span class="math inline">L</span> — the number of <strong>layer blocks</strong> (the <em>depth</em>). “A 12-layer transformer” means 12 blocks, each with multi-headed self-attention, layer norms, residual connections, and a feed-forward network.</li>
+<li><span class="math inline">d_{\text{model}}</span> — the dimensionality along the residual path (the <em>width</em>), fixed across the model and including the embedding dimension. In a pre-layer-norm transformer the residual connection goes around the whole block, so this dimension cannot change from block to block.</li>
+<li><span class="math inline">d_{\text{ff}}</span> — the dimensionality inside the feed-forward networks, which project up to <span class="math inline">d_{\text{ff}}</span> and back down to <span class="math inline">d_{\text{model}}</span>.</li>
+<li><span class="math inline">d_{kv}</span> — the dimensionality of the queries, keys, and values. Queries and keys must match, since attention uses a scaled dot product, and values are usually made the same size.</li>
+<li><span class="math inline">H</span> — the number of attention heads. Unlike a convolutional network’s channels, these shape hyperparameters are typically fixed across all blocks.</li>
+</ul>
+<p>Three conventions, none universal, are common:</p>
+<div class="boxed-eq">
+<p><span class="math display">d_{\text{ff}} = 4\, d_{\text{model}}, \qquad H \, d_{kv} = d_{\text{model}}, \qquad L \text{ and } d_{\text{model}} \text{ grow together}.</span></p>
+</div>
+<p>The feed-forward network projects into a space four times as wide before projecting back. Setting <span class="math inline">H\,d_{kv} = d_{\text{model}}</span> makes the total size of the queries, keys, and values across all heads equal to <span class="math inline">d_{\text{model}}</span>, so doubling the number of heads halves <span class="math inline">d_{kv}</span>. And when scaling a model up, one typically increases depth and width together rather than only one — matching the scaling story above, where “parameters” grows along both axes.</p>
+<hr>
+</section>
+<section id="sec-vit" class="level2">
+<h2 class="anchored" data-anchor-id="sec-vit">The Vision Transformer</h2>
+<p>So far we have applied transformers only to text. A considerable time after the transformer was introduced, people found how to apply it effectively to vision, giving the <strong>vision transformer</strong>.</p>
+<p>Recall the convolution’s inductive bias: locality and shift invariance, a reasonable structural assumption for images. The transformer has a much weaker inductive bias — only that every output may depend on every input. This is more generic and makes fewer assumptions, which may be good or bad, but it means a transformer can <em>learn</em> the appropriate structure rather than having it built in. Trained on a vision task, self-attention could learn locality, for instance, by attending only to a small region of the input; more generally it can learn arbitrary dependencies, especially with position encodings.</p>
+<p>To use a transformer we need a sequence, but an image is a grid of pixels with channels. Reading pixels one at a time would give an enormous sequence — a <span class="math inline">1024 \times 1024 \times 3</span> image would become a sequence of length roughly three million. Instead we split the image into <strong>patches</strong>: take each <span class="math inline">P \times P</span> patch across all channels, flatten it into a vector, and let each patch be one sequence element.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 700 280" width="100%" style="max-width:700px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="vA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Vision transformer: image → patches → sequence</text>
+<rect x="58" y="78" width="156" height="156" fill="#EAF3EF" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="54" y="74" width="156" height="156" fill="#EAF3EF" stroke="#5795C7" stroke-width="1.3"></rect>
+<rect x="50" y="70" width="156" height="156" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.3"></rect>
+<line x1="50" y1="96" x2="206" y2="96" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="76" y1="70" x2="76" y2="226" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="50" y1="122" x2="206" y2="122" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="102" y1="70" x2="102" y2="226" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="50" y1="148" x2="206" y2="148" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="128" y1="70" x2="128" y2="226" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="50" y1="174" x2="206" y2="174" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="154" y1="70" x2="154" y2="226" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="50" y1="200" x2="206" y2="200" stroke="#5795C7" stroke-width="0.8"></line>
+<line x1="180" y1="70" x2="180" y2="226" stroke="#5795C7" stroke-width="0.8"></line>
+<rect x="50" y="70" width="52" height="52" fill="none" stroke="#e53935" stroke-width="2.5"></rect>
+<text x="42" y="148" text-anchor="end" font-size="13" fill="#666">h</text>
+<text x="128" y="252" text-anchor="middle" font-size="13" fill="#666">w × C channels</text>
+<line x1="222" y1="96" x2="300" y2="96" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"></line>
+<text x="236" y="60" font-size="12" fill="#666">flatten P×P patch</text>
+<rect x="310" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
+<rect x="356" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
+<rect x="402" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
+<rect x="448" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
+<text x="407" y="62" text-anchor="middle" font-size="12" fill="#666">C·P²-dim</text>
+<text x="456" y="130" font-size="16" fill="#999">···</text>
+<text x="402" y="214" text-anchor="middle" font-size="13" fill="#666">m = hw / P²  sequence elements</text>
+<line x1="512" y1="130.0" x2="546" y2="130.0" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"></line>
+<text x="552" y="124" font-size="13" fill="#442079" font-weight="600">project</text>
+<text x="552" y="142" font-size="12" fill="#442079">to d_model</text>
+<text x="20" y="266" font-size="13" fill="#666">Prepend a &lt;CLS&gt; element, project each patch to d_model, then run an ordinary encoder-only transformer.</text>
+</svg></div>
+<p>An image of height <span class="math inline">h</span>, width <span class="math inline">w</span>, and <span class="math inline">C</span> channels becomes a sequence of length <span class="math inline">m = hw / P^2</span> of vectors of dimension <span class="math inline">C P^2</span>. (With <span class="math inline">P = 1</span> this is one pixel per element.) Each patch’s vector carries spatial context. To classify, we then follow the encoder-only recipe: map the image to a length-<span class="math inline">m</span> sequence, prepend a <code>&lt;CLS&gt;</code> representation, and linearly project each sequence element from <span class="math inline">C P^2</span> to <span class="math inline">d_{\text{model}}</span> with a learned projection — needed because <span class="math inline">C P^2</span> (e.g., <span class="math inline">27</span> for a <span class="math inline">3\times3</span> patch of a 3-channel image) is not the width we want. Everything after that is an ordinary encoder-only transformer, with the <code>&lt;CLS&gt;</code> output fed to a classifier. The transformer itself is unchanged; only the way an image is turned into a sequence is new <span class="citation" data-cites="dosovitskiy2021image">(<a href="02-mlp-backprop.html#ref-dosovitskiy2021image" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span>.</p>
+<p>This works well, with one caveat: it works especially well after pre-training. Suppose we pre-train on a large dataset and fine-tune on a task of interest, and measure downstream performance as a function of the pre-training dataset size.</p>
+<div style="overflow-x:auto; margin:1.5rem 0;">
+<svg viewbox="0 0 500 328" width="100%" style="max-width:500px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<text x="20" y="26" font-size="22" font-weight="600" fill="#333">Pre-training and inductive bias</text>
+<line x1="110" y1="64" x2="110" y2="244" stroke="#555" stroke-width="1.6"></line>
+<line x1="110" y1="244" x2="410" y2="244" stroke="#555" stroke-width="1.6"></line>
+<path d="M 110.0,190.0 L 117.5,175.2 L 125.0,169.1 L 132.5,164.4 L 140.0,160.4 L 147.5,156.9 L 155.0,153.7 L 162.5,150.8 L 170.0,148.1 L 177.5,145.6 L 185.0,143.2 L 192.5,140.9 L 200.0,138.7 L 207.5,136.6 L 215.0,134.6 L 222.5,132.7 L 230.0,130.8 L 237.5,129.0 L 245.0,127.2 L 252.5,125.5 L 260.0,123.8 L 267.5,122.2 L 275.0,120.6 L 282.5,119.0 L 290.0,117.5 L 297.5,116.0 L 305.0,114.5 L 312.5,113.1 L 320.0,111.7 L 327.5,110.3 L 335.0,108.9 L 342.5,107.6 L 350.0,106.3 L 357.5,105.0 L 365.0,103.7 L 372.5,102.4 L 380.0,101.2 L 387.5,100.0 L 395.0,98.8 L 402.5,97.6 L 410.0,96.4" fill="none" stroke="#EE6677" stroke-width="3"></path>
+<path d="M 110.0,222.4 L 117.5,220.2 L 125.0,217.6 L 132.5,214.7 L 140.0,211.7 L 147.5,208.6 L 155.0,205.3 L 162.5,202.0 L 170.0,198.6 L 177.5,195.2 L 185.0,191.7 L 192.5,188.1 L 200.0,184.5 L 207.5,180.9 L 215.0,177.2 L 222.5,173.5 L 230.0,169.7 L 237.5,165.9 L 245.0,162.0 L 252.5,158.2 L 260.0,154.3 L 267.5,150.3 L 275.0,146.4 L 282.5,142.4 L 290.0,138.4 L 297.5,134.3 L 305.0,130.3 L 312.5,126.2 L 320.0,122.1 L 327.5,117.9 L 335.0,113.8 L 342.5,109.6 L 350.0,105.4 L 357.5,101.2 L 365.0,97.0 L 372.5,92.7 L 380.0,88.5 L 387.5,84.2 L 395.0,79.9 L 402.5,75.5 L 410.0,71.2" fill="none" stroke="#4477AA" stroke-width="3"></path>
+<text x="416" y="94" font-size="14" fill="#4477AA" font-weight="600">vision</text>
+<text x="416" y="110" font-size="14" fill="#4477AA" font-weight="600">transformer</text>
+<text x="416" y="136" font-size="14" fill="#EE6677" font-weight="600">convnet</text>
+<text x="100" y="148" text-anchor="end" font-size="13" fill="#555">downstream</text>
+<text x="100" y="164" text-anchor="end" font-size="13" fill="#555">performance</text>
+<text x="260" y="272" text-anchor="middle" font-size="13" fill="#555">size of pre-training dataset</text>
+<text x="20" y="298" font-size="13" fill="#666">The vision transformer needs more pre-training than a convnet,</text>
+<text x="20" y="316" font-size="13" fill="#666">but surpasses it once pre-trained enough.</text>
+</svg></div>
+<p>For a convolutional network, performance improves with the pre-training budget. For a vision transformer, performance is worse at a small pre-training budget but better at a large one. The reason is inductive bias. Pre-training teaches the model the structure of the problem — for vision, recognizing shape templates such as round, square, or striped things. A convolutional network already assumes locality and shift invariance, so it needs less pre-training to do well; a vision transformer assumes almost nothing and must learn the structure, which requires more pre-training. But locality and shift invariance are not the right structure for every vision task, so given enough pre-training, a vision transformer can learn a better structural assumption and surpass the convolutional network.</p>
+<hr>
+</section>
+<section id="sec-summary" class="level2">
+<h2 class="anchored" data-anchor-id="sec-summary">Summary</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Key takeaways from Lecture 9:</strong></p>
+<ul>
+<li>A <strong>decoder-only transformer</strong> generates autoregressively using the unchanged transformer architecture: each generated token attends only to past tokens. The <strong>causal mask</strong> — zeroing attention to future positions — lets it be trained for next-step prediction in parallel across positions, unlike a sequential RNN. <strong>KV caching</strong> reuses the unchanging keys and values during generation.</li>
+<li><strong>Language modeling</strong> trains on unlabeled text, of which there is a great deal. Scaling the model and data yields <em>predictable</em> improvement — test loss versus parameters is nearly linear on log-log axes.</li>
+<li>Any text task is <strong>text-to-text</strong>: conditioned on a prefix, predict the next token. Lower held-out loss therefore means being better at essentially every text task. Models are steered by <strong>prompting</strong>, <strong>in-context learning</strong> (labeled examples in the prefix, no parameter updates), and <strong>post-training</strong> (instruction tuning and learning from feedback).</li>
+<li>The <strong>encoder-decoder transformer</strong> adds <strong>cross-attention</strong> in the decoder — queries from the decoder, keys and values from the encoder outputs — and can be pre-trained on unlabeled text by predicting masked spans.</li>
+<li>Transformer <strong>conventions</strong>: <span class="math inline">L</span> blocks (depth), <span class="math inline">d_{\text{model}}</span> (width), <span class="math inline">d_{\text{ff}} = 4\,d_{\text{model}}</span>, <span class="math inline">H\,d_{kv} = d_{\text{model}}</span>, with depth and width grown together.</li>
+<li>The <strong>vision transformer</strong> splits an image into patches, projects them to <span class="math inline">d_{\text{model}}</span>, and runs an ordinary encoder-only transformer. Its weaker inductive bias means it needs more pre-training than a convolutional network but can surpass it once pre-trained enough.</li>
+</ul>
+</div>
+</div>
+<p><strong>Next lecture:</strong> Architecture grab bag, part 1 - LoRA, graph neural networks, and mixture-of-experts models.</p>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<div id="ref-brown2020language" class="csl-entry" role="listitem">
+<span class="nocase">Brown, Tom B, Benjamin Mann, Nick Ryder, et al.</span> 2020. <span>“Language Models Are Few-Shot Learners.”</span> <em>Advances in Neural Information Processing Systems</em> 33.
+</div>
+<div id="ref-dosovitskiy2021image" class="csl-entry" role="listitem">
+Dosovitskiy, Alexey, Lucas Beyer, Alexander Kolesnikov, et al. 2021. <span>“An Image Is Worth 16x16 Words: Transformers for Image Recognition at Scale.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-kaplan2020scaling" class="csl-entry" role="listitem">
+Kaplan, Jared, Sam McCandlish, Tom Henighan, et al. 2020. <span>“Scaling Laws for Neural Language Models.”</span> <em>arXiv Preprint arXiv:2001.08361</em>.
+</div>
+<div id="ref-ouyang2022training" class="csl-entry" role="listitem">
+<span class="nocase">Ouyang, Long, Jeffrey Wu, Xu Jiang, et al.</span> 2022. <span>“Training Language Models to Follow Instructions with Human Feedback.”</span> <em>Advances in Neural Information Processing Systems</em> 35.
+</div>
+<div id="ref-raffel2020exploring" class="csl-entry" role="listitem">
+Raffel, Colin, Noam Shazeer, Adam Roberts, et al. 2020. <span>“Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer.”</span> <em>Journal of Machine Learning Research</em> 21 (140).
+</div>
+<div id="ref-wei2022finetuned" class="csl-entry" role="listitem">
+Wei, Jason, Maarten Bosma, Vincent Y Zhao, et al. 2022. <span>“Finetuned Language Models Are Zero-Shot Learners.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // target, if specified
+            link.setAttribute("target", "_blank");
+            if (link.getAttribute("rel") === null) {
+              link.setAttribute("rel", "noopener");
+            }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="../lectures/08-transformers-part-1.html" class="pagination-link" aria-label="Lecture 8: Transformers, Part 1">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="pagination-link" aria-label="Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs">
+        <span class="nav-page-text"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+<footer class="footer"><div class="nav-footer"><div class="nav-footer-center"><div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></div></div></footer><script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
