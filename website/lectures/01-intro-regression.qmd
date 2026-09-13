@@ -401,7 +401,7 @@ As a running example, consider the task of predicting a home's sale price from t
 $$\hat{y} = w_1 \cdot \text{age} + w_2 \cdot \text{sqft} + w_3 \cdot \text{nbr} + b$$
 
 where $w_1$, $w_2$, and $w_3$ are the weights assigned to each feature value and $\hat{y}$ is the predicted price.
-The features can be combined into a feature vector $\bm{x} = [\text{age},\, \text{sqft},\, \text{nbr}]^\top \in \mathbb{R}^4$ and weights into the weight vector $\bm{w} = [w_1, w_2, w_3]^\top \in \mathbb{R}^3$, giving the standard expression for a linear regression model:
+The features can be combined into a feature vector $\bm{x} = [\text{age},\, \text{sqft},\, \text{nbr}]^\top \in \mathbb{R}^3$ and weights into the weight vector $\bm{w} = [w_1, w_2, w_3]^\top \in \mathbb{R}^3$, giving the standard expression for a linear regression model:
 
 $$\hat{y} = \bm{w}^\top \bm{x} + b$$
 
@@ -411,7 +411,7 @@ In general, the parameters $\bm{\theta}$ of a given model are the values that ar
 
 What if we want to process more than one example at a time?
 As we will discuss later, this is common during both training and inference, or "test time", when the trained model is being used to make predictions.
-We can assemple $N$ feature vectors into a matrix $\bm{X} \in \mathbb{R}^{N \times d}$ and compute the model's predictions as
+We can assemble $N$ feature vectors into a matrix $\bm{X} \in \mathbb{R}^{N \times d}$ and compute the model's predictions as
 
 $$\hat{\bm{y}} = \bm{X}\bm{w} + b, \qquad \hat{\bm{y}} \in \mathbb{R}^N, \quad \bm{X} \in \mathbb{R}^{N \times d}$$
 
@@ -419,7 +419,7 @@ $$\hat{\bm{y}} = \bm{X}\bm{w} + b, \qquad \hat{\bm{y}} \in \mathbb{R}^N, \quad \
 
 Given a model, we need a way to tune the parameters to fit the data.
 To determine how well the model fits the data (and ultimately as an objective to be optimized), we use a **loss function**.
-For regression (predicting a scalar value) a common loss function is the *squared error loss**:
+For regression (predicting a scalar value) a common loss function is the *squared error loss*:
 
 $$\mathcal{L}(\hat{y}, y) = \frac{1}{2}(\hat{y} - y)^2$$
 
@@ -447,7 +447,7 @@ $$\bm{\theta} \leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\mathcal{L}$$
 where $\eta > 0$ is the **learning rate** and $\nabla_{\bm{\theta}}\mathcal{L}$ is the gradient of the loss with respect to $\bm{\theta}$.
 :::
 
-There are many ways to decide when to stop performing gradient descent. Since loss functions are generally nonnegative, a natural criteria is to wait until the loss reaches zero, but this is only possible if the model can perfectly fit the data. In the case of a linear model, this would mean that the input-output relationship is perfectly linear, which is rarely the case. Otherheuristics used as stopping criteria include:
+There are many ways to decide when to stop performing gradient descent. Since loss functions are generally nonnegative, a natural criterion is to wait until the loss reaches zero, but this is only possible if the model can perfectly fit the data. In the case of a linear model, this would mean that the input-output relationship is perfectly linear, which is rarely the case. Other heuristics used as stopping criteria include:
 
 - The loss stops decreasing, or its rate of decrease gets sufficiently slow.
 - Performance on held-out **validation data** stops improving.
@@ -570,7 +570,7 @@ In practice it is common to compute the gradient for more than one example and u
 
 $$\bm{\theta} \leftarrow \bm{\theta} - \frac{\eta}{B} \sum_{i=1}^{B} \nabla_{\bm{\theta}} \mathcal{L}^{(i)}$$
 
-where $B$ is called the the *batch size*.
+where $B$ is called the *batch size*.
 In the most extreme case, we could set the batch size equal to our training set size and compute the average gradient of all of the examples in our training set.
 However, computing the gradient for every example at every step of training might be unnecessarily expensive, as we will discuss later.
 More common in deep learning is therefore to draw a random sample of $B$ examples from the training set at each iteration.
@@ -607,7 +607,7 @@ As before, we will aim to make this prediction from its age, square footage, num
 
 ### One-hot encoding
 
-Representing class labels as integer class IDs (e.g. 1, 2, 3) would imply some kind of ordering..
+Representing class labels as integer class IDs (e.g. 1, 2, 3) would imply some kind of ordering.
 We instead represent class labels as **one-hot vectors**, which are length-$K$ (where $K$ is the number of classes) vectors with a 1 at the position of the correct class and 0s elsewhere.
 In the home price example, we would use the following three one-hot vectors for our classes:
 
@@ -619,8 +619,8 @@ $$
 \end{aligned}
 $$
 
-Note that the (Euclidean) distance between any two one-hot vectors is always 1, thereby implying no order of any kind.
-As we will see later, one-hot vectors can also be interpreted as a probability distribution, where a given example's assigned class is given a probability of 1 and the remaining classes have probabilty 0.
+Note that the (Euclidean) distance between any two distinct one-hot vectors is always $\sqrt{2}$, thereby implying no order of any kind.
+As we will see later, one-hot vectors can also be interpreted as a probability distribution, where a given example's assigned class is given a probability of 1 and the remaining classes have probability 0.
 
 ### From scores to probabilities
 
@@ -717,26 +717,26 @@ While it is technically possible to use a squared error loss to train a softmax 
 
 ### From maximum likelihood to cross-entropy
 
-Recall that we can consider softmax regression as producing a probability distribution over clases conditioned on the input.
-A natural objective would therefore to be maximizing the model's assigned probability to the *true* class over a dataset of labeled examples.
+Recall that we can consider softmax regression as producing a probability distribution over classes conditioned on the input.
+A natural objective would therefore be to maximize the model's assigned probability to the *true* class over a dataset of labeled examples.
 Concretely, given $N$ training examples $\{(\bm{x}^{(i)}, \bm{y}^{(i)})\}_{i=1}^N$, we can start by aiming to maximize the joint likelihood:
 
 $$\max_{\bm{\theta}} \prod_{i=1}^{N} P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})$$
 
-It's typical to maximize the log likelihood instead, because the logarithm is a monotonic function (so the parameter values corresponding to the maximum doesn't change when you apply it) and because a product of probabilities can cause underflow and other numerical instabilities.
+It's typical to maximize the log likelihood instead, because the logarithm is a monotonic function (so the parameter values corresponding to the maximum don't change when you apply it) and because a product of probabilities can cause underflow and other numerical instabilities.
 Additionally, in machine learning we generally minimize a loss rather than maximize an objective.
 This leads to the minimization of the negative log-likelihood:
 
 $$\min_{\bm{\theta}} -\sum_{i=1}^{N} \log P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})$$
 
-We can write this in the following eqvuialent form:
+We can write this in the following equivalent form:
 
 $$\min_{\bm{\theta}} -\sum_{i=1}^{N} \sum_{j=1}^{K} \bm{y}_j^{(i)} \log P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})$$
 
 by noting that $\bm{y}^{(i)}$ is one-hot.
 This final equation is the **cross-entropy loss**, a quantity from information theory that measures how "wrong" a probability distribution is relative to the ground truth.
 
-We can express the cross-entropy loss of for a single example using the softmax regression model with scores $\bm{o} = \bm{W}\bm{x} + \bm{b}$ and one-hot label $\bm{y}$ as
+We can express the cross-entropy loss for a single example using the softmax regression model with scores $\bm{o} = \bm{W}\bm{x} + \bm{b}$ and one-hot label $\bm{y}$ as
 
 $$
 \begin{aligned}
