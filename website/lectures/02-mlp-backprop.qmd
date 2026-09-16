@@ -1,6 +1,6 @@
 ---
 title: "Lecture 2: Multi-Layer Perceptrons & Backpropagation"
-description: "Why linear models are insufficient, how nonlinearity unlocks expressive power, and the backpropagation algorithm that makes training possible."
+description: "Why linear models are insufficient, how nonlinearity unlocks expressive power, the backpropagation algorithm that makes training possible, and the Universal Approximation Theorem."
 bibliography: references.bib
 ---
 
@@ -11,36 +11,47 @@ bibliography: references.bib
 </div>
 ```
 
-**Recap.** Recall from Lecture 1 that both linear regression and logistic regression are considered linear models. In this lecture, we study: What does it mean for a model to be linear, precisely? What are the limitations of linear models? what kinds of relationships can they not capture? How can we overcome these limitations, and how do we train the resulting model?
+**Recap.** Recall from Lecture 1 that both linear regression and logistic regression are considered linear models[^linpred]. In this lecture, we study: What does it mean for a model to be linear, precisely? What are the limitations of linear models? What kinds of relationships can they not capture? How can we overcome these limitations, and how do we train the resulting model?
 
 ## Limitations of Linear Models
 
 ::: {.definition-block}
-**Definition.** A model $\hat{y} = wx + b$ is a *linear model* if an increase
-or decrease in any feature must **always** increase or decrease the output by
-the same proportional amount, regardless of the current value of $x$.
+**Definition.** A model $\hat{y} = wx + b$ is a *linear model*[^lin] if an increase
+or decrease in any feature must **always** increase or decrease the output,
+respectively, by the same proportional amount, regardless of the current value of $x$.
 :::
 
-More precisely, two properties hold simultaneously:
+More precisely, a linear model satisfies two properties, one of which subsumes
+the other:
 
-1. **Monotonicity.** If $w > 0$, then $x \uparrow \Rightarrow \hat{y} \uparrow$
-   *always* (and vice versa for $w < 0$). The direction never flips.
-2. **Constant effect.** The rate of change $\dfrac{\partial\hat{y}}{\partial x} = w$ is
-   the same everywhere. Graphically, $\hat{y}$ vs $x$ is a straight line.
+1. **Monotonicity (necessary, but not sufficient).** If $w > 0$, then
+   $x \uparrow \Rightarrow \hat{y} \uparrow$ *always* (and vice versa for
+   $w < 0$); the direction never flips. Every linear model is monotonic —
+   but the converse fails. An exponential relationship, for instance, is
+   monotonic (it never reverses direction) yet is not linear, since it grows
+   faster and faster rather than at a constant rate.
+2. **Constant effect (necessary *and* sufficient).** The rate of change
+   $\dfrac{\partial\hat{y}}{\partial x} = w$ is the same everywhere,
+   regardless of the current value of $x$. Graphically, $\hat{y}$ vs $x$ is a
+   straight line. This alone fully characterizes linearity — and it forces
+   monotonicity as a side effect.
 
 ### When linearity fails
 
-Some relationships are approximately linear. For instance, larger houses tend to cost more, and a straight line is a reasonable first approximation. But many relationships are not. Consider doctor visits vs. age: visits are very frequent in infancy, drop through young adulthood, then climb again in old age. This U-shaped curve is neither monotonic nor linear.
+Some relationships are approximately linear. For instance, larger houses tend to cost more, and a straight line is a reasonable first approximation. Others are monotonic but not linear: transistor counts on computer chips have grown every decade (property 1), but the growth accelerates rather than proceeding at a constant rate (property 2 fails) — an exponential curve, not a straight line. And some relationships are neither: consider doctor visits vs. age: visits are very frequent in infancy, drop through young adulthood, then climb again in old age. This U-shaped curve is neither monotonic nor linear.
 
-::: {layout-ncol=2}
+::: {layout-ncol=3}
 ![**Linear:** As house size increases, price rises monotonically when other factors remain unchanged; a linear model captures this perfectly.](../figures/lecture2/house_price.png)
 
-![**Non-linear:** doctor visits follow a U-shaped curve over age; no linear model can represent this.](../figures/lecture2/doctor_visit.png)
+![**Monotonic, not linear:** transistor counts have grown every decade (property 1 holds) but at an accelerating, not constant, rate (property 2 fails) — no straight line fits this curve.](../figures/lecture2/moores_law.jpeg)
+
+![**Neither:** doctor visits follow a U-shaped curve over age; no linear model can represent this.](../figures/lecture2/doctor_visit.png)
 :::
 
-A classic ML solution is hand-engineering: take $\log x$ to linearize an
-exponential relationship. In deep learning we reject that. We learn the
-features automatically.
+A classic ML solution is hand-engineering: since exponential relationships
+like the transistor count example above are monotonic but not linear, statisticians take $\log x$
+to linearize them before fitting a linear model. In deep learning we reject
+that. We learn the features automatically.
 
 ---
 
@@ -55,19 +66,19 @@ Try composing two linear layers:
 
 $$H = XW_1, \qquad O = HW_2$$
 
-Substituting: $O = X\underbrace{W_1 W_2}_{=:\,W}$. The product of two matrices
-is a matrix, so $O = XW$ is still a single linear layer.
+Substituting: by associativity, $O = (XW_1)W_2 = X(W_1W_2) =: XW$ — a product
+of matrices is itself just a matrix, so this has the same form as a single
+linear layer.
 
 ::: {.callout-warning}
-**Key fact.** Composing linear (affine) transformations always yields another
-linear transformation. No matter how many linear layers you stack, the
-composition is equivalent to a single affine map. Depth adds no expressive
-power without nonlinearity.
+**Key fact.** Composing any number of linear (affine) layers always collapses
+to a single linear (affine) map. Depth adds no expressive power without
+nonlinearity.
 :::
 
 ### Adding nonlinearity
 
-The fix: insert a **nonlinear function** $\sigma$  (the *activation function* or
+The fix: insert a **nonlinear function** $\sigma$ (the *activation function* or
 *nonlinearity*) between the linear layers:
 
 $$\boxed{H = \sigma(XW_1 + b_1), \qquad O = HW_2 + b_2}$$
@@ -151,7 +162,8 @@ contrast to softmax (from Lecture 1), where every output depends on all inputs.
 </div>
 ```
 
-The architecture above is a **two-layer fully-connected multi-layer perceptron (MLP)**. Every input is
+The architecture above is a **two-layer** (by convention, counting weight
+layers — not the input Layer 0) **fully-connected multi-layer perceptron (MLP)**. Every input is
 connected to every hidden unit, and every hidden unit to every output, hence
 *fully connected*. The names for this architecture:
 
@@ -990,9 +1002,28 @@ foreshadow most of what we'll learn this semester.
   to get weight gradients. The forward pass caches activations to avoid
   recomputation.
 - The **Universal Approximation Theorem** guarantees a wide enough
-  single-hidden-layer MLP can fit any function, but overfitting, model size,
-  and the question of *how* to train are all open challenges.
+  single-hidden-layer MLP can approximate any continuous function on a
+  bounded domain to arbitrary accuracy, but overfitting, model size, and the
+  question of *how* to train are all open challenges.
 :::
 
 **Next lecture:** Regularization and Overfitting - how to prevent the MLP
 from simply memorizing training data?
+
+---
+
+[^lin]: Strictly speaking $wx+b$ is *affine*, not linear ($f(0)=b\neq0$ unless
+    $b=0$) — a true linear function satisfies $f(cx)=cf(x)$. "Linear model" is
+    standard ML/DL shorthand for the affine form [@goodfellow2016deep] (see
+    [Chapter 5 "Machine Learning Basics"](https://www.deeplearningbook.org/contents/ml.html),
+    p. 107, §5.1.4 "Example: Linear Regression").
+
+[^linpred]: "Linear" here describes the *linear predictor* $wx+b$ (equivalently,
+    the decision boundary $wx+b=0$), not logistic regression's output. The
+    predicted probability $\hat y=\operatorname{sigmoid}(wx+b)$ is not itself
+    linear — or even affine — in $x$: its rate of change
+    $\partial\hat y/\partial x = w\,\hat y(1-\hat y)$ varies with $x$, as
+    @sec-activations shows. Logistic regression is a *generalized linear
+    model*: linear in the parameters, with a fixed nonlinear *link function*
+    (sigmoid) mapping scores to probabilities — unlike the learned, stacked
+    nonlinearities in an MLP.
