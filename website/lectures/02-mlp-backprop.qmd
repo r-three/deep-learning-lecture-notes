@@ -11,7 +11,7 @@ bibliography: references.bib
 </div>
 ```
 
-**Recap.** Recall from Lecture 1 that both linear regression and logistic regression are considered linear models. In this lecture, we study: What does it mean for a model to be linear, precisely? What are the limitations of linear models? what kinds of relationships can they not capture? How can we overcome these limitations, and how do we train the resulting model?
+**Recap.** Recall from Lecture 1 that both linear regression and logistic regression are considered linear models. In this lecture, we first discuss the limitations of linear models. Then, we introduce multi-layer perceptrons as our first non-linear model. To train multi-layer perceptrons, we introduce the full backpropagation algorithm. We conclude with a discussion of how multi-layer perceptrons can represent any function.
 
 ## Limitations of Linear Models
 
@@ -21,16 +21,16 @@ or decrease in any feature must **always** increase or decrease the output by
 the same proportional amount, regardless of the current value of $x$.
 :::
 
-More precisely, two properties hold simultaneously:
+More precisely, a linear model satisfies the following two properties:
 
 1. **Monotonicity.** If $w > 0$, then $x \uparrow \Rightarrow \hat{y} \uparrow$
-   *always* (and vice versa for $w < 0$). The direction never flips.
+   *always* (and vice versa for $w < 0$).
 2. **Constant effect.** The rate of change $\dfrac{\partial\hat{y}}{\partial x} = w$ is
-   the same everywhere. Graphically, $\hat{y}$ vs $x$ is a straight line.
+   the same everywhere. Informally, the graph of $\hat{y}$ vs $x$ is a straight line.
 
 ### When linearity fails
 
-Some relationships are approximately linear. For instance, larger houses tend to cost more, and a straight line is a reasonable first approximation. But many relationships are not. Consider doctor visits vs. age: visits are very frequent in infancy, drop through young adulthood, then climb again in old age. This U-shaped curve is neither monotonic nor linear.
+Some relationships are approximately linear. For instance, larger houses tend to cost more, and a linear fit could be a reasonable approximation of this relationship. But many interesting problems involve nonlinearities. Consider the relationship between the number of doctor visits per year and the patient's age: visits are very frequent in infancy, drop through young adulthood, then climb again in old age. This U-shaped curve is neither monotonic nor linear.
 
 ::: {layout-ncol=2}
 ![**Linear:** As house size increases, price rises monotonically when other factors remain unchanged; a linear model captures this perfectly.](../figures/lecture2/house_price.png)
@@ -38,25 +38,23 @@ Some relationships are approximately linear. For instance, larger houses tend to
 ![**Non-linear:** doctor visits follow a U-shaped curve over age; no linear model can represent this.](../figures/lecture2/doctor_visit.png)
 :::
 
-A classic ML solution is hand-engineering: take $\log x$ to linearize an
-exponential relationship. In deep learning we reject that. We learn the
-features automatically.
+While nonlinearity can sometimes be dealt with via feature engineering (e.g. taking the log of a feature with an exponential relationship in order to enable use of a linear model), deep learning aims to avoid feature engineering and instead learn the relationship "from scratch".
 
 ---
 
 ## The Multi-Layer Perceptron {#sec-mlp}
 
-The central idea in deep learning: build complex models by **composing many
-simple, differentiable functions**.
+Remember, the central idea in deep learning is to build complex models that can model complex relationships by **composing many simple, differentiable functions**.
 
 ### Why stacking linear layers doesn't help
 
-Try composing two linear layers:
+We have already seen one example of a layer in this class: The linear layer underlying linear and logistic regression.
+Given that we've already been exposed to linear layers, let's try composing two of them:
 
 $$H = XW_1, \qquad O = HW_2$$
 
-Substituting: $O = X\underbrace{W_1 W_2}_{=:\,W}$. The product of two matrices
-is a matrix, so $O = XW$ is still a single linear layer.
+Substituting, we get $O = X\underbrace{W_1 W_2}_{=:\,W}$. The product of two matrices
+is another matrix, so $O = XW$ can still be considered a linear model.
 
 ::: {.callout-warning}
 **Key fact.** Composing linear (affine) transformations always yields another
