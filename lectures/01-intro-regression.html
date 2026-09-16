@@ -72,6 +72,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
+<link href="../lectures/02-mlp-backprop.html" rel="next">
 <link href="../index.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -225,6 +226,11 @@ window.Quarto = {
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../lectures/01-intro-regression.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 1: Introduction, Linear &amp; Logistic Regression</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../lectures/02-mlp-backprop.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation</span></a>
   </div>
 </li>
     </ul>
@@ -661,14 +667,14 @@ window.Quarto = {
 </div>
 <p>As a running example, consider the task of predicting a home’s sale price from three features: its age (years), the square footage (sqft), and the number of bedrooms (nbr).</p>
 <p><span class="math display">\hat{y} = w_1 \cdot \text{age} + w_2 \cdot \text{sqft} + w_3 \cdot \text{nbr} + b</span></p>
-<p>where <span class="math inline">w_1</span>, <span class="math inline">w_2</span>, and <span class="math inline">w_3</span> are the weights assigned to each feature value and <span class="math inline">\hat{y}</span> is the predicted price. The features can be combined into a feature vector <span class="math inline">\bm{x} = [\text{age},\, \text{sqft},\, \text{nbr}]^\top \in \mathbb{R}^4</span> and weights into the weight vector <span class="math inline">\bm{w} = [w_1, w_2, w_3]^\top \in \mathbb{R}^3</span>, giving the standard expression for a linear regression model:</p>
+<p>where <span class="math inline">w_1</span>, <span class="math inline">w_2</span>, and <span class="math inline">w_3</span> are the weights assigned to each feature value and <span class="math inline">\hat{y}</span> is the predicted price. The features can be combined into a feature vector <span class="math inline">\bm{x} = [\text{age},\, \text{sqft},\, \text{nbr}]^\top \in \mathbb{R}^3</span> and weights into the weight vector <span class="math inline">\bm{w} = [w_1, w_2, w_3]^\top \in \mathbb{R}^3</span>, giving the standard expression for a linear regression model:</p>
 <p><span class="math display">\hat{y} = \bm{w}^\top \bm{x} + b</span></p>
 <p>The weight vector <span class="math inline">\bm{w}</span> and bias value <span class="math inline">b</span> are the <strong>parameters</strong> of the model. Together we write them as the parameter vector <span class="math inline">\bm{\theta} = (\bm{w}, b)</span>. In general, the parameters <span class="math inline">\bm{\theta}</span> of a given model are the values that are tuned via optimization and “learned” from data.</p>
-<p>What if we want to process more than one example at a time? As we will discuss later, this is common during both training and inference, or “test time”, when the trained model is being used to make predictions. We can assemple <span class="math inline">N</span> feature vectors into a matrix <span class="math inline">\bm{X} \in \mathbb{R}^{N \times d}</span> and compute the model’s predictions as</p>
+<p>What if we want to process more than one example at a time? As we will discuss later, this is common during both training and inference, or “test time”, when the trained model is being used to make predictions. We can assemble <span class="math inline">N</span> feature vectors into a matrix <span class="math inline">\bm{X} \in \mathbb{R}^{N \times d}</span> and compute the model’s predictions as</p>
 <p><span class="math display">\hat{\bm{y}} = \bm{X}\bm{w} + b, \qquad \hat{\bm{y}} \in \mathbb{R}^N, \quad \bm{X} \in \mathbb{R}^{N \times d}</span></p>
 <section id="the-loss-function" class="level3">
 <h3 class="anchored" data-anchor-id="the-loss-function">The loss function</h3>
-<p>Given a model, we need a way to tune the parameters to fit the data. To determine how well the model fits the data (and ultimately as an objective to be optimized), we use a <strong>loss function</strong>. For regression (predicting a scalar value) a common loss function is the *squared error loss**:</p>
+<p>Given a model, we need a way to tune the parameters to fit the data. To determine how well the model fits the data (and ultimately as an objective to be optimized), we use a <strong>loss function</strong>. For regression (predicting a scalar value) a common loss function is the <em>squared error loss</em>:</p>
 <p><span class="math display">\mathcal{L}(\hat{y}, y) = \frac{1}{2}(\hat{y} - y)^2</span></p>
 <p>where <span class="math inline">y</span> is the true label for the input <span class="math inline">\bm{x}</span> used to produce the prediction <span class="math inline">\hat{y}</span>. The <span class="math inline">\frac{1}{2}</span> is included for convenience because it will cancel out the exponent of 2 when we differentiate. The <strong>goal</strong> is to find <span class="math inline">\bm{\theta}</span> that minimizes <span class="math inline">\mathcal{L}</span> over the training set.</p>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -694,7 +700,7 @@ Note
 <p><strong>Repeat</strong> until a stopping criterion is met: <span class="math display">\bm{\theta} \leftarrow \bm{\theta} - \eta\,\nabla_{\bm{\theta}}\mathcal{L}</span></p>
 <p>where <span class="math inline">\eta &gt; 0</span> is the <strong>learning rate</strong> and <span class="math inline">\nabla_{\bm{\theta}}\mathcal{L}</span> is the gradient of the loss with respect to <span class="math inline">\bm{\theta}</span>.</p>
 </section>
-<p>There are many ways to decide when to stop performing gradient descent. Since loss functions are generally nonnegative, a natural criteria is to wait until the loss reaches zero, but this is only possible if the model can perfectly fit the data. In the case of a linear model, this would mean that the input-output relationship is perfectly linear, which is rarely the case. Otherheuristics used as stopping criteria include:</p>
+<p>There are many ways to decide when to stop performing gradient descent. Since loss functions are generally nonnegative, a natural criterion is to wait until the loss reaches zero, but this is only possible if the model can perfectly fit the data. In the case of a linear model, this would mean that the input-output relationship is perfectly linear, which is rarely the case. Other heuristics used as stopping criteria include:</p>
 <ul>
 <li>The loss stops decreasing, or its rate of decrease gets sufficiently slow.</li>
 <li>Performance on held-out <strong>validation data</strong> stops improving.</li>
@@ -874,7 +880,7 @@ Note
 <h3 class="anchored" data-anchor-id="mini-batch-stochastic-gradient-descent">Mini-batch stochastic gradient descent</h3>
 <p>So far, we have computed the gradient of the loss for a single example. In practice it is common to compute the gradient for more than one example and update the parameters using the average gradient, like so:</p>
 <p><span class="math display">\bm{\theta} \leftarrow \bm{\theta} - \frac{\eta}{B} \sum_{i=1}^{B} \nabla_{\bm{\theta}} \mathcal{L}^{(i)}</span></p>
-<p>where <span class="math inline">B</span> is called the the <em>batch size</em>. In the most extreme case, we could set the batch size equal to our training set size and compute the average gradient of all of the examples in our training set. However, computing the gradient for every example at every step of training might be unnecessarily expensive, as we will discuss later. More common in deep learning is therefore to draw a random sample of <span class="math inline">B</span> examples from the training set at each iteration.</p>
+<p>where <span class="math inline">B</span> is called the <em>batch size</em>. In the most extreme case, we could set the batch size equal to our training set size and compute the average gradient of all of the examples in our training set. However, computing the gradient for every example at every step of training might be unnecessarily expensive, as we will discuss later. More common in deep learning is therefore to draw a random sample of <span class="math inline">B</span> examples from the training set at each iteration.</p>
 </section>
 <section id="hyperparameters" class="level3">
 <h3 class="anchored" data-anchor-id="hyperparameters">Hyperparameters</h3>
@@ -916,7 +922,7 @@ Note
 <p>To turn our running “home price prediction” example into a classification task, we could instead aim to predict whether a given home would sell <em>above asking</em>, <em>below asking</em>, or <em>not sell</em>. In this way, it becomes a 3-class classification problem. As before, we will aim to make this prediction from its age, square footage, number of bedrooms, and asking price.</p>
 <section id="one-hot-encoding" class="level3">
 <h3 class="anchored" data-anchor-id="one-hot-encoding">One-hot encoding</h3>
-<p>Representing class labels as integer class IDs (e.g.&nbsp;1, 2, 3) would imply some kind of ordering.. We instead represent class labels as <strong>one-hot vectors</strong>, which are length-<span class="math inline">K</span> (where <span class="math inline">K</span> is the number of classes) vectors with a 1 at the position of the correct class and 0s elsewhere. In the home price example, we would use the following three one-hot vectors for our classes:</p>
+<p>Representing class labels as integer class IDs (e.g.&nbsp;1, 2, 3) would imply some kind of ordering. We instead represent class labels as <strong>one-hot vectors</strong>, which are length-<span class="math inline">K</span> (where <span class="math inline">K</span> is the number of classes) vectors with a 1 at the position of the correct class and 0s elsewhere. In the home price example, we would use the following three one-hot vectors for our classes:</p>
 <p><span class="math display">
 \begin{aligned}
 \text{“below asking”} &amp;\;\to\; \bm{y} = [1,\, 0,\, 0]^\top \\
@@ -924,7 +930,7 @@ Note
 \text{“not sold”} &amp;\;\to\; \bm{y} = [0,\, 0,\, 1]^\top
 \end{aligned}
 </span></p>
-<p>Note that the (Euclidean) distance between any two one-hot vectors is always 1, thereby implying no order of any kind. As we will see later, one-hot vectors can also be interpreted as a probability distribution, where a given example’s assigned class is given a probability of 1 and the remaining classes have probabilty 0.</p>
+<p>Note that the (Euclidean) distance between any two distinct one-hot vectors is always <span class="math inline">\sqrt{2}</span>, thereby implying no order of any kind. As we will see later, one-hot vectors can also be interpreted as a probability distribution, where a given example’s assigned class is given a probability of 1 and the remaining classes have probability 0.</p>
 </section>
 <section id="from-scores-to-probabilities" class="level3">
 <h3 class="anchored" data-anchor-id="from-scores-to-probabilities">From scores to probabilities</h3>
@@ -1059,14 +1065,14 @@ Note
 <p>For linear regression, we used a squared error loss. While it is technically possible to use a squared error loss to train a softmax regression model, in practice it is much more common to use the cross-entropy loss.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
 <section id="from-maximum-likelihood-to-cross-entropy" class="level3">
 <h3 class="anchored" data-anchor-id="from-maximum-likelihood-to-cross-entropy">From maximum likelihood to cross-entropy</h3>
-<p>Recall that we can consider softmax regression as producing a probability distribution over clases conditioned on the input. A natural objective would therefore to be maximizing the model’s assigned probability to the <em>true</em> class over a dataset of labeled examples. Concretely, given <span class="math inline">N</span> training examples <span class="math inline">\{(\bm{x}^{(i)}, \bm{y}^{(i)})\}_{i=1}^N</span>, we can start by aiming to maximize the joint likelihood:</p>
+<p>Recall that we can consider softmax regression as producing a probability distribution over classes conditioned on the input. A natural objective would therefore be to maximize the model’s assigned probability to the <em>true</em> class over a dataset of labeled examples. Concretely, given <span class="math inline">N</span> training examples <span class="math inline">\{(\bm{x}^{(i)}, \bm{y}^{(i)})\}_{i=1}^N</span>, we can start by aiming to maximize the joint likelihood:</p>
 <p><span class="math display">\max_{\bm{\theta}} \prod_{i=1}^{N} P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})</span></p>
-<p>It’s typical to maximize the log likelihood instead, because the logarithm is a monotonic function (so the parameter values corresponding to the maximum doesn’t change when you apply it) and because a product of probabilities can cause underflow and other numerical instabilities. Additionally, in machine learning we generally minimize a loss rather than maximize an objective. This leads to the minimization of the negative log-likelihood:</p>
+<p>It’s typical to maximize the log likelihood instead, because the logarithm is a monotonic function (so the parameter values corresponding to the maximum don’t change when you apply it) and because a product of probabilities can cause underflow and other numerical instabilities. Additionally, in machine learning we generally minimize a loss rather than maximize an objective. This leads to the minimization of the negative log-likelihood:</p>
 <p><span class="math display">\min_{\bm{\theta}} -\sum_{i=1}^{N} \log P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})</span></p>
-<p>We can write this in the following eqvuialent form:</p>
+<p>We can write this in the following equivalent form:</p>
 <p><span class="math display">\min_{\bm{\theta}} -\sum_{i=1}^{N} \sum_{j=1}^{K} \bm{y}_j^{(i)} \log P_{\bm{\theta}}(y^{(i)} \mid \bm{x}^{(i)})</span></p>
 <p>by noting that <span class="math inline">\bm{y}^{(i)}</span> is one-hot. This final equation is the <strong>cross-entropy loss</strong>, a quantity from information theory that measures how “wrong” a probability distribution is relative to the ground truth.</p>
-<p>We can express the cross-entropy loss of for a single example using the softmax regression model with scores <span class="math inline">\bm{o} = \bm{W}\bm{x} + \bm{b}</span> and one-hot label <span class="math inline">\bm{y}</span> as</p>
+<p>We can express the cross-entropy loss for a single example using the softmax regression model with scores <span class="math inline">\bm{o} = \bm{W}\bm{x} + \bm{b}</span> and one-hot label <span class="math inline">\bm{y}</span> as</p>
 <p><span class="math display">
 \begin{aligned}
 \mathcal{L}(\bm{y}, \hat{\bm{y}}) &amp;= -\sum_j y_j \log \frac{\exp(o_j)}{\sum_k \exp(o_k)} \\
@@ -1520,6 +1526,9 @@ window._ojs.runtime.interpretFromScriptTags();
       </a>          
   </div>
   <div class="nav-page nav-page-next">
+      <a href="../lectures/02-mlp-backprop.html" class="pagination-link" aria-label="Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation">
+        <span class="nav-page-text"><span class="chapter-title">Lecture 2: Multi-Layer Perceptrons &amp; Backpropagation</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
   </div>
 </nav>
 </div> <!-- /content -->

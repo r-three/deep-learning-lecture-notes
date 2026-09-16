@@ -297,7 +297,7 @@ window.Quarto = {
   <li><a href="#dropout" id="toc-dropout" class="nav-link" data-scroll-target="#dropout">Dropout</a></li>
   </ul></li>
   <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
-  <li><a href="#sec-references" id="toc-sec-references" class="nav-link" data-scroll-target="#sec-references">References</a></li>
+  <li><a href="#bibliography" id="toc-bibliography" class="nav-link" data-scroll-target="#bibliography">References</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -485,7 +485,7 @@ Warning
 <div class="boxed-eq">
 <p><span class="math display">\sigma = \sqrt{\frac{2}{n_{in} + n_{out}}}</span></p>
 </div>
-<p>This is <strong>Xavier</strong> (or <strong>Glorot</strong>) <strong>initialization</strong> <span class="citation" data-cites="glorot2010understanding">(<a href="02-mlp-backprop.html#ref-glorot2010understanding" role="doc-biblioref">Glorot and Bengio 2010</a>)</span> — sample every weight from <span class="math inline">\mathcal{N}(0, \sigma^2)</span> with this <span class="math inline">\sigma</span>. Because the activation variance stays <span class="math inline">\approx 1</span> at every layer, neither the forward activations nor the backward gradients can systematically explode or vanish.</p>
+<p>This is <strong>Xavier</strong> (or <strong>Glorot</strong>) <strong>initialization</strong> <span class="citation" data-cites="glorot2010understanding">(<a href="#ref-glorot2010understanding" role="doc-biblioref">Glorot and Bengio 2010</a>)</span> — sample every weight from <span class="math inline">\mathcal{N}(0, \sigma^2)</span> with this <span class="math inline">\sigma</span>. Because the activation variance stays <span class="math inline">\approx 1</span> at every layer, neither the forward activations nor the backward gradients can systematically explode or vanish.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -496,7 +496,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>He initialization.</strong> Xavier’s derivation assumes no nonlinearity. If you instead assume a ReLU activation (as Homework 3 does), the same style of derivation gives a slightly different scale, called <strong>He initialization</strong> <span class="citation" data-cites="he2015delving">(<a href="02-mlp-backprop.html#ref-he2015delving" role="doc-biblioref">He et al. 2015</a>)</span>. Most deep learning frameworks default to one of these two schemes.</p>
+<p><strong>He initialization.</strong> Xavier’s derivation assumes no nonlinearity. If you instead assume a ReLU activation (as Homework 3 does), the same style of derivation gives a slightly different scale, called <strong>He initialization</strong> <span class="citation" data-cites="he2015delving">(<a href="#ref-he2015delving" role="doc-biblioref">He et al. 2015</a>)</span>. Most deep learning frameworks default to one of these two schemes.</p>
 </div>
 </div>
 </section>
@@ -616,26 +616,27 @@ Note
   <line x1="759" y1="407" x2="1331" y2="407" stroke="#555" stroke-width="1.5" marker-end="url(#axOF)"></line>
   <line x1="759" y1="407" x2="759" y2="66" stroke="#555" stroke-width="1.5" marker-end="url(#axOF)"></line>
   <text x="1023" y="462" text-anchor="middle" font-size="24" fill="#666">x</text>
+  <text x="735" y="237" text-anchor="middle" font-size="24" fill="#666" transform="rotate(-90,735,237)">y</text>
 
-  <path d="M 759.00,260.00 C 774.17,250.00 818.17,213.33 850.00,200.00 C 881.83,186.67 916.67,175.00 950.00,180.00 C 983.33,185.00 1016.67,215.00 1050.00,230.00 C 1083.33,245.00 1116.67,271.67 1150.00,270.00 C 1183.33,268.33 1219.83,233.33 1250.00,220.00 C 1280.17,206.67 1317.50,195.00 1331.00,190.00" fill="none" stroke="#888" stroke-width="3" stroke-dasharray="9,6" stroke-linecap="round"></path>
-  <path d="M 790.0,240.0 L 835.0,287.5 L 880.0,215.0 L 925.0,117.5 L 970.0,160.0 L 1005.0,272.5 L 1040.0,255.0 L 1080.0,217.5 L 1120.0,290.0 L 1160.0,315.0 L 1200.0,200.0 L 1245.0,122.5 L 1290.0,175.0" fill="none" stroke="#e53935" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M 759.00,255.00 C 774.17,248.00 818.17,213.33 850.00,200.00 C 881.83,186.67 916.67,175.00 950.00,180.00 C 983.33,185.00 1016.67,215.00 1050.00,230.00 C 1083.33,245.00 1116.67,271.67 1150.00,270.00 C 1183.33,268.33 1219.83,233.33 1250.00,220.00 C 1280.17,206.67 1317.50,195.00 1331.00,190.00" fill="none" stroke="#888" stroke-width="3" stroke-dasharray="9,6" stroke-linecap="round"></path>
+  <path d="M 759,255 L 855,315 L 900,230 L 958,288 L 1010,135 L 1058,255 L 1095,215 L 1138,325 L 1175,300 L 1210,178 L 1245,125 L 1300,205 L 1325,238" fill="none" stroke="#e53935" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
   <g fill="#333">
-    <circle cx="790" cy="240" r="7"></circle>
-    <circle cx="880" cy="215" r="7"></circle>
-    <circle cx="970" cy="160" r="7"></circle>
-    <circle cx="1040" cy="255" r="7"></circle>
-    <circle cx="1120" cy="290" r="7"></circle>
-    <circle cx="1200" cy="200" r="7"></circle>
-    <circle cx="1290" cy="175" r="7"></circle>
+    <circle cx="759" cy="255" r="7"></circle>
+    <circle cx="900" cy="230" r="7"></circle>
+    <circle cx="1010" cy="135" r="7"></circle>
+    <circle cx="1095" cy="215" r="7"></circle>
+    <circle cx="1175" cy="300" r="7"></circle>
+    <circle cx="1245" cy="125" r="7"></circle>
+    <circle cx="1300" cy="205" r="7"></circle>
   </g>
 
-  <!-- legend for right panel -->
-  <line x1="800" y1="90" x2="840" y2="90" stroke="#888" stroke-width="3" stroke-dasharray="9,6"></line>
-  <text x="848" y="96" font-size="24" fill="#666">true function</text>
-  <circle cx="820" cy="130" r="7" fill="#333"></circle>
-  <text x="848" y="136" font-size="24" fill="#666">training data</text>
-  <line x1="800" y1="170" x2="840" y2="170" stroke="#e53935" stroke-width="3"></line>
-  <text x="848" y="176" font-size="24" fill="#e53935">overfit model</text>
+  <!-- legend for right panel (top-left, clear of the curves) -->
+  <line x1="778" y1="86" x2="812" y2="86" stroke="#888" stroke-width="3" stroke-dasharray="9,6"></line>
+  <text x="820" y="93" font-size="24" fill="#666">true function</text>
+  <circle cx="795" cy="120" r="7" fill="#333"></circle>
+  <text x="820" y="127" font-size="24" fill="#666">training data</text>
+  <line x1="778" y1="154" x2="812" y2="154" stroke="#e53935" stroke-width="3"></line>
+  <text x="820" y="161" font-size="24" fill="#e53935">overfit model</text>
 </svg>
 </div>
 <p>The classic symptom (left) is a gap that opens up between training and validation loss: training loss keeps falling while validation loss bottoms out and starts rising. The classic picture of <em>why</em> (right): given noisy samples of some true function, a good fit stays close to the true curve everywhere, while an overfit model contorts itself to pass exactly through every training point — at the cost of wild, high-error excursions everywhere else.</p>
@@ -654,7 +655,7 @@ Note
 </section>
 <section id="dropout" class="level3">
 <h3 class="anchored" data-anchor-id="dropout">Dropout</h3>
-<p>The second common regularizer, <strong>dropout</strong> <span class="citation" data-cites="srivastava2014dropout">(<a href="02-mlp-backprop.html#ref-srivastava2014dropout" role="doc-biblioref">Srivastava et al. 2014</a>)</span> (invented at the University of Toronto), attacks over-reliance more directly: during training, each feature is independently zeroed out with probability <span class="math inline">p</span> (a hyperparameter), and otherwise rescaled by <span class="math inline">\frac{1}{1-p}</span>:</p>
+<p>The second common regularizer, <strong>dropout</strong> <span class="citation" data-cites="srivastava2014dropout">(<a href="#ref-srivastava2014dropout" role="doc-biblioref">Srivastava et al. 2014</a>)</span> (invented at the University of Toronto), attacks over-reliance more directly: during training, each feature is independently zeroed out with probability <span class="math inline">p</span> (a hyperparameter), and otherwise rescaled by <span class="math inline">\frac{1}{1-p}</span>:</p>
 <p><span class="math display">x_i' = \begin{cases} 0 &amp; \text{with probability } p \\[4pt] \dfrac{x_i}{1-p} &amp; \text{with probability } 1-p \end{cases}</span></p>
 <p>The rescaling is chosen precisely so that <span class="math inline">\mathbb{E}[x_i'] = x_i</span> — dropout doesn’t change what the network computes <em>on average</em>, but because any given feature might vanish on any given training step, the model can never afford to rely on just one. Weight decay and dropout are, in practice, the two regularizers you will reach for most often in deep learning.</p>
 </section>
@@ -682,10 +683,12 @@ Note
 </div>
 </div>
 <p><strong>Next lecture:</strong> Optimization — the adaptive, momentum-based variants of gradient descent used to train real networks in practice.</p>
+
+
 </section>
-<section id="sec-references" class="level2 unnumbered">
-<h2 class="unnumbered anchored" data-anchor-id="sec-references">References</h2>
-<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<section id="bibliography" class="level1 unnumbered">
+<h1 class="unnumbered">References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent" role="list">
 <div id="ref-glorot2010understanding" class="csl-entry" role="listitem">
 Glorot, Xavier, and Yoshua Bengio. 2010. <span>“Understanding the Difficulty of Training Deep Feedforward Neural Networks.”</span> <em>Proceedings of the Thirteenth International Conference on Artificial Intelligence and Statistics</em>, 249–56.
 </div>
@@ -696,8 +699,6 @@ He, Kaiming, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. 2015. <span>“Delving D
 Srivastava, Nitish, Geoffrey Hinton, Alex Krizhevsky, Ilya Sutskever, and Ruslan Salakhutdinov. 2014. <span>“Dropout: A Simple Way to Prevent Neural Networks from Overfitting.”</span> <em>The Journal of Machine Learning Research</em> 15 (1): 1929–58.
 </div>
 </div>
-
-
 </section>
 
 </main> <!-- /main -->

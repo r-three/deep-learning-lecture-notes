@@ -297,6 +297,7 @@ window.Quarto = {
   </ul></li>
   <li><a href="#sec-resnet" id="toc-sec-resnet" class="nav-link" data-scroll-target="#sec-resnet">Modern ConvNets: The ResNet</a></li>
   <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  <li><a href="#bibliography" id="toc-bibliography" class="nav-link" data-scroll-target="#bibliography">References</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -565,7 +566,7 @@ Note
 </section>
 <section id="sec-simple-convnet" class="level3">
 <h3 class="anchored" data-anchor-id="sec-simple-convnet">Building a simple convolutional network</h3>
-<p>With convolution and pooling, and the dense layers from earlier lectures, we can assemble a simple convolutional network, of the kind sometimes called a LeNet after Yann LeCun, an early proponent of these models <span class="citation" data-cites="lecun1998gradient">(<a href="02-mlp-backprop.html#ref-lecun1998gradient" role="doc-biblioref">LeCun et al. 1998</a>)</span>. The basic block applies a convolution, then an elementwise nonlinearity (nonlinearities do not care about the shape of their input; they act on each entry independently), then pooling. This block repeats several times.</p>
+<p>With convolution and pooling, and the dense layers from earlier lectures, we can assemble a simple convolutional network, of the kind sometimes called a LeNet after Yann LeCun, an early proponent of these models <span class="citation" data-cites="lecun1998gradient">(<a href="#ref-lecun1998gradient" role="doc-biblioref">LeCun et al. 1998</a>)</span>. The basic block applies a convolution, then an elementwise nonlinearity (nonlinearities do not care about the shape of their input; they act on each entry independently), then pooling. This block repeats several times.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 720 270" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="fArr" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
@@ -617,7 +618,7 @@ Note
 <section id="sec-batchnorm-why" class="level3">
 <h3 class="anchored" data-anchor-id="sec-batchnorm-why">Why it might help</h3>
 <p>Batch normalization is a good example of how many methods in deep learning are developed: a combination of intuition and empirical results, rather than a theoretical guarantee. Several reasons have been offered for why it helps.</p>
-<p>The original one, from the paper that introduced it, is that it <strong>reduces internal covariate shift</strong> <span class="citation" data-cites="ioffe2015batch">(<a href="02-mlp-backprop.html#ref-ioffe2015batch" role="doc-biblioref">Ioffe and Szegedy 2015</a>)</span> — the idea that as activations propagate through the model, their mean and variance drift from layer to layer, and normalization counteracts this. Subsequent work has shown that in practice batch normalization does not necessarily reduce internal covariate shift, so this explanation is on uncertain ground.</p>
+<p>The original one, from the paper that introduced it, is that it <strong>reduces internal covariate shift</strong> <span class="citation" data-cites="ioffe2015batch">(<a href="#ref-ioffe2015batch" role="doc-biblioref">Ioffe and Szegedy 2015</a>)</span> — the idea that as activations propagate through the model, their mean and variance drift from layer to layer, and normalization counteracts this. Subsequent work has shown that in practice batch normalization does not necessarily reduce internal covariate shift, so this explanation is on uncertain ground.</p>
 <p>One thing it can do is <strong>move activations toward the non-saturated region of the nonlinearity</strong>. Recall that a ReLU outputs zero for negative inputs; if a layer’s activations drift negative, its outputs become zero and it produces no gradient. Shifting activations back toward zero, and then possibly adjusting them through <span class="math inline">\bm{\beta}</span>, keeps them in a region where the nonlinearity passes a gradient. The same holds for a sigmoid, which saturates for large-magnitude inputs; keeping activations near zero avoids saturating it. The batch normalization paper showed, for instance, that a network with sigmoid nonlinearities could still be trained when batch normalization was included.</p>
 <p>Two further effects have been observed in practice, though neither is guaranteed. Batch normalization can <strong>smooth the optimization landscape</strong>, so that the loss as a function of the parameters is less jagged and easier to optimize. And it can have an <strong>unintended regularization effect</strong>, because the mean and variance are noisy estimates computed from a batch. As is common in deep learning, these observations came from trying the method, finding it helped, and then studying why.</p>
 </section>
@@ -667,7 +668,7 @@ Note
 </section>
 <section id="sec-resnet" class="level2">
 <h2 class="anchored" data-anchor-id="sec-resnet">Modern ConvNets: The ResNet</h2>
-<p>With convolution, nonlinearities, pooling, batch normalization, and residual connections in hand, we can describe the modern convolutional network: the residual network, or <strong>ResNet</strong> <span class="citation" data-cites="he2016deep">(<a href="02-mlp-backprop.html#ref-he2016deep" role="doc-biblioref">He et al. 2016</a>)</span>. As with the simple convolutional network, we build it by defining a block and repeating it.</p>
+<p>With convolution, nonlinearities, pooling, batch normalization, and residual connections in hand, we can describe the modern convolutional network: the residual network, or <strong>ResNet</strong> <span class="citation" data-cites="he2016deep">(<a href="#ref-he2016deep" role="doc-biblioref">He et al. 2016</a>)</span>. As with the simple convolutional network, we build it by defining a block and repeating it.</p>
 <p>A ResNet block usually applies a <span class="math inline">3\times3</span> convolution, batch normalization, a nonlinearity, another <span class="math inline">3\times3</span> convolution, and another batch normalization; a residual connection is added around that whole sequence, and a final nonlinearity is applied after the addition. Because the <span class="math inline">3\times3</span> convolutions can change the number of channels (and the spatial size if strided), the residual path sometimes includes a <span class="math inline">1\times1</span> convolution to match the shape.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 760 400" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
@@ -761,7 +762,10 @@ Note
 <p><strong>Next lecture:</strong> Recurrent neural networks - architectures with an inductive bias for sequential data, where the structure to exploit is order in time rather than space.</p>
 
 
-<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+</section>
+<section id="bibliography" class="level1 unnumbered">
+<h1 class="unnumbered">References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent" role="list">
 <div id="ref-he2016deep" class="csl-entry" role="listitem">
 He, Kaiming, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. 2016. <span>“Deep Residual Learning for Image Recognition.”</span> <em>Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition</em>, 770–78.
 </div>

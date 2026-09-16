@@ -295,6 +295,7 @@ window.Quarto = {
   </ul></li>
   <li><a href="#sec-seq2seq" id="toc-sec-seq2seq" class="nav-link" data-scroll-target="#sec-seq2seq">Sequence-to-Sequence Learning</a></li>
   <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  <li><a href="#bibliography" id="toc-bibliography" class="nav-link" data-scroll-target="#bibliography">References</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -427,7 +428,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Why embeddings are useful.</strong> Because embeddings are vectors, they can have rich relationships. If two words have identical embeddings, the model is fed the same vector for both, so they are interchangeable to it; if two embeddings are close, the words are treated similarly. Relationships that resemble arithmetic can also emerge — for example, the embedding of “king” minus “man” plus “woman” landing near “queen” <span class="citation" data-cites="mikolov2013distributed">(<a href="02-mlp-backprop.html#ref-mikolov2013distributed" role="doc-biblioref">Mikolov et al. 2013</a>)</span>. These relationships are not hand-specified; they arise through learning, because they happen to help the model process text.</p>
+<p><strong>Why embeddings are useful.</strong> Because embeddings are vectors, they can have rich relationships. If two words have identical embeddings, the model is fed the same vector for both, so they are interchangeable to it; if two embeddings are close, the words are treated similarly. Relationships that resemble arithmetic can also emerge — for example, the embedding of “king” minus “man” plus “woman” landing near “queen” <span class="citation" data-cites="mikolov2013distributed">(<a href="#ref-mikolov2013distributed" role="doc-biblioref">Mikolov et al. 2013</a>)</span>. These relationships are not hand-specified; they arise through learning, because they happen to help the model process text.</p>
 </div>
 </div>
 <p>We have gone from words, which we cannot feed into a model, to a learned vector for each word. Returning to our goal of modeling <span class="math inline">p(\bm{x}_t \mid \bm{x}_{t-1}, \dots, \bm{x}_1)</span>: since each element is a token drawn from the vocabulary, this conditional distribution is just <strong><span class="math inline">|V|</span>-way classification</strong> — classification over as many classes as there are vocabulary entries. We know how to do classification: a softmax output trained with cross-entropy. There is one important difference, though — the input has <strong>variable length</strong>.</p>
@@ -522,7 +523,7 @@ Note
 </section>
 <section id="sec-lstm" class="level2">
 <h2 class="anchored" data-anchor-id="sec-lstm">Long Short-Term Memory</h2>
-<p>How do we deal with this? The main historical response, for those who still wanted to use recurrent networks, was to design variants less sensitive to exploding and vanishing gradients. One reason the vanilla network is so sensitive to <span class="math inline">\bm{W}_h</span> is that how much it remembers from the past, and how strongly, depends entirely on that one weight matrix. The more effective variants add explicit mechanisms for remembering and forgetting information in the hidden state. The most prominent is the <strong>long short-term memory</strong> network, or <strong>LSTM</strong> <span class="citation" data-cites="hochreiter1997long">(<a href="02-mlp-backprop.html#ref-hochreiter1997long" role="doc-biblioref">Hochreiter and Schmidhuber 1997</a>)</span>.</p>
+<p>How do we deal with this? The main historical response, for those who still wanted to use recurrent networks, was to design variants less sensitive to exploding and vanishing gradients. One reason the vanilla network is so sensitive to <span class="math inline">\bm{W}_h</span> is that how much it remembers from the past, and how strongly, depends entirely on that one weight matrix. The more effective variants add explicit mechanisms for remembering and forgetting information in the hidden state. The most prominent is the <strong>long short-term memory</strong> network, or <strong>LSTM</strong> <span class="citation" data-cites="hochreiter1997long">(<a href="#ref-hochreiter1997long" role="doc-biblioref">Hochreiter and Schmidhuber 1997</a>)</span>.</p>
 <p>Concretely, we want explicit mechanisms to remember or ignore the previous state, to update or not update the state based on the new input, and to forget the past completely. In a vanilla network all of this is controlled only by <span class="math inline">\bm{W}_h</span> and how it interacts with the state, which is a coarse instrument. The LSTM adds a <strong>cell</strong>, a separate recurrent state, with explicit mechanisms for reading, writing, and updating it. These mechanisms are governed by <strong>gates</strong> — values that would ideally be binary (read or not, write or not), and which we make soft by computing them with a sigmoid nonlinearity so they lie between <span class="math inline">0</span> and <span class="math inline">1</span>.</p>
 <p>There are three gates, each computed like a dense layer with a sigmoid, plus a candidate cell update computed with a <span class="math inline">\tanh</span> (it is not a gate, so it need not lie in <span class="math inline">[0,1]</span>):</p>
 <section id="lstm-cell" class="level4 algorithm">
@@ -596,7 +597,7 @@ Note
 <div class="boxed-eq">
 <p><span class="math display">p(\bm{y}_{t'} \mid \bm{y}_{t'-1}, \bm{y}_{t'-2}, \dots, \bm{y}_1, \; \bm{x}_T, \bm{x}_{T-1}, \dots, \bm{x}_1).</span></p>
 </div>
-<p>The standard example is <strong>machine translation</strong>: <span class="math inline">\bm{x}</span> is an English sentence and <span class="math inline">\bm{y}</span> is its French translation. We already have the tools we need. We build a seq2seq model from two RNNs <span class="citation" data-cites="sutskever2014sequence">(<a href="02-mlp-backprop.html#ref-sutskever2014sequence" role="doc-biblioref">Sutskever et al. 2014</a>)</span>:</p>
+<p>The standard example is <strong>machine translation</strong>: <span class="math inline">\bm{x}</span> is an English sentence and <span class="math inline">\bm{y}</span> is its French translation. We already have the tools we need. We build a seq2seq model from two RNNs <span class="citation" data-cites="sutskever2014sequence">(<a href="#ref-sutskever2014sequence" role="doc-biblioref">Sutskever et al. 2014</a>)</span>:</p>
 <ol type="1">
 <li>An <strong>encoder</strong> RNN reads the input sequence, <span class="math inline">\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1})</span>, producing a sequence of hidden states.</li>
 <li>The <strong>context</strong> is the encoder’s final hidden state, <span class="math inline">\bm{c} = \bm{h}_T</span>, which summarizes the whole input.</li>
@@ -693,7 +694,10 @@ Note
 <p><strong>Next lecture:</strong> Attention and the transformer - the mechanism that lets a model condition directly on every element of a sequence, avoiding the single-context bottleneck and the sequential recurrence of RNNs, and that has largely replaced them.</p>
 
 
-<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+</section>
+<section id="bibliography" class="level1 unnumbered">
+<h1 class="unnumbered">References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent" role="list">
 <div id="ref-hochreiter1997long" class="csl-entry" role="listitem">
 Hochreiter, Sepp, and Jürgen Schmidhuber. 1997. <span>“Long Short-Term Memory.”</span> <em>Neural Computation</em> 9 (8): 1735–80.
 </div>

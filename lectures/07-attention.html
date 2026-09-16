@@ -289,6 +289,7 @@ window.Quarto = {
   <li><a href="#sec-position" id="toc-sec-position" class="nav-link" data-scroll-target="#sec-position">Position Encoding</a></li>
   <li><a href="#sec-multihead" id="toc-sec-multihead" class="nav-link" data-scroll-target="#sec-multihead">Multi-Headed Self-Attention</a></li>
   <li><a href="#sec-summary" id="toc-sec-summary" class="nav-link" data-scroll-target="#sec-summary">Summary</a></li>
+  <li><a href="#bibliography" id="toc-bibliography" class="nav-link" data-scroll-target="#bibliography">References</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/r-three/csc413-2516-deep-learning-fall-2026/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -425,7 +426,7 @@ Note
 <p>The first place attention appeared widely in neural networks was in sequence-to-sequence models, so we do not yet leave recurrent networks behind. Recall from the previous lecture the encoder–decoder RNN: the input sequence is fed into an encoder RNN, whose final hidden state <span class="math inline">\bm{h}_T</span> summarizes the input, and this state initializes a decoder RNN that generates the output. We called this summary the <strong>context</strong> <span class="math inline">\bm{c}</span>, and set it to <span class="math inline">\bm{h}_T</span>.</p>
 <p>If <span class="math inline">\bm{c} = \bm{h}_T</span>, then <span class="math inline">\bm{h}_T</span> has to encode all relevant information about the input, because the decoder’s only access to the input is through <span class="math inline">\bm{c}</span>. This is limiting: for a long input, we are forcing more and more information into a single fixed-length vector, and compressing all the relevant information — while discarding the irrelevant — into one vector can be hard.</p>
 <p>We can do better by noting that a decoder’s output at a given step may depend on only a few inputs. Consider translating the English sentence “the cat sat on the mat” into French, “le chat s’est assis sur le tapis.” The word <em>tapis</em> is a translation of <em>mat</em>, and to produce it we need to know essentially only the word <em>mat</em>, not the rest of the sentence. But with a single context, the decoder must rely on <span class="math inline">\bm{h}_T</span> for every output, whether or not a given output depends on the whole input.</p>
-<p>The idea is to compute a <strong>different context <span class="math inline">\bm{c}_{t'}</span> at each output step <span class="math inline">t'</span></strong>, recomputing it based on what we are about to predict — so that the context for producing the French <em>tapis</em> focuses on the encoder state for <em>mat</em>. We implement this with an attention mechanism <span class="citation" data-cites="bahdanau2015neural">(<a href="02-mlp-backprop.html#ref-bahdanau2015neural" role="doc-biblioref">Bahdanau et al. 2015</a>)</span>.</p>
+<p>The idea is to compute a <strong>different context <span class="math inline">\bm{c}_{t'}</span> at each output step <span class="math inline">t'</span></strong>, recomputing it based on what we are about to predict — so that the context for producing the French <em>tapis</em> focuses on the encoder state for <em>mat</em>. We implement this with an attention mechanism <span class="citation" data-cites="bahdanau2015neural">(<a href="#ref-bahdanau2015neural" role="doc-biblioref">Bahdanau et al. 2015</a>)</span>.</p>
 <p>We fill in the five ingredients for sequence-to-sequence attention:</p>
 <ul>
 <li>The <strong>query</strong> is the decoder’s hidden state from the previous step, <span class="math inline">\bm{s}_{t'-1}</span>. (We cannot use <span class="math inline">\bm{s}_{t'}</span>, since it will depend on the context <span class="math inline">\bm{c}_{t'}</span> we are trying to compute.)</li>
@@ -450,7 +451,7 @@ Note
 </section>
 <section id="sec-self-attention" class="level2">
 <h2 class="anchored" data-anchor-id="sec-self-attention">Self-Attention</h2>
-<p>Sequence-to-sequence RNNs with attention work, but the mechanism now dominant is <strong>self-attention</strong>, the core operation inside the transformer <span class="citation" data-cites="vaswani2017attention">(<a href="02-mlp-backprop.html#ref-vaswani2017attention" role="doc-biblioref">Vaswani et al. 2017</a>)</span>. Self-attention has the same role as a recurrent layer: it takes a sequence of inputs and produces a sequence of outputs of the same length, which can be fed to a further layer. It performs this mapping not through recurrence but through an attention mechanism.</p>
+<p>Sequence-to-sequence RNNs with attention work, but the mechanism now dominant is <strong>self-attention</strong>, the core operation inside the transformer <span class="citation" data-cites="vaswani2017attention">(<a href="#ref-vaswani2017attention" role="doc-biblioref">Vaswani et al. 2017</a>)</span>. Self-attention has the same role as a recurrent layer: it takes a sequence of inputs and produces a sequence of outputs of the same length, which can be fed to a further layer. It performs this mapping not through recurrence but through an attention mechanism.</p>
 <div class="definition-block">
 <p><strong>Definition.</strong> In <em>self-attention</em>, the queries, keys, and values all come from the same sequence — hence “self.” Given an input sequence, we transform it three ways to produce queries, keys, and values, then use them to produce an output sequence of the same length.</p>
 </div>
@@ -600,7 +601,7 @@ Note
 <p>More common now is a <strong>relative encoding</strong>, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we learn a position term. Three variants:</p>
 <p><span class="math display">\text{(i)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top (\bm{k}_j + \bm{p}_{ij})}{\sqrt{d_k}}, \qquad \text{(ii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top \bm{k}_j}{\sqrt{d_k}} + p_{ij},</span></p>
 <p>where in (i) <span class="math inline">\bm{p}_{ij} \in \mathbb{R}^{d_k}</span> is a learned vector for each offset, and in (ii) <span class="math inline">p_{ij}</span> is a learned scalar acting as a relative bias that raises or lowers the score before the softmax. Both depend only on the offset <span class="math inline">i - j</span>, up to a maximum beyond which a single far-apart encoding is reused, which allows extrapolation. Variant (i) is somewhat costly, requiring a learned <span class="math inline">d_k</span>-dimensional vector for every offset.</p>
-<p>The third variant is <strong>rotary position encoding</strong> (RoPE) <span class="citation" data-cites="su2024roformer">(<a href="02-mlp-backprop.html#ref-su2024roformer" role="doc-biblioref">Su et al. 2024</a>)</span>. Define a rotation matrix <span class="math inline">\bm{R}_i</span> that rotates by an angle <span class="math inline">i\theta</span> for a fixed hyperparameter <span class="math inline">\theta</span>, rotate the query by <span class="math inline">i\theta</span> and the key by <span class="math inline">j\theta</span>, and compare:</p>
+<p>The third variant is <strong>rotary position encoding</strong> (RoPE) <span class="citation" data-cites="su2024roformer">(<a href="#ref-su2024roformer" role="doc-biblioref">Su et al. 2024</a>)</span>. Define a rotation matrix <span class="math inline">\bm{R}_i</span> that rotates by an angle <span class="math inline">i\theta</span> for a fixed hyperparameter <span class="math inline">\theta</span>, rotate the query by <span class="math inline">i\theta</span> and the key by <span class="math inline">j\theta</span>, and compare:</p>
 <div class="boxed-eq">
 <p><span class="math display">\text{(iii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{(\bm{R}_i \bm{q}_i)^\top (\bm{R}_j \bm{k}_j)}{\sqrt{d_k}}, \qquad \bm{R}_i = \text{rotate by angle } i\theta.</span></p>
 </div>
@@ -679,7 +680,10 @@ Note
 <p><strong>Next lecture:</strong> The transformer - how multi-headed self-attention, position encodings, residual connections, and normalization combine into the architecture that has become standard across sequences, images, and beyond.</p>
 
 
-<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+</section>
+<section id="bibliography" class="level1 unnumbered">
+<h1 class="unnumbered">References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent" role="list">
 <div id="ref-bahdanau2015neural" class="csl-entry" role="listitem">
 Bahdanau, Dzmitry, Kyunghyun Cho, and Yoshua Bengio. 2015. <span>“Neural Machine Translation by Jointly Learning to Align and Translate.”</span> <em>International Conference on Learning Representations</em>.
 </div>
