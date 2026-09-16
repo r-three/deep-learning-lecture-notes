@@ -17,6 +17,7 @@ book:
   chapters:
     - index.qmd
     - lectures/01-intro-regression.qmd
+    - lectures/02-mlp-backprop.qmd
 
 format:
   html:

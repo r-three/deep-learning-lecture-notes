@@ -63,6 +63,7 @@ prerequisites for the undergraduate version of this course, see
 | # | Title |
 |---|---|
 | 1 | [Class introduction; linear & logistic regression](lectures/01-intro-regression.qmd) |
+| 2 | [Multilayer perceptrons, backpropagation](lectures/02-mlp-backprop.qmd) |
 
 ---
 
