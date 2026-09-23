@@ -29,7 +29,7 @@ $$\frac{\partial \mathcal{L}}{\partial W^m} = \frac{\partial \mathcal{L}}{\parti
 
 Suppose the model is a stack of matrix multiplies and element-wise nonlinearities. Which is more expensive: a matrix multiply, or an element-wise nonlinearity? The matrix multiply. It does one multiply-add per *entry* of the weight matrix, and a weight matrix has far more entries than the layer has units. So the cost of a layer is dominated by its matrix multiply, and the **forward pass** costs roughly one multiply per parameter, summed over all layers: $O(|\theta|)$, where $|\theta|$ is the total number of parameters.
 
-Now, look at the backward recursion above. It also does a matrix–vector product with $W^{m+1}$ at every layer. The same asymptotic cost as the forward pass and the weight-gradient step is an outer product that produces an object as large as $W^m$ itself, again, with the same cost. So:
+Now, look at the backward recursion above. It also does a matrix–vector product with $W^{m+1}$ at every layer, which has the same asymptotic cost as the forward pass. The weight-gradient step is an outer product that produces an object as large as $W^m$ itself, again with the same cost. So:
 
 | Pass | What it computes | Cost |
 |---|---|---|
@@ -125,19 +125,19 @@ Two repeated multiplications drive the recursion, and each can misbehave:
 **This is why sigmoid is rarely used as a hidden-layer activation.** ReLU's derivative is exactly $0$ or exactly $1$. Multiplying by $1$ repeatedly neither shrinks nor grows the gradient. This is one of the reasons ReLU made training much deeper networks practical.
 :::
 
-**The weight-matrix term.** The recursion also repeatedly multiplies by $(W^{k})^\top$. What happens when you multiply a matrix by itself over and over depends on its eigenvalues: values consistently above 1 tend to blow the product up (**exploding** gradients); values consistently below 1 tend to shrink it to zero (vanishing again). Unlike the nonlinearity term, this direction of failure is entirely in our hands. It's set by how we choose the weight matrices *before training even starts*.
+**The weight-matrix term.** The recursion also repeatedly multiplies by $(W^{k})^\top$. What happens when you multiply a matrix by itself over and over depends on its eigenvalues: values consistently above 1 tend to blow the product up (**exploding** gradients); values consistently below 1 tend to shrink it to zero (vanishing again). The recursion uses a different matrix at each layer, so what matters is how much each one tends to stretch or shrink vectors, but the idea is the same. Unlike the nonlinearity term, this direction of failure is entirely in our hands. It's set by how we choose the weight matrices *before training even starts*.
 
 ## Parameter Initialization {#sec-initialization}
 
 Gradient descent only ever nudges parameters by a small step in the direction of the negative gradient — the *initial* values are the one place we have direct control, before training dynamics take over. So we should choose that starting distribution carefully.
 
-**Two bad ideas, first.** Why not initialize every weight to $0$? Then every layer's output stops depending on the input entirely (ignoring the bias), the model can't learn any input–output mapping, and every gradient is $0$ too — nothing updates. Why not make every weight the same constant, say $1$? Then every row of $W$ computes the *same* dot product with the input, so every hidden unit learns an identical, totally redundant function — we waste nearly all of the layer's capacity. We need **random**, but carefully-scaled, initial values.
+**Two bad ideas, first.** Why not initialize every weight to $0$? Then every layer's output stops depending on the input entirely (ignoring the bias), and the model can't represent any input–output mapping. Training can't easily fix this either: the backward recursion multiplies by ${W^{m+1}}^\top = 0$, so at initialization every layer below the output receives exactly zero gradient, and even once updates begin, every unit within a layer stays identical. Why not make every weight the same constant, say $1$? Then every row of $W$ computes the *same* dot product with the input, so every hidden unit learns an identical, totally redundant function — we waste nearly all of the layer's capacity. We need **random**, but carefully-scaled, initial values.
 
 ### Deriving Xavier / Glorot Initialization
 
 Consider one linear layer in isolation, $\bm{o} = W\bm{x}$, with $\bm{x}\in\mathbb{R}^{n_{in}}$ and $\bm{o}\in\mathbb{R}^{n_{out}}$. Assume no nonlinearity, $x_j \sim \mathcal{N}(0, 1)$, and $W_{ij} \sim \mathcal{N}(0, \sigma^2)$ — the only knob we control is $\sigma$.
 
-Since $o_i = \sum_{j=1}^{n_{in}} W_{ij}\, x_j$ is a sum of zero-mean terms, $\mathbb{E}[o_i] = 0$. For the variance, using $\mathrm{Var}[o_i] = \mathbb{E}[o_i^2] - \mathbb{E}[o_i]^2 = \mathbb{E}[o_i^2]$ and independence of $W$ and $x$:
+Since $o_i = \sum_{j=1}^{n_{in}} W_{ij}\, x_j$ is a sum of zero-mean terms, $\mathbb{E}[o_i] = 0$. For the variance, using $\mathrm{Var}[o_i] = \mathbb{E}[o_i^2] - \mathbb{E}[o_i]^2 = \mathbb{E}[o_i^2]$ and independence of all the $W_{ij}$ and $x_j$ (so every cross term $W_{ij}W_{ik}x_jx_k$ with $j \neq k$ has zero mean):
 
 $$\mathrm{Var}[o_i] = \sum_{j=1}^{n_{in}} \mathbb{E}[W_{ij}^2]\,\mathbb{E}[x_j^2] = \sum_{j=1}^{n_{in}} \sigma^2 \cdot 1 = n_{in}\,\sigma^2$$
 
@@ -154,7 +154,7 @@ $$\sigma = \sqrt{\frac{2}{n_{in} + n_{out}}}$$
 This is **Xavier** (or **Glorot**) **initialization** [@glorot2010understanding] — sample every weight from $\mathcal{N}(0, \sigma^2)$ with this $\sigma$. Because the activation variance stays $\approx 1$ at every layer, neither the forward activations nor the backward gradients can systematically explode or vanish.
 
 ::: {.callout-note}
-**He initialization.** Xavier's derivation assumes no nonlinearity. If you instead assume a ReLU activation (as Homework 3 does), the same style of derivation gives a slightly different scale, called **He initialization** [@he2015delving]. Most deep learning frameworks default to one of these two schemes.
+**He initialization.** Xavier's derivation assumes no nonlinearity. If you instead assume a ReLU activation (as Homework 3 does), the same style of derivation gives a slightly different scale, $\sigma = \sqrt{2/n_{in}}$, called **He initialization** [@he2015delving]. Most deep learning frameworks default to one of these two schemes.
 :::
 
 ## Automatic Differentiation {#sec-autodiff}
@@ -203,28 +203,28 @@ Each line is one **op**: multiply, add, ReLU, multiply, add, subtract, power. Th
   <text x="372" y="403" text-anchor="end" font-size="24" fill="#207965" font-style="italic">o</text>
   <circle cx="420" cy="514" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
   <text x="420" y="521" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">&#215;</text>
-  <text x="372" y="521" text-anchor="end" font-size="24" fill="#207965" font-style="italic">m_o</text>
+  <text x="372" y="521" text-anchor="end" font-size="24" fill="#207965" font-style="italic">m<tspan dy="6" font-size="18">o</tspan></text>
   <circle cx="420" cy="632" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
   <text x="420" y="639" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">ReLU</text>
   <text x="372" y="639" text-anchor="end" font-size="24" fill="#207965" font-style="italic">h</text>
   <circle cx="420" cy="750" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
   <text x="420" y="757" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">+</text>
-  <text x="372" y="757" text-anchor="end" font-size="24" fill="#207965" font-style="italic">a_h</text>
+  <text x="372" y="757" text-anchor="end" font-size="24" fill="#207965" font-style="italic">a<tspan dy="6" font-size="18">h</tspan></text>
   <circle cx="420" cy="868" r="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="2"/>
   <text x="420" y="875" text-anchor="middle" font-size="24" font-weight="600" fill="#207965">&#215;</text>
-  <text x="372" y="875" text-anchor="end" font-size="24" fill="#207965" font-style="italic">m_h</text>
+  <text x="372" y="875" text-anchor="end" font-size="24" fill="#207965" font-style="italic">m<tspan dy="6" font-size="18">h</tspan></text>
   <circle cx="650" cy="160" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
   <text x="650" y="167" text-anchor="middle" font-size="24" fill="#205279">2</text>
   <circle cx="650" cy="278" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
   <text x="650" y="285" text-anchor="middle" font-size="24" fill="#205279">y</text>
   <circle cx="650" cy="396" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="403" text-anchor="middle" font-size="24" fill="#205279">b_o</text>
+  <text x="650" y="403" text-anchor="middle" font-size="24" fill="#205279">b<tspan dy="6" font-size="18">o</tspan></text>
   <circle cx="650" cy="514" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="521" text-anchor="middle" font-size="24" fill="#205279">w_o</text>
+  <text x="650" y="521" text-anchor="middle" font-size="24" fill="#205279">w<tspan dy="6" font-size="18">o</tspan></text>
   <circle cx="650" cy="750" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="757" text-anchor="middle" font-size="24" fill="#205279">b_h</text>
+  <text x="650" y="757" text-anchor="middle" font-size="24" fill="#205279">b<tspan dy="6" font-size="18">h</tspan></text>
   <circle cx="650" cy="868" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-  <text x="650" y="875" text-anchor="middle" font-size="24" fill="#205279">w_h</text>
+  <text x="650" y="875" text-anchor="middle" font-size="24" fill="#205279">w<tspan dy="6" font-size="18">h</tspan></text>
   <circle cx="420" cy="986" r="32" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
   <text x="420" y="993" text-anchor="middle" font-size="24" fill="#205279">x</text>
   <text x="722" y="514" font-size="24" fill="#666" text-anchor="start">leaf nodes</text>
@@ -250,10 +250,10 @@ Every factor here is the derivative of a *single, simple* operation — exactly 
 **Given a user's model** (a composition of these ops):
 
 1. **Forward pass** — evaluate every op in order, and record which ops were applied to which inputs. This record *is* the computational graph.
-2. **Backward pass** — to get $d\mathcal{L}/dw$ for any leaf $w$, traverse the graph from $\mathcal{L}$ to $w$, multiplying local derivatives along every path (summing over paths if there is more than one).
+2. **Backward pass** — starting from $d\mathcal{L}/d\mathcal{L} = 1$, visit the nodes in *reverse* topological order (each node only after every node that uses it). At each op node, multiply the node's accumulated gradient by the op's derivative with respect to each input, and **add** the result to that input's running gradient. When the sweep finishes, every leaf $w$ holds $d\mathcal{L}/dw$. Accumulating into a running sum is how the "sum over paths" is computed without enumerating paths, and one sweep yields the gradients for all leaves at once.
 :::
 
-This is exactly what Homework 3 asks you to build: an `Operation` class (with `add`, `multiply`, ... subclasses) that knows its own forward and backward rules, a graph that records which operations were applied, and a `backward()` that walks the graph to produce every gradient automatically — no more hand-deriving a custom backward pass per architecture.
+This is exactly what Homework 3 asks you to build: an `Operation` class (with `Add`, `Mul`, `ReLU`, `MatMul`, ... subclasses) that knows its own forward and backward rules, a `Node` class that records which operation and parents produced each value, and a `backward()` that walks the graph to produce every gradient automatically — no more hand-deriving a custom backward pass per architecture.
 
 ## Overfitting and Regularization {#sec-overfitting}
 
@@ -315,19 +315,19 @@ The classic symptom (left) is a gap that opens up between training and validatio
 
 ### How Can a Linear Model Overfit?
 
-It's tempting to think a model as simple as $\hat{y} = wx$ can't overfit. But consider: each feature $x_i$ is sampled from $x_i \sim \mathcal{N}(y_i, \sigma)$ where $y_i \in \{-1, +1\}$ is the label — i.e., every feature is a noisy version of the label, so its distribution for the two classes overlaps heavily. With enough *features* and a small enough training set, it's entirely possible that pure chance makes **one** particular feature perfectly linearly separable on the training data alone. The model can then achieve zero training loss by placing all of its weight on that one lucky feature and ignoring every other — a classic case of **over-reliance on a feature** that has no reason to generalize.
+It's tempting to think a model as simple as $\hat{y} = \bm{w}^\top\bm{x}$ can't overfit. But consider: for an example with label $y \in \{-1, +1\}$, each feature is sampled as $x_j \sim \mathcal{N}(y, \sigma^2)$ — i.e., every feature is a noisy version of the label, so its distribution for the two classes overlaps heavily. With enough *features* and a small enough training set, it's entirely possible that pure chance makes **one** particular feature perfectly linearly separable on the training data alone. The model can then achieve zero training loss by placing all of its weight on that one lucky feature and ignoring every other — a classic case of **over-reliance on a feature** that is no more reliable than any other.
 
 The same failure mode shows up in deep networks: with many learned features and a limited training set, some feature may become accidentally separable, and the model over-invests in it. Both regularizers below attack exactly this over-reliance.
 
 ### L2 Regularization (Weight Decay)
 
-To discourage any single weight from growing too large, add the squared L2 norm of the weights to the loss, scaled by a hyperparameter $\lambda$:
+To discourage any single weight from growing too large, add the squared L2 norm of the weights (for a matrix, the squared Frobenius norm $\lVert W \rVert_F^2 = \sum_{i,j} W_{ij}^2$) to the loss, scaled by a hyperparameter $\lambda$:
 
-$$\mathcal{L}_{\text{reg}} = \mathcal{L} + \lambda \lVert W \rVert_2^2$$
+$$\mathcal{L}_{\text{reg}} = \mathcal{L} + \lambda \lVert W \rVert_F^2$$
 
 The gradient descent update on this regularized loss is
 
-$$W \leftarrow W - \eta \nabla_W\!\left(\mathcal{L} + \lambda \lVert W \rVert_2^2\right) = (1 - 2\eta\lambda)\, W - \eta \nabla_W \mathcal{L}$$
+$$W \leftarrow W - \eta \nabla_W\!\left(\mathcal{L} + \lambda \lVert W \rVert_F^2\right) = (1 - 2\eta\lambda)\, W - \eta \nabla_W \mathcal{L}$$
 
 Since $\eta$ and $\lambda$ are both small, $(1-2\eta\lambda)$ is a number just under $1$ — every update multiplicatively **shrinks** $W$ a little, in addition to the usual gradient step. This is why L2 regularization is also called **weight decay**.
 
@@ -337,18 +337,18 @@ The second common regularizer, **dropout** [@srivastava2014dropout] (invented at
 
 $$x_i' = \begin{cases} 0 & \text{with probability } p \\[4pt] \dfrac{x_i}{1-p} & \text{with probability } 1-p \end{cases}$$
 
-The rescaling is chosen precisely so that $\mathbb{E}[x_i'] = x_i$ — dropout doesn't change what the network computes *on average*, but because any given feature might vanish on any given training step, the model can never afford to rely on just one. Weight decay and dropout are, in practice, the two regularizers you will reach for most often in deep learning.
+The rescaling is chosen precisely so that $\mathbb{E}[x_i'] = x_i$ — dropout doesn't change what the network computes *on average*, but because any given feature might vanish on any given training step, the model can never afford to rely on just one. At test time, dropout is turned off: no features are zeroed and no rescaling is applied. Weight decay and dropout are, in practice, the two regularizers you will reach for most often in deep learning.
 
 ## Summary {#sec-summary}
 
 ::: {.callout-note}
 **Key takeaways from Lecture 3**
 
-- Backpropagation costs about **3×** a forward pass: $\sim|\theta|$ for the forward pass, and $\sim2|\theta|$ more for the backward pass (a matrix–vector product plus an outer product per layer).
+- A training step (forward + backward) costs about **3×** a forward pass: $\sim|\theta|$ for the forward pass, and $\sim2|\theta|$ more for the backward pass (a matrix–vector product plus an outer product per layer).
 - A sigmoid network's backward recursion repeatedly multiplies by (a) the sigmoid derivative (max $\tfrac14$) and (b) the weight matrix transpose — the first reliably **vanishes**, the second can **vanish or explode** depending on its eigenvalues.
 - **Xavier/Glorot initialization** ($\sigma = \sqrt{2/(n_{in}+n_{out})}$) keeps activation and gradient variance $\approx 1$ at every layer, avoiding vanishing/exploding gradients from the start of training. **He initialization** is the ReLU-specific variant.
 - **Automatic differentiation** decomposes any model into elementary operations with known local derivatives, records them in a **computational graph** during the forward pass, and computes every gradient by traversing that graph backward — no hand-derived backward pass required.
-- **Overfitting** happens when a model over-relies on a feature that is accidentally informative on the training set alone. **Weight decay** ($+\lambda\lVert W\rVert_2^2$, i.e. shrink weights every step) and **dropout** (randomly zero features during training) both discourage this over-reliance.
+- **Overfitting** happens when a model over-relies on a feature that is accidentally informative on the training set alone. **Weight decay** ($+\lambda\lVert W\rVert_F^2$, i.e. shrink weights every step) and **dropout** (randomly zero features during training) both discourage this over-reliance.
 :::
 
 **Next lecture:** Optimization — the adaptive, momentum-based variants of gradient descent used to train real networks in practice.
