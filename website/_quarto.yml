@@ -18,6 +18,7 @@ book:
     - index.qmd
     - lectures/01-intro-regression.qmd
     - lectures/02-mlp-backprop.qmd
+    - lectures/03-regularization.qmd
 
 format:
   html:
