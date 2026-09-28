@@ -57,12 +57,12 @@ that. We learn the features automatically.
 
 ## The Multi-Layer Perceptron {#sec-mlp}
 
-The central idea in deep learning: build complex models by **composing many
-simple, differentiable functions**.
+Remember, the central idea in deep learning is to build complex models that can model complex relationships by **composing many simple, differentiable functions**.
 
 ### Why stacking linear layers doesn't help
 
-Try composing two linear layers:
+We have already seen one example of a layer in this class: The linear layer underlying linear and logistic regression.
+Given that we've already been exposed to linear layers, let's try composing two of them:
 
 $$H = XW_1, \qquad O = HW_2$$
 
