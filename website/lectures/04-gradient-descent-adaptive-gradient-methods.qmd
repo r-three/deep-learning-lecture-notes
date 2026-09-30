@@ -19,9 +19,9 @@ Before returning to machine learning, it helps to set neural networks aside and 
 
 ### Why gradient descent works {#sec-why-gd}
 
-To justify the gradient descent update, we start from a Taylor expansion of $f$. Writing it in one particular form, if $f$ is infinitely differentiable then its value at a point offset by $e$ from $x$ can be written as an infinite sum,
+To justify the gradient descent update, we start from a Taylor expansion of $f$. Writing it in one particular form, if $f$ is infinitely differentiable then its value at a point offset by $h$ from $x$ can be written as an infinite sum,
 
-$$f(x + e) = \sum_{n=0}^{\infty} \frac{e^n f^{(n)}(x)}{n!},$$
+$$f(x + h) = \sum_{n=0}^{\infty} \frac{h^n f^{(n)}(x)}{n!},$$
 
 where $f^{(n)}$ is the $n$th derivative of $f$. This decomposes the function's behavior near $x$ into contributions from its successive derivatives. If this specific form is unfamiliar, it is the same Taylor expansion seen elsewhere, just written as a single sum.
 
@@ -49,7 +49,7 @@ We will return to the question of what happens when that error is *not* small.
 
 The size of the error term, and therefore whether the update actually decreases $f$, depends on the learning rate $\eta$. This gives three qualitatively different regimes.
 
-If we want to be sure the approximate inequality holds, we can make $\epsilon = -\eta f'(x)$ very small by making $\eta$ very small. This works, but each step then covers very little ground, so minimizing the function takes a great many iterations. In deep learning each iteration means a forward and backward pass through the model, and, as we saw last lecture (Lecture 3), the backward pass roughly triples the cost of the forward pass. A very small learning rate multiplies an already expensive computation by the number of steps, and training may run out of time or budget before it converges.
+If we want to be sure the approximate inequality holds, we can make $\epsilon = -\eta f'(x)$ very small by making $\eta$ very small. This works, but each step then covers very little ground, so minimizing the function takes a great many iterations. In deep learning each iteration means a forward and backward pass through the model, and, as we saw last lecture (Lecture 3), adding the backward pass roughly triples the cost of the forward pass alone. A very small learning rate multiplies an already expensive computation by the number of steps, and training may run out of time or budget before it converges.
 
 The opposite choice is a large $\eta$, to make faster progress. But when $\eta$ is too large the error term is no longer negligible, and the update can overshoot so badly that the new point is *worse* than where it started. Instead of decreasing, $f$ increases, and increases again on the next step. This is **divergence**: when training a model, we see the loss climbing rather than falling.
 
@@ -163,7 +163,7 @@ $$\bm{\theta} \leftarrow \bm{\theta} - \eta\, \nabla_{\bm{\theta}} \mathcal{L}_i
 
 We might feel comfortable with this because in expectation the single-example update matches the batch update. Since each index has probability $1/N$,
 
-$$\mathbb{E}\big[\nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta})\big] = \frac{1}{N} \sum_{i=1}^{N} \nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta}) = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta}).$$
+$$\mathbb{E}\big[\nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta})\big] = \frac{1}{N} \sum_{j=1}^{N} \nabla_{\bm{\theta}} \mathcal{L}_j(\bm{\theta}) = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta}).$$
 
 ::: {.definition-block}
 **Definition.** *Stochastic gradient descent* (SGD) updates the parameters using the gradient of the loss on a single randomly drawn example. In expectation this update equals the full-batch update, but any individual update uses only one example. In common usage "SGD" usually refers to the mini-batch version introduced below rather than this single-example form.
@@ -206,13 +206,13 @@ This is worth picturing. When we justified gradient descent at the start of the 
   <circle cx="128.7" cy="183.3" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"/><circle cx="169.6" cy="201.7" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"/><circle cx="210.5" cy="234.0" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"/><circle cx="247.7" cy="264.3" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"/><circle cx="281.2" cy="283.4" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"/><circle cx="311.0" cy="289.4" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"/>
 
   <line x1="150" y1="84" x2="188" y2="84" stroke="#205279" stroke-width="3.2"/>
-  <text x="196" y="89" font-size="14" fill="#333">Full-batch loss 𝓛(θ) (average)</text>
+  <text x="196" y="89" font-size="14" fill="#333">Full-batch loss ℒ(θ) (average)</text>
   <line x1="150" y1="106" x2="188" y2="106" stroke="#9db8cf" stroke-width="2.4" stroke-dasharray="6,4"/>
-  <text x="196" y="111" font-size="14" fill="#333">Per-example losses 𝓛ᵢ(θ)</text>
+  <text x="196" y="111" font-size="14" fill="#333">Per-example losses ℒᵢ(θ)</text>
 
   <rect x="26" y="348" width="413" height="66" rx="10" fill="#E7F1FB" stroke="#9db8cf" stroke-width="1.2"/>
   <circle cx="56.7" cy="388.7" r="2.2" fill="#5795C7"/><circle cx="47.5" cy="375.8" r="1.9" fill="#5795C7"/><circle cx="69.7" cy="381.9" r="2.1" fill="#5795C7"/><circle cx="57.6" cy="393.7" r="2.4" fill="#5795C7"/><circle cx="60.5" cy="375.1" r="2.6" fill="#5795C7"/><circle cx="62.4" cy="388.1" r="2.8" fill="#5795C7"/><circle cx="43.8" cy="379.6" r="2.6" fill="#5795C7"/><circle cx="67.6" cy="385.0" r="2.5" fill="#5795C7"/><circle cx="55.2" cy="382.8" r="2.8" fill="#5795C7"/>
-  <text x="92" y="376" font-size="14" fill="#205279">Each iteration uses a different loss 𝓛ᵢ(θ),</text>
+  <text x="92" y="376" font-size="14" fill="#205279">Each iteration uses a different loss ℒᵢ(θ),</text>
   <text x="92" y="398" font-size="14" fill="#205279">so the gradient direction changes.</text>
 
   <!-- ===================== CARD 2 (crimson) ===================== -->
@@ -223,7 +223,7 @@ This is worth picturing. When we justified gradient descent at the start of the 
 
   <line x1="512" y1="322" x2="895" y2="322" stroke="#888" stroke-width="1.4" marker-end="url(#axA)"/>
   <line x1="512" y1="322" x2="512" y2="112" stroke="#888" stroke-width="1.4" marker-end="url(#axA)"/>
-  <text x="520" y="128" font-size="14" fill="#792051">𝓛(θ)</text>
+  <text x="520" y="128" font-size="14" fill="#792051">ℒ(θ)</text>
   <text x="892" y="342" text-anchor="end" font-size="14" fill="#444">iteration</text>
 
   <line x1="512" y1="303.8" x2="890" y2="303.8" stroke="#b0b0b0" stroke-width="1.4" stroke-dasharray="7,5"/>
@@ -252,7 +252,13 @@ At each iteration we descend a different one of these per-example curves. The di
 
 One widespread response to this stalling is a **learning rate schedule**: rather than holding $\eta$ fixed, use a different value $\eta(t)$ at each iteration $t$. Several common choices are
 
-$$\eta(t) = \eta \quad \text{(constant)}, \qquad \eta(t) = \eta_i \;\text{ if } t_i \le t \le t_{i+1} \quad \text{(piecewise constant)}, \qquad \eta(t) = \eta_0\, e^{-\lambda t} \quad \text{(exponential)}.$$
+$$
+\begin{aligned}
+\eta(t) &= \eta \quad \text{(constant)}, \\
+\eta(t) &= \eta_i \;\text{ if } t_i \le t < t_{i+1} \quad \text{(piecewise constant)}, \\
+\eta(t) &= \eta_0\, e^{-\lambda t} \quad \text{(exponential)}.
+\end{aligned}
+$$
 
 The constant schedule is what we have used so far. A piecewise-constant schedule holds the learning rate at a sensible value for most of training and then drops it in the late phase, when SGD's progress would otherwise stall, so that smaller steps can make further progress; the intervals $t_i$ and rates $\eta_i$ are hyperparameters. A common variant is to not fix the intervals in advance but instead drop the rate — say by a factor of ten — whenever progress stalls, an adaptive rather than predefined schedule. The exponential schedule decays the rate continuously at a speed set by $\lambda$. Another popular choice, which we will not write out, is the **cosine schedule**, which decays the rate from its initial value to near zero over a fixed training duration $T$ following the shape of a cosine curve. The shared intuition is that early in training the per-example losses agree and a larger rate is safe, while later a smaller rate makes less noisy progress toward the minimum.
 
@@ -413,7 +419,7 @@ Because $\beta_1 + (1 - \beta_1) = 1$, this is exactly a moving average of the o
 
 $$s_t \leftarrow \beta_2\, s_{t-1} + (1 - \beta_2)\, g_t^2 \qquad \text{(second moment estimate)},$$
 
-which estimates the second moment (roughly, the uncentered variance) of the gradients.
+which estimates the second moment (roughly, the uncentered variance) of the gradients. Here $g_t^2$ denotes the element-wise square of $g_t$.
 
 The point of the two averages is as follows. Using the moving-average gradient $v_t$ instead of the raw gradient smooths the update, following the same intuition as momentum: gradients that agree accumulate, while gradients that disagree average toward something smaller. The squared-gradient average $s_t$ lets us normalize magnitude: dividing by its square root puts each parameter's gradient onto a comparable scale. Combining the two gives the update
 
@@ -430,7 +436,7 @@ where $\epsilon$ is a small constant, around $10^{-8}$. Its role is purely numer
 $$v_1 = \beta_1 v_0 + (1 - \beta_1) g_1 = (1 - \beta_1) g_1,$$
 $$v_2 = \beta_1 v_1 + (1 - \beta_1) g_2 = \beta_1 (1 - \beta_1) g_1 + (1 - \beta_1) g_2.$$
 
-The total weight on the gradients in $v_2$ — the coefficient of $g_1$ plus the coefficient of $g_2$ — is $\beta_1(1 - \beta_1) + (1 - \beta_1) = 1 - \beta_1^2$. Carrying the same expansion one step further gives a total rescaling of $1 - \beta_1^3$ for $v_3$, and in general
+The total weight on the gradients in $v_2$ (the coefficient of $g_1$ plus the coefficient of $g_2$) is $\beta_1(1 - \beta_1) + (1 - \beta_1) = 1 - \beta_1^2$. Carrying the same expansion one step further gives a total rescaling of $1 - \beta_1^3$ for $v_3$, and in general
 
 $$\text{total gradient rescaling at iteration } t \;=\; 1 - \beta_1^t.$$
 
@@ -452,7 +458,7 @@ $$g_t' = \frac{\eta\, \hat{v}_t}{\sqrt{\hat{s}_t} + \epsilon} \qquad\qquad \bm{\
 
 Compared to plain gradient descent, Adam uses a moving average of the gradients in place of the raw gradient, which smooths the update much as momentum does; it divides by the square root of the second-moment estimate, which normalizes the parameters' gradients toward a common magnitude; and it corrects the early-training bias, so that updates are not effectively scaled down at the start.
 
-**Why Adam became the default.** If the normalization works as intended, then across problems — different architectures, datasets, and loss functions — the gradients Adam produces have roughly the same magnitude. Since the appropriate learning rate is tied to the gradient magnitude, this means one learning rate tends to work across many problems, which reduces the hyperparameter tuning that is otherwise expensive and tedious. In practice this largely holds. The values proposed in the Adam paper,
+**Why Adam became the default.** If the normalization works as intended, then across problems — different architectures, datasets, and loss functions — the updates Adam produces have roughly the same magnitude. Since the appropriate learning rate is tied to the gradient magnitude, this means one learning rate tends to work across many problems, which reduces the hyperparameter tuning that is otherwise expensive and tedious. In practice this largely holds. The values proposed in the Adam paper,
 
 $$\beta_1 = 0.9, \qquad \beta_2 = 0.999, \qquad \eta = 0.001, \qquad \epsilon = 10^{-8},$$
 
