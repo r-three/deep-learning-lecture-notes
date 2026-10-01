@@ -411,38 +411,38 @@ A typical value is $\beta = 0.9$, close to one so that $v_t$ reflects a long his
 
 The adaptive gradient method used to train essentially all modern neural networks is **Adam** [@kingma2015adam]. Historically, early attempts to train neural networks with plain gradient descent were hampered by the difficulty of finding one learning rate that worked for every parameter, with results depending heavily on initialization. Momentum helped somewhat, various adaptive methods were proposed, and eventually Adam was introduced and worked well enough that it became the default. It was developed by two graduate students, one at the University of Toronto and one at the University of Amsterdam; it retains a connection to Toronto on that account.
 
-Adam keeps *two* gradient accumulators. The first, $m_t$, resembles the momentum accumulator but is written as a moving average through the extra factor $1 - \beta_1$,
+Adam keeps *two* gradient accumulators. The first, $v_t$, resembles the momentum accumulator but is written as a moving average through the extra factor $1 - \beta_1$,
 
-$$m_t \leftarrow \beta_1\, m_{t-1} + (1 - \beta_1)\, g_t \qquad \text{(first moment estimate)}.$$
+$$v_t \leftarrow \beta_1\, v_{t-1} + (1 - \beta_1)\, g_t \qquad \text{(first moment estimate)}.$$
 
 Because $\beta_1 + (1 - \beta_1) = 1$, this is exactly a moving average of the old value and the incoming gradient. It is not the same as explicitly averaging every gradient seen so far, but it approximates that average without storing the whole history, and it estimates the first moment (the mean) of the gradients. The second accumulator uses its own hyperparameter $\beta_2$ and averages the *squared* gradient,
 
-$$v_t \leftarrow \beta_2\, v_{t-1} + (1 - \beta_2)\, g_t^2 \qquad \text{(second moment estimate)},$$
+$$s_t \leftarrow \beta_2\, s_{t-1} + (1 - \beta_2)\, g_t^2 \qquad \text{(second moment estimate)},$$
 
 which estimates the second moment (roughly, the uncentered variance) of the gradients. Here $g_t^2$ denotes the element-wise square of $g_t$.
 
-The point of the two averages is as follows. Using the moving-average gradient $m_t$ instead of the raw gradient smooths the update, following the same intuition as momentum: gradients that agree accumulate, while gradients that disagree average toward something smaller. The squared-gradient average $v_t$ lets us normalize magnitude: dividing by its square root puts each parameter's gradient onto a comparable scale. Combining the two gives the update
+The point of the two averages is as follows. Using the moving-average gradient $v_t$ instead of the raw gradient smooths the update, following the same intuition as momentum: gradients that agree accumulate, while gradients that disagree average toward something smaller. The squared-gradient average $s_t$ lets us normalize magnitude: dividing by its square root puts each parameter's gradient onto a comparable scale. Combining the two gives the update
 
-$$g_t' = \frac{\eta\, m_t}{\sqrt{v_t} + \epsilon}, \qquad \bm{\theta}_t = \bm{\theta}_{t-1} - g_t',$$
+$$g_t' = \frac{\eta\, v_t}{\sqrt{s_t} + \epsilon}, \qquad \bm{\theta}_t = \bm{\theta}_{t-1} - g_t',$$
 
-where $\epsilon$ is a small constant, around $10^{-8}$. Its role is purely numerical: when $v_t$ is very small, dividing by $\sqrt{v_t}$ alone could blow up, and adding $\epsilon$ prevents that. (This $\epsilon$ is unrelated to the $\epsilon$ from the Taylor expansion at the start of the lecture.)
+where $\epsilon$ is a small constant, around $10^{-8}$. Its role is purely numerical: when $s_t$ is very small, dividing by $\sqrt{s_t}$ alone could blow up, and adding $\epsilon$ prevents that. (This $\epsilon$ is unrelated to the $\epsilon$ from the Taylor expansion at the start of the lecture.)
 
 ::: {.callout-warning}
-**This is not yet Adam.** The update above is missing one step. Because both accumulators are initialized to zero, $m_0 = v_0 = 0$, they are biased toward zero early in training, and Adam corrects for this bias before using them.
+**This is not yet Adam.** The update above is missing one step. Because both accumulators are initialized to zero, $v_0 = s_0 = 0$, they are biased toward zero early in training, and Adam corrects for this bias before using them.
 :::
 
-**The bias and its correction.** To see the bias, track the total rescaling applied to the gradients as the moving average unrolls. With $m_0 = 0$,
+**The bias and its correction.** To see the bias, track the total rescaling applied to the gradients as the moving average unrolls. With $v_0 = 0$,
 
-$$m_1 = \beta_1 m_0 + (1 - \beta_1) g_1 = (1 - \beta_1) g_1,$$
-$$m_2 = \beta_1 m_1 + (1 - \beta_1) g_2 = \beta_1 (1 - \beta_1) g_1 + (1 - \beta_1) g_2.$$
+$$v_1 = \beta_1 v_0 + (1 - \beta_1) g_1 = (1 - \beta_1) g_1,$$
+$$v_2 = \beta_1 v_1 + (1 - \beta_1) g_2 = \beta_1 (1 - \beta_1) g_1 + (1 - \beta_1) g_2.$$
 
-The total weight on the gradients in $m_2$ (the coefficient of $g_1$ plus the coefficient of $g_2$) is $\beta_1(1 - \beta_1) + (1 - \beta_1) = 1 - \beta_1^2$. Carrying the same expansion one step further gives a total rescaling of $1 - \beta_1^3$ for $m_3$, and in general
+The total weight on the gradients in $v_2$ (the coefficient of $g_1$ plus the coefficient of $g_2$) is $\beta_1(1 - \beta_1) + (1 - \beta_1) = 1 - \beta_1^2$. Carrying the same expansion one step further gives a total rescaling of $1 - \beta_1^3$ for $v_3$, and in general
 
 $$\text{total gradient rescaling at iteration } t \;=\; 1 - \beta_1^t.$$
 
-Typically $\beta_1$ and $\beta_2$ are close to one, so that the moving average reflects a long history. But then $1 - \beta_1^t$ and $1 - \beta_2^t$ start near zero and grow only slowly, which means $m_t$ and $v_t$ are biased toward zero early in training — at the first step, $m_1 = (1 - \beta_1) g_1$ is nearly zero rather than $g_1$. The simplest correction is to divide out exactly this factor:
+Typically $\beta_1$ and $\beta_2$ are close to one, so that the moving average reflects a long history. But then $1 - \beta_1^t$ and $1 - \beta_2^t$ start near zero and grow only slowly, which means $v_t$ and $s_t$ are biased toward zero early in training — at the first step, $v_1 = (1 - \beta_1) g_1$ is nearly zero rather than $g_1$. The simplest correction is to divide out exactly this factor:
 
-$$\hat{m}_t = \frac{m_t}{1 - \beta_1^t}, \qquad \hat{v}_t = \frac{v_t}{1 - \beta_2^t}.$$
+$$\hat{v}_t = \frac{v_t}{1 - \beta_1^t}, \qquad \hat{s}_t = \frac{s_t}{1 - \beta_2^t}.$$
 
 Putting the moment estimates, the bias correction, the normalization, and the update together gives Adam in full.
 
@@ -451,9 +451,9 @@ Putting the moment estimates, the bias correction, the normalization, and the up
 
 At iteration $t$, with gradient $g_t = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta})$:
 
-$$m_t \leftarrow \beta_1\, m_{t-1} + (1 - \beta_1)\, g_t \qquad\qquad \hat{m}_t = \frac{m_t}{1 - \beta_1^t}$$
-$$v_t \leftarrow \beta_2\, v_{t-1} + (1 - \beta_2)\, g_t^2 \qquad\qquad \hat{v}_t = \frac{v_t}{1 - \beta_2^t}$$
-$$g_t' = \frac{\eta\, \hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon} \qquad\qquad \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} - g_t'$$
+$$v_t \leftarrow \beta_1\, v_{t-1} + (1 - \beta_1)\, g_t \qquad\qquad \hat{v}_t = \frac{v_t}{1 - \beta_1^t}$$
+$$s_t \leftarrow \beta_2\, s_{t-1} + (1 - \beta_2)\, g_t^2 \qquad\qquad \hat{s}_t = \frac{s_t}{1 - \beta_2^t}$$
+$$g_t' = \frac{\eta\, \hat{v}_t}{\sqrt{\hat{s}_t} + \epsilon} \qquad\qquad \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} - g_t'$$
 :::
 
 Compared to plain gradient descent, Adam uses a moving average of the gradients in place of the raw gradient, which smooths the update much as momentum does; it divides by the square root of the second-moment estimate, which normalizes the parameters' gradients toward a common magnitude; and it corrects the early-training bias, so that updates are not effectively scaled down at the start.
@@ -465,7 +465,7 @@ $$\beta_1 = 0.9, \qquad \beta_2 = 0.999, \qquad \eta = 0.001, \qquad \epsilon = 
 are sensible defaults that work acceptably on most problems, even if they are not optimal for the fastest convergence on any particular one. There is no comparable default learning rate for plain SGD, because a different initialization, loss, or dataset can put the gradients on a completely different scale; Adam rescales them to a common scale, so one set of hyperparameters can be pulled off the shelf and applied broadly. That convenience, more than anything, is why Adam is so widely used.
 
 ::: {.callout-note}
-**The cost.** Adam has to store both accumulators $m_t$ and $v_t$, each with one entry per parameter. Together with the parameters themselves, that is three copies of everything, so Adam roughly triples the optimizer's memory footprint relative to the model's parameters — usually an acceptable price for reliable convergence.
+**The cost.** Adam has to store both accumulators $v_t$ and $s_t$, each with one entry per parameter. Together with the parameters themselves, that is three copies of everything, so Adam roughly triples the optimizer's memory footprint relative to the model's parameters — usually an acceptable price for reliable convergence.
 :::
 
 ---
@@ -481,7 +481,7 @@ are sensible defaults that work acceptably on most problems, even if they are no
 - **Learning rate schedules** (piecewise-constant, exponential, cosine, or adaptive drops) and **mini-batch SGD** address this. Mini-batches balance efficiency, noise, and parallelism.
 - A single learning rate suits all parameters poorly when their gradients have very different magnitudes, as in a valley with mismatched curvatures. **Adaptive gradient methods** give each parameter an effective learning rate from its gradient history.
 - **Momentum** accumulates $v_t \leftarrow \beta v_{t-1} + g_t$, growing steps where gradients agree and shrinking them where they disagree.
-- **Adam** keeps moving averages of the gradient ($m_t$) and the squared gradient ($v_t$), applies bias correction, and updates with $g_t' = \eta \hat{m}_t / (\sqrt{\hat{v}_t} + \epsilon)$. By normalizing gradient magnitudes it lets one set of default hyperparameters work across many problems, at the cost of roughly tripling optimizer memory.
+- **Adam** keeps moving averages of the gradient ($v_t$) and the squared gradient ($s_t$), applies bias correction, and updates with $g_t' = \eta \hat{v}_t / (\sqrt{\hat{s}_t} + \epsilon)$. By normalizing gradient magnitudes it lets one set of default hyperparameters work across many problems, at the cost of roughly tripling optimizer memory.
 :::
 
 **Next lecture:** Normalization methods - batch normalization and layer normalization, which were foreshadowed here: rather than adapting the optimizer to gradients on different scales, they normalize a network's intermediate activations directly so that the scales stay consistent during training.
