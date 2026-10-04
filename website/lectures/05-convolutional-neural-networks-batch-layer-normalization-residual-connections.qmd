@@ -37,20 +37,20 @@ $$\bm{H}_{i,j} = \bm{U}_{i,j} + \sum_k \sum_l \bm{W}_{i,j,k,l}\, \bm{X}_{k,l},$$
 
 where $\bm{H}$ is now a two-dimensional activation, $\bm{X}$ is the input image, and $\bm{W}$ has become a four-dimensional array of weights. This is the same computation as before, only with each dimension split in two.
 
-Next we reindex the sum using offsets. Instead of summing over absolute positions $k$ and $l$, we sum over offsets $a$ and $b$ relative to the output position $(i,j)$, and rename the weights $\bm{V}$ to signal the different indexing:
+Next we reindex the sum using offsets. Instead of summing over absolute positions $k$ and $l$, we sum over offsets $a$ and $b$ relative to the output position $(i,j)$, and rename the weights to $\bm{V}$ to signal the different indexing:
 
 $$\bm{H}_{i,j} = \bm{U}_{i,j} + \sum_a \sum_b \bm{V}_{i,j,a,b}\, \bm{X}_{i+a,\, j+b}.$$
 
 The offsets $a$ and $b$ can be positive or negative so that, as they range over all their values, $\bm{X}_{i+a,j+b}$ covers every pixel of the input. As written, each entry of $\bm{H}$ still depends on every entry of $\bm{X}$, and there is a separate bias $\bm{U}_{i,j}$ and a separate set of weights $\bm{V}_{i,j,\cdot,\cdot}$ for every output position. This is exactly what translation invariance and locality tell us to change.
 
-**Translation invariance** asks that we apply the same operation regardless of the output position. The simplest way to enforce it is to drop the dependence of the bias and weights on $(i,j)$ — use one shared bias $\bm{U}$ and one shared set of weights $\bm{V}_{a,b}$ for every output position:
+**Translation invariance** asks that we apply the same operation regardless of the output position. The simplest way to enforce it is to drop the dependence of the bias and weights on $(i,j)$ — use one shared bias $u$ and one shared set of weights $\bm{V}_{a,b}$ for every output position:
 
-$$\bm{H}_{i,j} = \bm{U} + \sum_a \sum_b \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.$$
+$$\bm{H}_{i,j} = u + \sum_a \sum_b \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.$$
 
 **Locality** asks that each output depend only on a small region of the input. Instead of summing over offsets that cover the whole image, we sum over a small window, from $-\Delta$ to $\Delta$ in each direction:
 
 ::: {.boxed-eq}
-$$\bm{H}_{i,j} = \bm{U} + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.$$
+$$\bm{H}_{i,j} = u + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.$$
 :::
 
 This is the **convolution**.
@@ -221,7 +221,7 @@ In practice, images are not bare two-dimensional grids but grids with one or mor
 With channels, the output at spatial position $(i,j)$ and output channel $d$ is
 
 ::: {.boxed-eq}
-$$\bm{H}_{i,j,d} = \bm{U}_d + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \sum_c \bm{V}_{a,b,c,d}\, \bm{X}_{i+a,\, j+b,\, c},$$
+$$\bm{H}_{i,j,d} = u_d + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \sum_c \bm{V}_{a,b,c,d}\, \bm{X}_{i+a,\, j+b,\, c},$$
 :::
 
 where $c$ indexes input channels and $d$ indexes output channels. There is a separate bias per output channel — a per-position bias would break translation invariance — and, importantly, a separate kernel for each input–output channel pair. With $10$ output channels and $20$ input channels there are $200$ kernels. We compute each output channel by convolving every input channel with its corresponding kernel and summing the results over the input channels. This mirrors the dense layer, where a weight connects each input feature to each output feature; here, a kernel connects each input channel to each output channel, mixing the channels while convolving spatially.
@@ -230,7 +230,7 @@ where $c$ indexes input channels and $d$ indexes output channels. There is a sep
 
 The last ingredient of a simple convolutional network is **pooling**, a way of aggregating spatial information through a transformation with no parameters — like a nonlinearity, but aggregating rather than acting elementwise. Pooling looks at a small region of the input and applies a reduction, an operation that maps a set of values to a single value.
 
-The most common form is **max pooling**, whose reduction is the maximum. Applying a $2\times2$ max pooling to our $0$-through-$8$ input, and sliding the window, takes the maximum of each $2\times2$ region.
+The most common form is **max pooling**, whose reduction is the maximum. Applying a $2\times2$ max pooling to our $0$-through-$8$ input, and sliding the window with stride 1, takes the maximum of each $2\times2$ region.
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -272,7 +272,7 @@ The most common form is **max pooling**, whose reduction is the maximum. Applyin
 </svg></div>
 ```
 
-Unlike the convolution example, pooling is almost always applied with a stride equal to the pooling window size, so the windows do not overlap and the spatial dimensions shrink by that factor. Max pooling is by far the most common choice; average pooling, whose reduction is the mean, is also seen. The intuition for max pooling on our cat-detection question is that if a filter responds to a cat's face, we care most about the strongest response in a region — how much cat-face was found nearby — rather than its precise location. Pooling also makes the model cheaper by downsampling, so fewer convolutions follow.
+Unlike convolution, pooling is almost always applied with a stride equal to the pooling window size, so the windows do not overlap and the spatial dimensions shrink by that factor. Max pooling is by far the most common choice; average pooling, whose reduction is the mean, is also seen. The intuition for max pooling on our cat-detection question is that if a filter responds to a cat's face, we care most about the strongest response in a region — how much cat-face was found nearby — rather than its precise location. Pooling also makes the model cheaper by downsampling, so fewer convolutions follow.
 
 ### Building a simple convolutional network {#sec-simple-convnet}
 
@@ -323,23 +323,23 @@ Recall from the previous lecture that when input features have different scales,
 
 Assume for the moment that activations are vectors, so the notation is less cluttered. Given a batch $B$ of activations, batch normalization first computes the batch's mean activation and variance:
 
-$$\mu_B = \frac{1}{|B|} \sum_{\bm{x}\in B} \bm{x}, \qquad \sigma_B^2 = \frac{1}{|B|} \sum_{\bm{x}\in B} (\bm{x} - \mu_B)^2.$$
+$$\bm{\mu}_B = \frac{1}{|B|} \sum_{\bm{x}\in B} \bm{x}, \qquad \bm{\sigma}_B^2 = \frac{1}{|B|} \sum_{\bm{x}\in B} (\bm{x} - \bm{\mu}_B)^2.$$
 
-For an activation $\bm{x}\in\mathbb{R}^d$, both $\mu_B$ and $\sigma_B^2$ are $d$-dimensional. To normalize an activation, it subtracts the mean, divides by the standard deviation, and then applies a learned scale and shift:
+For an activation $\bm{x}\in\mathbb{R}^d$, both $\bm{\mu}_B$ and $\bm{\sigma}_B^2$ are $d$-dimensional. To normalize an activation, it subtracts the mean, divides by the standard deviation, and then applies a learned scale and shift:
 
 ::: {.boxed-eq}
-$$\operatorname{BN}(\bm{x}) = \bm{\gamma} \odot \frac{\bm{x} - \mu_B}{\sigma_B + \epsilon} + \bm{\beta},$$
+$$\operatorname{BN}(\bm{x}) = \bm{\gamma} \odot \frac{\bm{x} - \bm{\mu}_B}{\bm{\sigma}_B + \epsilon} + \bm{\beta},$$
 :::
 
-where $\odot$ is the elementwise product, $\epsilon$ is a small constant that prevents numerical trouble when $\sigma_B$ is small, and $\bm{\gamma}, \bm{\beta}\in\mathbb{R}^d$ are learned parameters, playing the roles of a weight and a bias. Subtracting the mean and dividing by the standard deviation performs the normalization that we might expect to be helpful. But it is not obvious that we want every activation everywhere in the model to have zero mean and unit variance, so $\bm{\gamma}$ and $\bm{\beta}$ let the model learn to rescale and shift the normalized activation as it sees fit.
+where $\odot$ is the elementwise product, $\epsilon$ is a small constant that prevents numerical trouble when $\bm{\sigma}_B$ is small, and $\bm{\gamma}, \bm{\beta}\in\mathbb{R}^d$ are learned parameters, playing the roles of a weight and a bias. Subtracting the mean and dividing by the standard deviation performs the normalization that we might expect to be helpful. But it is not obvious that we want every activation everywhere in the model to have zero mean and unit variance, so $\bm{\gamma}$ and $\bm{\beta}$ let the model learn to rescale and shift the normalized activation as it sees fit.
 
-At inference time we may not have a batch to compute statistics over. The standard approach is to keep an exponential moving average of the $\mu_B$ and $\sigma_B$ observed during training, and use that average at inference.
+At inference time we may not have a batch to compute statistics over. The standard approach is to keep an exponential moving average of the $\bm{\mu}_B$ and $\bm{\sigma}_B$ observed during training, and use that average at inference.
 
 For images, the activation is a volume rather than a vector — a batch is $B\times H\times W\times C$ — and we normalize per channel, computing the statistics not just over the batch dimension but also over the spatial dimensions:
 
-$$\mu_B = \operatorname{mean}\big(\bm{X},\ \text{axis}=(0,1,2)\big) \in \mathbb{R}^C,$$
+$$\bm{\mu}_B = \operatorname{mean}\big(\bm{X},\ \text{axis}=(0,1,2)\big) \in \mathbb{R}^C,$$
 
-and similarly for $\sigma_B$. Each channel is normalized by statistics gathered over the batch and over all spatial positions.
+and similarly for $\bm{\sigma}_B$. Each channel is normalized by statistics gathered over the batch and over all spatial positions.
 
 ### Why it might help {#sec-batchnorm-why}
 
