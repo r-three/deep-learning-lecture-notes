@@ -56,7 +56,6 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" rel="next">
 <link href="../lectures/03-regularization.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -225,46 +224,6 @@ window.Quarto = {
   <a href="../lectures/04-gradient-descent-adaptive-gradient-methods.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 4: Gradient Descent, Adaptive Gradient Methods</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
-  </div>
-</li>
     </ul>
     </div>
 </nav>
@@ -333,8 +292,8 @@ window.Quarto = {
 <p>Before returning to machine learning, it helps to set neural networks aside and consider the more general problem of minimizing a function. Call the function <span class="math inline">f(x)</span>. To <em>minimize</em> <span class="math inline">f</span> means to find values of <span class="math inline">x</span> that make <span class="math inline">f</span> as small as possible. In machine learning the function we minimize is usually the loss and the variable we adjust is usually the model’s parameters, but for the moment we keep things generic.</p>
 <section id="sec-why-gd" class="level3">
 <h3 class="anchored" data-anchor-id="sec-why-gd">Why gradient descent works</h3>
-<p>To justify the gradient descent update, we start from a Taylor expansion of <span class="math inline">f</span>. Writing it in one particular form, if <span class="math inline">f</span> is infinitely differentiable then its value at a point offset by <span class="math inline">e</span> from <span class="math inline">x</span> can be written as an infinite sum,</p>
-<p><span class="math display">f(x + e) = \sum_{n=0}^{\infty} \frac{e^n f^{(n)}(x)}{n!},</span></p>
+<p>To justify the gradient descent update, we start from a Taylor expansion of <span class="math inline">f</span>. Writing it in one particular form, if <span class="math inline">f</span> is infinitely differentiable and real analytic then its value at a point offset by <span class="math inline">h</span> from <span class="math inline">x</span> can be written as an infinite sum,</p>
+<p><span class="math display">f(x + h) = \sum_{n=0}^{\infty} \frac{h^n f^{(n)}(x)}{n!},</span></p>
 <p>where <span class="math inline">f^{(n)}</span> is the <span class="math inline">n</span>th derivative of <span class="math inline">f</span>. This decomposes the function’s behavior near <span class="math inline">x</span> into contributions from its successive derivatives. If this specific form is unfamiliar, it is the same Taylor expansion seen elsewhere, just written as a single sum.</p>
 <p>Now set the offset to <span class="math inline">\epsilon</span>, a placeholder for a small number, and expand. The <span class="math inline">n=0</span> term is <span class="math inline">\epsilon^0 f(x)/0! = f(x)</span>. The <span class="math inline">n=1</span> term is <span class="math inline">\epsilon^1 f'(x)/1! = \epsilon f'(x)</span>. Every remaining term carries a factor of <span class="math inline">\epsilon^2</span> or higher; because <span class="math inline">\epsilon</span> is small and we divide by <span class="math inline">n!</span>, these terms are dominated by <span class="math inline">\epsilon^2</span>, which is small. Collecting them into an error term,</p>
 <p><span class="math display">f(x + \epsilon) = f(x) + \epsilon f'(x) + \mathcal{O}(\epsilon^2).</span></p>
@@ -351,7 +310,7 @@ window.Quarto = {
 <section id="sec-learning-rate" class="level3">
 <h3 class="anchored" data-anchor-id="sec-learning-rate">The learning rate</h3>
 <p>The size of the error term, and therefore whether the update actually decreases <span class="math inline">f</span>, depends on the learning rate <span class="math inline">\eta</span>. This gives three qualitatively different regimes.</p>
-<p>If we want to be sure the approximate inequality holds, we can make <span class="math inline">\epsilon = -\eta f'(x)</span> very small by making <span class="math inline">\eta</span> very small. This works, but each step then covers very little ground, so minimizing the function takes a great many iterations. In deep learning each iteration means a forward and backward pass through the model, and, as we saw last lecture (Lecture 3), the backward pass roughly triples the cost of the forward pass. A very small learning rate multiplies an already expensive computation by the number of steps, and training may run out of time or budget before it converges.</p>
+<p>If we want to be sure the approximate inequality holds, we can make <span class="math inline">\epsilon = -\eta f'(x)</span> very small by making <span class="math inline">\eta</span> very small. This works, but each step then covers very little ground, so minimizing the function takes a great many iterations. In deep learning each iteration means a forward and backward pass through the model, and, as we saw last lecture (Lecture 3), adding the backward pass roughly triples the cost of the forward pass alone. A very small learning rate multiplies an already expensive computation by the number of steps, and training may run out of time or budget before it converges.</p>
 <p>The opposite choice is a large <span class="math inline">\eta</span>, to make faster progress. But when <span class="math inline">\eta</span> is too large the error term is no longer negligible, and the update can overshoot so badly that the new point is <em>worse</em> than where it started. Instead of decreasing, <span class="math inline">f</span> increases, and increases again on the next step. This is <strong>divergence</strong>: when training a model, we see the loss climbing rather than falling.</p>
 <p>The learning rate we want is somewhere between these, “just right”: large enough to make steady progress, small enough not to diverge. In general the right value is hard to characterize in advance, because we do not have access to the function’s curvature ahead of time and every problem differs. In practice we tune <span class="math inline">\eta</span> as a hyperparameter, adjusting it until we observe consistent, reasonably rapid decrease in the loss.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -441,7 +400,7 @@ window.Quarto = {
 <p>Batch gradient descent is not what we have actually been doing in this course. Instead, in the most extreme case, we compute each update from the gradient of a <em>single</em> per-example loss, where the example is drawn uniformly at random,</p>
 <p><span class="math display">\bm{\theta} \leftarrow \bm{\theta} - \eta\, \nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta}), \qquad i \sim \operatorname{Uniform}\{1, \dots, N\}.</span></p>
 <p>We might feel comfortable with this because in expectation the single-example update matches the batch update. Since each index has probability <span class="math inline">1/N</span>,</p>
-<p><span class="math display">\mathbb{E}\big[\nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta})\big] = \frac{1}{N} \sum_{i=1}^{N} \nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta}) = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta}).</span></p>
+<p><span class="math display">\mathbb{E}\big[\nabla_{\bm{\theta}} \mathcal{L}_i(\bm{\theta})\big] = \frac{1}{N} \sum_{j=1}^{N} \nabla_{\bm{\theta}} \mathcal{L}_j(\bm{\theta}) = \nabla_{\bm{\theta}} \mathcal{L}(\bm{\theta}).</span></p>
 <div class="definition-block">
 <p><strong>Definition.</strong> <em>Stochastic gradient descent</em> (SGD) updates the parameters using the gradient of the loss on a single randomly drawn example. In expectation this update equals the full-batch update, but any individual update uses only one example. In common usage “SGD” usually refers to the mini-batch version introduced below rather than this single-example form.</p>
 </div>
@@ -480,13 +439,13 @@ window.Quarto = {
   <circle cx="128.7" cy="183.3" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"></circle><circle cx="169.6" cy="201.7" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"></circle><circle cx="210.5" cy="234.0" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"></circle><circle cx="247.7" cy="264.3" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"></circle><circle cx="281.2" cy="283.4" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"></circle><circle cx="311.0" cy="289.4" r="6" fill="#5795C7" stroke="#205279" stroke-width="1.5"></circle>
 
   <line x1="150" y1="84" x2="188" y2="84" stroke="#205279" stroke-width="3.2"></line>
-  <text x="196" y="89" font-size="14" fill="#333">Full-batch loss 𝓛(θ) (average)</text>
+  <text x="196" y="89" font-size="14" fill="#333">Full-batch loss ℒ(θ) (average)</text>
   <line x1="150" y1="106" x2="188" y2="106" stroke="#9db8cf" stroke-width="2.4" stroke-dasharray="6,4"></line>
-  <text x="196" y="111" font-size="14" fill="#333">Per-example losses 𝓛ᵢ(θ)</text>
+  <text x="196" y="111" font-size="14" fill="#333">Per-example losses ℒᵢ(θ)</text>
 
   <rect x="26" y="348" width="413" height="66" rx="10" fill="#E7F1FB" stroke="#9db8cf" stroke-width="1.2"></rect>
   <circle cx="56.7" cy="388.7" r="2.2" fill="#5795C7"></circle><circle cx="47.5" cy="375.8" r="1.9" fill="#5795C7"></circle><circle cx="69.7" cy="381.9" r="2.1" fill="#5795C7"></circle><circle cx="57.6" cy="393.7" r="2.4" fill="#5795C7"></circle><circle cx="60.5" cy="375.1" r="2.6" fill="#5795C7"></circle><circle cx="62.4" cy="388.1" r="2.8" fill="#5795C7"></circle><circle cx="43.8" cy="379.6" r="2.6" fill="#5795C7"></circle><circle cx="67.6" cy="385.0" r="2.5" fill="#5795C7"></circle><circle cx="55.2" cy="382.8" r="2.8" fill="#5795C7"></circle>
-  <text x="92" y="376" font-size="14" fill="#205279">Each iteration uses a different loss 𝓛ᵢ(θ),</text>
+  <text x="92" y="376" font-size="14" fill="#205279">Each iteration uses a different loss ℒᵢ(θ),</text>
   <text x="92" y="398" font-size="14" fill="#205279">so the gradient direction changes.</text>
 
   <!-- ===================== CARD 2 (crimson) ===================== -->
@@ -497,7 +456,7 @@ window.Quarto = {
 
   <line x1="512" y1="322" x2="895" y2="322" stroke="#888" stroke-width="1.4" marker-end="url(#axA)"></line>
   <line x1="512" y1="322" x2="512" y2="112" stroke="#888" stroke-width="1.4" marker-end="url(#axA)"></line>
-  <text x="520" y="128" font-size="14" fill="#792051">𝓛(θ)</text>
+  <text x="520" y="128" font-size="14" fill="#792051">ℒ(θ)</text>
   <text x="892" y="342" text-anchor="end" font-size="14" fill="#444">iteration</text>
 
   <line x1="512" y1="303.8" x2="890" y2="303.8" stroke="#b0b0b0" stroke-width="1.4" stroke-dasharray="7,5"></line>
@@ -523,7 +482,13 @@ window.Quarto = {
 <section id="sec-schedules" class="level3">
 <h3 class="anchored" data-anchor-id="sec-schedules">Learning rate schedules</h3>
 <p>One widespread response to this stalling is a <strong>learning rate schedule</strong>: rather than holding <span class="math inline">\eta</span> fixed, use a different value <span class="math inline">\eta(t)</span> at each iteration <span class="math inline">t</span>. Several common choices are</p>
-<p><span class="math display">\eta(t) = \eta \quad \text{(constant)}, \qquad \eta(t) = \eta_i \;\text{ if } t_i \le t \le t_{i+1} \quad \text{(piecewise constant)}, \qquad \eta(t) = \eta_0\, e^{-\lambda t} \quad \text{(exponential)}.</span></p>
+<p><span class="math display">
+\begin{aligned}
+\eta(t) &amp;= \eta \quad \text{(constant)}, \\
+\eta(t) &amp;= \eta_i \;\text{ if } t_i \le t &lt; t_{i+1} \quad \text{(piecewise constant)}, \\
+\eta(t) &amp;= \eta_0\, e^{-\lambda t} \quad \text{(exponential)}.
+\end{aligned}
+</span></p>
 <p>The constant schedule is what we have used so far. A piecewise-constant schedule holds the learning rate at a sensible value for most of training and then drops it in the late phase, when SGD’s progress would otherwise stall, so that smaller steps can make further progress; the intervals <span class="math inline">t_i</span> and rates <span class="math inline">\eta_i</span> are hyperparameters. A common variant is to not fix the intervals in advance but instead drop the rate — say by a factor of ten — whenever progress stalls, an adaptive rather than predefined schedule. The exponential schedule decays the rate continuously at a speed set by <span class="math inline">\lambda</span>. Another popular choice, which we will not write out, is the <strong>cosine schedule</strong>, which decays the rate from its initial value to near zero over a fixed training duration <span class="math inline">T</span> following the shape of a cosine curve. The shared intuition is that early in training the per-example losses agree and a larger rate is safe, while later a smaller rate makes less noisy progress toward the minimum.</p>
 </section>
 <section id="sec-minibatch" class="level3">
@@ -658,7 +623,7 @@ Note
 <p><span class="math display">v_t \leftarrow \beta_1\, v_{t-1} + (1 - \beta_1)\, g_t \qquad \text{(first moment estimate)}.</span></p>
 <p>Because <span class="math inline">\beta_1 + (1 - \beta_1) = 1</span>, this is exactly a moving average of the old value and the incoming gradient. It is not the same as explicitly averaging every gradient seen so far, but it approximates that average without storing the whole history, and it estimates the first moment (the mean) of the gradients. The second accumulator uses its own hyperparameter <span class="math inline">\beta_2</span> and averages the <em>squared</em> gradient,</p>
 <p><span class="math display">s_t \leftarrow \beta_2\, s_{t-1} + (1 - \beta_2)\, g_t^2 \qquad \text{(second moment estimate)},</span></p>
-<p>which estimates the second moment (roughly, the uncentered variance) of the gradients.</p>
+<p>which estimates the second moment (roughly, the uncentered variance) of the gradients. Here <span class="math inline">g_t^2</span> denotes the element-wise square of <span class="math inline">g_t</span>.</p>
 <p>The point of the two averages is as follows. Using the moving-average gradient <span class="math inline">v_t</span> instead of the raw gradient smooths the update, following the same intuition as momentum: gradients that agree accumulate, while gradients that disagree average toward something smaller. The squared-gradient average <span class="math inline">s_t</span> lets us normalize magnitude: dividing by its square root puts each parameter’s gradient onto a comparable scale. Combining the two gives the update</p>
 <p><span class="math display">g_t' = \frac{\eta\, v_t}{\sqrt{s_t} + \epsilon}, \qquad \bm{\theta}_t = \bm{\theta}_{t-1} - g_t',</span></p>
 <p>where <span class="math inline">\epsilon</span> is a small constant, around <span class="math inline">10^{-8}</span>. Its role is purely numerical: when <span class="math inline">s_t</span> is very small, dividing by <span class="math inline">\sqrt{s_t}</span> alone could blow up, and adding <span class="math inline">\epsilon</span> prevents that. (This <span class="math inline">\epsilon</span> is unrelated to the <span class="math inline">\epsilon</span> from the Taylor expansion at the start of the lecture.)</p>
@@ -677,7 +642,7 @@ Warning
 </div>
 <p><strong>The bias and its correction.</strong> To see the bias, track the total rescaling applied to the gradients as the moving average unrolls. With <span class="math inline">v_0 = 0</span>,</p>
 <p><span class="math display">v_1 = \beta_1 v_0 + (1 - \beta_1) g_1 = (1 - \beta_1) g_1,</span> <span class="math display">v_2 = \beta_1 v_1 + (1 - \beta_1) g_2 = \beta_1 (1 - \beta_1) g_1 + (1 - \beta_1) g_2.</span></p>
-<p>The total weight on the gradients in <span class="math inline">v_2</span> — the coefficient of <span class="math inline">g_1</span> plus the coefficient of <span class="math inline">g_2</span> — is <span class="math inline">\beta_1(1 - \beta_1) + (1 - \beta_1) = 1 - \beta_1^2</span>. Carrying the same expansion one step further gives a total rescaling of <span class="math inline">1 - \beta_1^3</span> for <span class="math inline">v_3</span>, and in general</p>
+<p>The total weight on the gradients in <span class="math inline">v_2</span> (the coefficient of <span class="math inline">g_1</span> plus the coefficient of <span class="math inline">g_2</span>) is <span class="math inline">\beta_1(1 - \beta_1) + (1 - \beta_1) = 1 - \beta_1^2</span>. Carrying the same expansion one step further gives a total rescaling of <span class="math inline">1 - \beta_1^3</span> for <span class="math inline">v_3</span>, and in general</p>
 <p><span class="math display">\text{total gradient rescaling at iteration } t \;=\; 1 - \beta_1^t.</span></p>
 <p>Typically <span class="math inline">\beta_1</span> and <span class="math inline">\beta_2</span> are close to one, so that the moving average reflects a long history. But then <span class="math inline">1 - \beta_1^t</span> and <span class="math inline">1 - \beta_2^t</span> start near zero and grow only slowly, which means <span class="math inline">v_t</span> and <span class="math inline">s_t</span> are biased toward zero early in training — at the first step, <span class="math inline">v_1 = (1 - \beta_1) g_1</span> is nearly zero rather than <span class="math inline">g_1</span>. The simplest correction is to divide out exactly this factor:</p>
 <p><span class="math display">\hat{v}_t = \frac{v_t}{1 - \beta_1^t}, \qquad \hat{s}_t = \frac{s_t}{1 - \beta_2^t}.</span></p>
@@ -688,7 +653,7 @@ Warning
 <p><span class="math display">v_t \leftarrow \beta_1\, v_{t-1} + (1 - \beta_1)\, g_t \qquad\qquad \hat{v}_t = \frac{v_t}{1 - \beta_1^t}</span> <span class="math display">s_t \leftarrow \beta_2\, s_{t-1} + (1 - \beta_2)\, g_t^2 \qquad\qquad \hat{s}_t = \frac{s_t}{1 - \beta_2^t}</span> <span class="math display">g_t' = \frac{\eta\, \hat{v}_t}{\sqrt{\hat{s}_t} + \epsilon} \qquad\qquad \bm{\theta}_t \leftarrow \bm{\theta}_{t-1} - g_t'</span></p>
 </section>
 <p>Compared to plain gradient descent, Adam uses a moving average of the gradients in place of the raw gradient, which smooths the update much as momentum does; it divides by the square root of the second-moment estimate, which normalizes the parameters’ gradients toward a common magnitude; and it corrects the early-training bias, so that updates are not effectively scaled down at the start.</p>
-<p><strong>Why Adam became the default.</strong> If the normalization works as intended, then across problems — different architectures, datasets, and loss functions — the gradients Adam produces have roughly the same magnitude. Since the appropriate learning rate is tied to the gradient magnitude, this means one learning rate tends to work across many problems, which reduces the hyperparameter tuning that is otherwise expensive and tedious. In practice this largely holds. The values proposed in the Adam paper,</p>
+<p><strong>Why Adam became the default.</strong> If the normalization works as intended, then across problems — different architectures, datasets, and loss functions — the updates Adam produces have roughly the same magnitude. Since the appropriate learning rate is tied to the gradient magnitude, this means one learning rate tends to work across many problems, which reduces the hyperparameter tuning that is otherwise expensive and tedious. In practice this largely holds. The values proposed in the Adam paper,</p>
 <p><span class="math display">\beta_1 = 0.9, \qquad \beta_2 = 0.999, \qquad \eta = 0.001, \qquad \epsilon = 10^{-8},</span></p>
 <p>are sensible defaults that work acceptably on most problems, even if they are not optimal for the fastest convergence on any particular one. There is no comparable default learning rate for plain SGD, because a different initialization, loss, or dataset can put the gradients on a completely different scale; Adam rescales them to a common scale, so one set of hyperparameters can be pulled off the shelf and applied broadly. That convenience, more than anything, is why Adam is so widely used.</p>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -1157,9 +1122,6 @@ Kingma, Diederik P, and Jimmy Ba. 2015. <span>“Adam: A Method for Stochastic O
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="pagination-link" aria-label="Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections">
-        <span class="nav-page-text"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->
