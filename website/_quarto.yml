@@ -19,6 +19,7 @@ book:
     - lectures/01-intro-regression.qmd
     - lectures/02-mlp-backprop.qmd
     - lectures/03-regularization.qmd
+    - lectures/04-gradient-descent-adaptive-gradient-methods.qmd
 
 format:
   html:
