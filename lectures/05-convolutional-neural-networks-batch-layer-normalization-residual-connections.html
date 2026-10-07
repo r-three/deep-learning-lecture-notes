@@ -56,7 +56,6 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" rel="next">
 <link href="../lectures/04-gradient-descent-adaptive-gradient-methods.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -230,41 +229,6 @@ window.Quarto = {
   <a href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 5: Convolutional Neural Networks, Batch/Layer Normalization, Residual Connections</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
-  </div>
-</li>
     </ul>
     </div>
 </nav>
@@ -342,14 +306,14 @@ window.Quarto = {
 <p>An image differs from a vector in that we usually represent it as a two-dimensional grid. We can make the two equivalent by stacking the rows of an image into a vector, and unstacking them to recover the image — a reshape. If we unflatten in this way, the single index <span class="math inline">m</span> over outputs becomes a pair <span class="math inline">(i,j)</span>, and the single index <span class="math inline">n</span> over inputs becomes a pair <span class="math inline">(k,l)</span>. The dense layer becomes</p>
 <p><span class="math display">\bm{H}_{i,j} = \bm{U}_{i,j} + \sum_k \sum_l \bm{W}_{i,j,k,l}\, \bm{X}_{k,l},</span></p>
 <p>where <span class="math inline">\bm{H}</span> is now a two-dimensional activation, <span class="math inline">\bm{X}</span> is the input image, and <span class="math inline">\bm{W}</span> has become a four-dimensional array of weights. This is the same computation as before, only with each dimension split in two.</p>
-<p>Next we reindex the sum using offsets. Instead of summing over absolute positions <span class="math inline">k</span> and <span class="math inline">l</span>, we sum over offsets <span class="math inline">a</span> and <span class="math inline">b</span> relative to the output position <span class="math inline">(i,j)</span>, and rename the weights <span class="math inline">\bm{V}</span> to signal the different indexing:</p>
+<p>Next we reindex the sum using offsets. Instead of summing over absolute positions <span class="math inline">k</span> and <span class="math inline">l</span>, we sum over offsets <span class="math inline">a</span> and <span class="math inline">b</span> relative to the output position <span class="math inline">(i,j)</span>, and rename the weights to <span class="math inline">\bm{V}</span> to signal the different indexing:</p>
 <p><span class="math display">\bm{H}_{i,j} = \bm{U}_{i,j} + \sum_a \sum_b \bm{V}_{i,j,a,b}\, \bm{X}_{i+a,\, j+b}.</span></p>
 <p>The offsets <span class="math inline">a</span> and <span class="math inline">b</span> can be positive or negative so that, as they range over all their values, <span class="math inline">\bm{X}_{i+a,j+b}</span> covers every pixel of the input. As written, each entry of <span class="math inline">\bm{H}</span> still depends on every entry of <span class="math inline">\bm{X}</span>, and there is a separate bias <span class="math inline">\bm{U}_{i,j}</span> and a separate set of weights <span class="math inline">\bm{V}_{i,j,\cdot,\cdot}</span> for every output position. This is exactly what translation invariance and locality tell us to change.</p>
-<p><strong>Translation invariance</strong> asks that we apply the same operation regardless of the output position. The simplest way to enforce it is to drop the dependence of the bias and weights on <span class="math inline">(i,j)</span> — use one shared bias <span class="math inline">\bm{U}</span> and one shared set of weights <span class="math inline">\bm{V}_{a,b}</span> for every output position:</p>
-<p><span class="math display">\bm{H}_{i,j} = \bm{U} + \sum_a \sum_b \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.</span></p>
+<p><strong>Translation invariance</strong> asks that we apply the same operation regardless of the output position. The simplest way to enforce it is to drop the dependence of the bias and weights on <span class="math inline">(i,j)</span> — use one shared bias <span class="math inline">u</span> and one shared set of weights <span class="math inline">\bm{V}_{a,b}</span> for every output position:</p>
+<p><span class="math display">\bm{H}_{i,j} = u + \sum_a \sum_b \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.</span></p>
 <p><strong>Locality</strong> asks that each output depend only on a small region of the input. Instead of summing over offsets that cover the whole image, we sum over a small window, from <span class="math inline">-\Delta</span> to <span class="math inline">\Delta</span> in each direction:</p>
 <div class="boxed-eq">
-<p><span class="math display">\bm{H}_{i,j} = \bm{U} + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.</span></p>
+<p><span class="math display">\bm{H}_{i,j} = u + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \bm{V}_{a,b}\, \bm{X}_{i+a,\, j+b}.</span></p>
 </div>
 <p>This is the <strong>convolution</strong>.</p>
 <div class="definition-block">
@@ -517,14 +481,14 @@ Note
 <p>In practice, images are not bare two-dimensional grids but grids with one or more <strong>channels</strong>. A color image has red, green, and blue channels, each a grid of brightness values; a single-channel image is grayscale. The convolution’s outputs, the feature maps, have channels too, and their number is a hyperparameter much like the width of a dense layer.</p>
 <p>With channels, the output at spatial position <span class="math inline">(i,j)</span> and output channel <span class="math inline">d</span> is</p>
 <div class="boxed-eq">
-<p><span class="math display">\bm{H}_{i,j,d} = \bm{U}_d + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \sum_c \bm{V}_{a,b,c,d}\, \bm{X}_{i+a,\, j+b,\, c},</span></p>
+<p><span class="math display">\bm{H}_{i,j,d} = u_d + \sum_{a=-\Delta}^{\Delta} \sum_{b=-\Delta}^{\Delta} \sum_c \bm{V}_{a,b,c,d}\, \bm{X}_{i+a,\, j+b,\, c},</span></p>
 </div>
 <p>where <span class="math inline">c</span> indexes input channels and <span class="math inline">d</span> indexes output channels. There is a separate bias per output channel — a per-position bias would break translation invariance — and, importantly, a separate kernel for each input–output channel pair. With <span class="math inline">10</span> output channels and <span class="math inline">20</span> input channels there are <span class="math inline">200</span> kernels. We compute each output channel by convolving every input channel with its corresponding kernel and summing the results over the input channels. This mirrors the dense layer, where a weight connects each input feature to each output feature; here, a kernel connects each input channel to each output channel, mixing the channels while convolving spatially.</p>
 </section>
 <section id="sec-pooling" class="level3">
 <h3 class="anchored" data-anchor-id="sec-pooling">Pooling</h3>
 <p>The last ingredient of a simple convolutional network is <strong>pooling</strong>, a way of aggregating spatial information through a transformation with no parameters — like a nonlinearity, but aggregating rather than acting elementwise. Pooling looks at a small region of the input and applies a reduction, an operation that maps a set of values to a single value.</p>
-<p>The most common form is <strong>max pooling</strong>, whose reduction is the maximum. Applying a <span class="math inline">2\times2</span> max pooling to our <span class="math inline">0</span>-through-<span class="math inline">8</span> input, and sliding the window, takes the maximum of each <span class="math inline">2\times2</span> region.</p>
+<p>The most common form is <strong>max pooling</strong>, whose reduction is the maximum. Applying a <span class="math inline">2\times2</span> max pooling to our <span class="math inline">0</span>-through-<span class="math inline">8</span> input, and sliding the window with stride 1, takes the maximum of each <span class="math inline">2\times2</span> region.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 620 250" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="pArr" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
@@ -562,7 +526,7 @@ Note
 <text x="360" y="194" text-anchor="middle" font-size="15" fill="#666">output (2×2)</text>
 <text x="30" y="238" font-size="14" fill="#666">Each output entry is the maximum of the corresponding 2×2 window.</text>
 </svg></div>
-<p>Unlike the convolution example, pooling is almost always applied with a stride equal to the pooling window size, so the windows do not overlap and the spatial dimensions shrink by that factor. Max pooling is by far the most common choice; average pooling, whose reduction is the mean, is also seen. The intuition for max pooling on our cat-detection question is that if a filter responds to a cat’s face, we care most about the strongest response in a region — how much cat-face was found nearby — rather than its precise location. Pooling also makes the model cheaper by downsampling, so fewer convolutions follow.</p>
+<p>Unlike convolution, pooling is almost always applied with a stride equal to the pooling window size, so the windows do not overlap and the spatial dimensions shrink by that factor. Max pooling is by far the most common choice; average pooling, whose reduction is the mean, is also seen. The intuition for max pooling on our cat-detection question is that if a filter responds to a cat’s face, we care most about the strongest response in a region — how much cat-face was found nearby — rather than its precise location. Pooling also makes the model cheaper by downsampling, so fewer convolutions follow.</p>
 </section>
 <section id="sec-simple-convnet" class="level3">
 <h3 class="anchored" data-anchor-id="sec-simple-convnet">Building a simple convolutional network</h3>
@@ -604,16 +568,16 @@ Note
 <section id="sec-batchnorm-how" class="level3">
 <h3 class="anchored" data-anchor-id="sec-batchnorm-how">How it works</h3>
 <p>Assume for the moment that activations are vectors, so the notation is less cluttered. Given a batch <span class="math inline">B</span> of activations, batch normalization first computes the batch’s mean activation and variance:</p>
-<p><span class="math display">\mu_B = \frac{1}{|B|} \sum_{\bm{x}\in B} \bm{x}, \qquad \sigma_B^2 = \frac{1}{|B|} \sum_{\bm{x}\in B} (\bm{x} - \mu_B)^2.</span></p>
-<p>For an activation <span class="math inline">\bm{x}\in\mathbb{R}^d</span>, both <span class="math inline">\mu_B</span> and <span class="math inline">\sigma_B^2</span> are <span class="math inline">d</span>-dimensional. To normalize an activation, it subtracts the mean, divides by the standard deviation, and then applies a learned scale and shift:</p>
+<p><span class="math display">\bm{\mu}_B = \frac{1}{|B|} \sum_{\bm{x}\in B} \bm{x}, \qquad \bm{\sigma}_B^2 = \frac{1}{|B|} \sum_{\bm{x}\in B} (\bm{x} - \bm{\mu}_B)^2.</span></p>
+<p>For an activation <span class="math inline">\bm{x}\in\mathbb{R}^d</span>, both <span class="math inline">\bm{\mu}_B</span> and <span class="math inline">\bm{\sigma}_B^2</span> are <span class="math inline">d</span>-dimensional. To normalize an activation, it subtracts the mean, divides by the standard deviation, and then applies a learned scale and shift:</p>
 <div class="boxed-eq">
-<p><span class="math display">\operatorname{BN}(\bm{x}) = \bm{\gamma} \odot \frac{\bm{x} - \mu_B}{\sigma_B + \epsilon} + \bm{\beta},</span></p>
+<p><span class="math display">\operatorname{BN}(\bm{x}) = \bm{\gamma} \odot \frac{\bm{x} - \bm{\mu}_B}{\bm{\sigma}_B + \epsilon} + \bm{\beta},</span></p>
 </div>
-<p>where <span class="math inline">\odot</span> is the elementwise product, <span class="math inline">\epsilon</span> is a small constant that prevents numerical trouble when <span class="math inline">\sigma_B</span> is small, and <span class="math inline">\bm{\gamma}, \bm{\beta}\in\mathbb{R}^d</span> are learned parameters, playing the roles of a weight and a bias. Subtracting the mean and dividing by the standard deviation performs the normalization that we might expect to be helpful. But it is not obvious that we want every activation everywhere in the model to have zero mean and unit variance, so <span class="math inline">\bm{\gamma}</span> and <span class="math inline">\bm{\beta}</span> let the model learn to rescale and shift the normalized activation as it sees fit.</p>
-<p>At inference time we may not have a batch to compute statistics over. The standard approach is to keep an exponential moving average of the <span class="math inline">\mu_B</span> and <span class="math inline">\sigma_B</span> observed during training, and use that average at inference.</p>
+<p>where <span class="math inline">\odot</span> is the elementwise product, <span class="math inline">\epsilon</span> is a small constant that prevents numerical trouble when <span class="math inline">\bm{\sigma}_B</span> is small, and <span class="math inline">\bm{\gamma}, \bm{\beta}\in\mathbb{R}^d</span> are learned parameters, playing the roles of a weight and a bias. Subtracting the mean and dividing by the standard deviation performs the normalization that we might expect to be helpful. But it is not obvious that we want every activation everywhere in the model to have zero mean and unit variance, so <span class="math inline">\bm{\gamma}</span> and <span class="math inline">\bm{\beta}</span> let the model learn to rescale and shift the normalized activation as it sees fit.</p>
+<p>At inference time we may not have a batch to compute statistics over. The standard approach is to keep an exponential moving average of the <span class="math inline">\bm{\mu}_B</span> and <span class="math inline">\bm{\sigma}_B</span> observed during training, and use that average at inference.</p>
 <p>For images, the activation is a volume rather than a vector — a batch is <span class="math inline">B\times H\times W\times C</span> — and we normalize per channel, computing the statistics not just over the batch dimension but also over the spatial dimensions:</p>
-<p><span class="math display">\mu_B = \operatorname{mean}\big(\bm{X},\ \text{axis}=(0,1,2)\big) \in \mathbb{R}^C,</span></p>
-<p>and similarly for <span class="math inline">\sigma_B</span>. Each channel is normalized by statistics gathered over the batch and over all spatial positions.</p>
+<p><span class="math display">\bm{\mu}_B = \operatorname{mean}\big(\bm{X},\ \text{axis}=(0,1,2)\big) \in \mathbb{R}^C,</span></p>
+<p>and similarly for <span class="math inline">\bm{\sigma}_B</span>. Each channel is normalized by statistics gathered over the batch and over all spatial positions.</p>
 </section>
 <section id="sec-batchnorm-why" class="level3">
 <h3 class="anchored" data-anchor-id="sec-batchnorm-why">Why it might help</h3>
@@ -1191,9 +1155,6 @@ LeCun, Yann, Léon Bottou, Yoshua Bengio, and Patrick Haffner. 1998. <span>“Gr
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="pagination-link" aria-label="Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning">
-        <span class="nav-page-text"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->
