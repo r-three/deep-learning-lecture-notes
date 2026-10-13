@@ -56,7 +56,6 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../lectures/07-attention.html" rel="next">
 <link href="../lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -235,36 +234,6 @@ window.Quarto = {
   <a href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 6: Sequences, Recurrent Neural Networks, and Sequence-to-Sequence Learning</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 7: Attention</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
-  </div>
-</li>
     </ul>
     </div>
 </nav>
@@ -335,7 +304,7 @@ window.Quarto = {
 <p>By <em>order</em> we mean that there is a natural way to decompose the joint distribution over the sequence into a set of dependencies, and that any other order feels unnatural. A clear example is a sequence whose elements are measurements taken at successive points in time: time itself induces the order, because whether something happened earlier or later is a fact we cannot rearrange. If we took a series of measurements over time and then shuffled or reversed them, they would be in the wrong order.</p>
 <p>Why does the order matter? Beyond letting us write the sequence down, it lets us use the <strong>chain rule of probability</strong> to express the joint probability of the whole sequence as a product of conditional probabilities:</p>
 <div class="boxed-eq">
-<p><span class="math display">p(\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T) = p(\bm{x}_1)\, p(\bm{x}_2 \mid \bm{x}_1)\, p(\bm{x}_3 \mid \bm{x}_2, \bm{x}_1) \cdots</span></p>
+<p><span class="math display">p(\bm{x}_1, \bm{x}_2, \dots, \bm{x}_T) = p(\bm{x}_1)\, p(\bm{x}_2 \mid \bm{x}_1)\, p(\bm{x}_3 \mid \bm{x}_2, \bm{x}_1) \cdots p(\bm{x}_T \mid \bm{x}_{T-1}, \dots, \bm{x}_1)</span></p>
 </div>
 <p>Any set of random variables can be decomposed this way; nothing about it is special to sequences. But because a sequence has a natural order, this particular decomposition makes sense: if the first element we observe is <span class="math inline">\bm{x}_1</span>, we can express <span class="math inline">p(\bm{x}_1)</span>; if the next is <span class="math inline">\bm{x}_2</span>, we can ask for its probability given <span class="math inline">\bm{x}_1</span>; and so on. Asking instead for the probability of <span class="math inline">\bm{x}_3</span> given <span class="math inline">\bm{x}_{10}</span> would be awkward, because we would be conditioning on something we have not observed yet. Text is the main example we will use, but there are many others — a spectrogram is a sequence of spectra over time, a video is a sequence of images.</p>
 <section id="sec-autoregressive" class="level3">
@@ -444,7 +413,7 @@ Note
 <div class="boxed-eq">
 <p><span class="math display">\bm{h}_t = \sigma(\bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h), \qquad \bm{o}_t = \bm{W}_o \bm{h}_t + \bm{b}_o.</span></p>
 </div>
-<p>The only structural change is the term <span class="math inline">\bm{W}_h \bm{h}_{t-1}</span>, a recurrent connection from <span class="math inline">\bm{h}_{t-1}</span> to <span class="math inline">\bm{h}_t</span> through a learned weight matrix <span class="math inline">\bm{W}_h</span>. To use the model, we feed in <span class="math inline">\bm{x}_1</span> to get <span class="math inline">\bm{h}_1</span>, use <span class="math inline">\bm{h}_1</span> to produce <span class="math inline">\bm{o}_1</span> and hence a distribution over <span class="math inline">\bm{x}_2</span>; then feed in <span class="math inline">\bm{x}_2</span> together with the retained <span class="math inline">\bm{h}_1</span> to get <span class="math inline">\bm{h}_2</span> and a distribution over <span class="math inline">\bm{x}_3</span>; and so on. We carry the hidden state from one step to the next.</p>
+<p>The only structural change is the term <span class="math inline">\bm{W}_h \bm{h}_{t-1}</span>, a recurrent connection from <span class="math inline">\bm{h}_{t-1}</span> to <span class="math inline">\bm{h}_t</span> through a learned weight matrix <span class="math inline">\bm{W}_h</span>. To use the model, we start from an initial hidden state <span class="math inline">\bm{h}_0</span> (discussed later) and feed in <span class="math inline">\bm{x}_1</span> to get <span class="math inline">\bm{h}_1</span>, use <span class="math inline">\bm{h}_1</span> to produce <span class="math inline">\bm{o}_1</span> and hence a distribution over <span class="math inline">\bm{x}_2</span>; then feed in <span class="math inline">\bm{x}_2</span> together with the retained <span class="math inline">\bm{h}_1</span> to get <span class="math inline">\bm{h}_2</span> and a distribution over <span class="math inline">\bm{x}_3</span>; and so on. We carry the hidden state from one step to the next.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 620 344" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="rA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
@@ -491,7 +460,7 @@ Note
 </section>
 <section id="sec-bptt" class="level2">
 <h2 class="anchored" data-anchor-id="sec-bptt">Backpropagation Through Time</h2>
-<p>One way to picture backpropagation in a recurrent network is to <strong>unroll</strong> it: apply the same layer over and over, feeding in <span class="math inline">\bm{x}_t</span> at each step to update <span class="math inline">\bm{h}_t</span>, and then backpropagate from the outputs back to the inputs. To keep the notation manageable, write the hidden-state update as a function <span class="math inline">f</span> and the output as a function <span class="math inline">g</span>:</p>
+<p>One way to picture backpropagation in a recurrent network is to <strong>unroll</strong> it: apply the same layer over and over, feeding in <span class="math inline">\bm{x}_t</span> at each step to update <span class="math inline">\bm{h}_t</span>, and then backpropagate from the outputs back to the inputs. Backpropagation on this unrolled graph is called backpropagation through time. To keep the notation manageable, write the hidden-state update as a function <span class="math inline">f</span> and the output as a function <span class="math inline">g</span>:</p>
 <p><span class="math display">\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h), \qquad \bm{o}_t = g(\bm{h}_t, \bm{W}_o).</span></p>
 <p>We focus on <span class="math inline">\bm{W}_h</span>, the recurrent weights, since they are what make this case different. Suppose we incur a loss at every step, averaging a per-step loss <span class="math inline">\ell</span> between the target <span class="math inline">\bm{y}_t</span> and the output <span class="math inline">\bm{o}_t</span>:</p>
 <p><span class="math display">\mathcal{L} = \frac{1}{T} \sum_{t=1}^{T} \ell(\bm{y}_t, \bm{o}_t).</span></p>
@@ -500,22 +469,22 @@ Note
 <p>The first factor is the gradient of a softmax cross-entropy loss, which we have handled before. The second, <span class="math inline">d\bm{o}_t / d\bm{h}_t</span>, is <span class="math inline">\bm{W}_o</span>, since <span class="math inline">g</span> is a dense layer. The third factor, <span class="math inline">d\bm{h}_t / d\bm{W}_h</span>, is the hard one.</p>
 <section id="sec-bptt-term" class="level3">
 <h3 class="anchored" data-anchor-id="sec-bptt-term">The recurrent term</h3>
-<p>What makes <span class="math inline">d\bm{h}_t / d\bm{W}_h</span> hard is that <span class="math inline">\bm{W}_h</span> affects <span class="math inline">\bm{h}_t</span> through two paths. It contributes <strong>directly</strong>, because <span class="math inline">\bm{h}_t</span> is computed using <span class="math inline">\bm{W}_h</span>; and it contributes <strong>indirectly</strong>, because <span class="math inline">\bm{h}_t</span> depends on <span class="math inline">\bm{h}_{t-1}</span>, which itself depends on <span class="math inline">\bm{W}_h</span>, which depends on <span class="math inline">\bm{h}_{t-2}</span>, and so on back to the start. When a variable reaches another through two paths, we sum the derivative along each:</p>
-<p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h} + \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{h}_{t-1}}\, \frac{d\bm{h}_{t-1}}{d\bm{W}_h}.</span></p>
+<p>What makes <span class="math inline">d\bm{h}_t / d\bm{W}_h</span> hard is that <span class="math inline">\bm{W}_h</span> affects <span class="math inline">\bm{h}_t</span> through two paths. It contributes <strong>directly</strong>, because <span class="math inline">\bm{h}_t</span> is computed using <span class="math inline">\bm{W}_h</span>; and it contributes <strong>indirectly</strong>, because <span class="math inline">\bm{h}_t</span> depends on <span class="math inline">\bm{h}_{t-1}</span>, which itself depends on <span class="math inline">\bm{W}_h</span> and on <span class="math inline">\bm{h}_{t-2}</span>, and so on back to the start. When a variable reaches another through two paths, we sum the derivative along each:</p>
+<p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{\partial f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{\partial\bm{W}_h} + \frac{\partial f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{\partial\bm{h}_{t-1}}\, \frac{d\bm{h}_{t-1}}{d\bm{W}_h}.</span></p>
 <p>The final factor <span class="math inline">d\bm{h}_{t-1}/d\bm{W}_h</span> has the same form as the term we started with, one step earlier — a recursion. To see its solution, abbreviate</p>
-<p><span class="math display">a_t = \frac{d\bm{h}_t}{d\bm{W}_h}, \qquad b_t = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h}, \qquad c_t = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{h}_{t-1}},</span></p>
+<p><span class="math display">a_t = \frac{d\bm{h}_t}{d\bm{W}_h}, \qquad b_t = \frac{\partial f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{\partial\bm{W}_h}, \qquad c_t = \frac{\partial f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{\partial\bm{h}_{t-1}},</span></p>
 <p>so that the recursion is <span class="math inline">a_t = b_t + c_t\, a_{t-1}</span>. Since there is no <span class="math inline">\bm{h}_{-1}</span> to depend on, <span class="math inline">a_0 = 0</span>. Unrolling,</p>
 <p><span class="math display">a_1 = b_1, \quad a_2 = b_2 + c_2 b_1, \quad a_3 = b_3 + c_3 b_2 + c_3 c_2 b_1, \quad a_4 = b_4 + c_4 b_3 + c_4 c_3 b_2 + c_4 c_3 c_2 b_1.</span></p>
 <p>The pattern is an always-present <span class="math inline">b_t</span> plus a sum of terms, each a product of <span class="math inline">c</span>’s counting down to a <span class="math inline">b_i</span>:</p>
 <p><span class="math display">a_t = b_t + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} c_j \right) b_i.</span></p>
 <p>Substituting the definitions back in gives the recurrent term in full:</p>
 <div class="boxed-eq">
-<p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{d f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{d\bm{W}_h} + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} \frac{d f(\bm{x}_j, \bm{h}_{j-1}, \bm{W}_h)}{d\bm{h}_{j-1}} \right) \frac{d f(\bm{x}_i, \bm{h}_{i-1}, \bm{W}_h)}{d\bm{W}_h}.</span></p>
+<p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \frac{\partial f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h)}{\partial\bm{W}_h} + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} \frac{\partial f(\bm{x}_j, \bm{h}_{j-1}, \bm{W}_h)}{\partial\bm{h}_{j-1}} \right) \frac{\partial f(\bm{x}_i, \bm{h}_{i-1}, \bm{W}_h)}{\partial\bm{W}_h}.</span></p>
 </div>
 </section>
 <section id="sec-exploding-vanishing" class="level3">
 <h3 class="anchored" data-anchor-id="sec-exploding-vanishing">Why recurrent networks are hard to train</h3>
-<p>To see what this means, take a linear vanilla RNN, where <span class="math inline">f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h) = \bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h</span>. Then the direct term <span class="math inline">d f / d\bm{W}_h</span> is <span class="math inline">\bm{h}_{t-1}</span> (and each <span class="math inline">\bm{b}_i = \bm{h}_{i-1}</span>), while each factor <span class="math inline">d f / d\bm{h}_{j-1}</span> is <span class="math inline">\bm{W}_h</span>, so</p>
+<p>To see what this means, take a linear vanilla RNN, where <span class="math inline">f(\bm{x}_t, \bm{h}_{t-1}, \bm{W}_h) = \bm{W}_x \bm{x}_t + \bm{W}_h \bm{h}_{t-1} + \bm{b}_h</span>. Then the direct term <span class="math inline">\partial f / \partial\bm{W}_h</span> is <span class="math inline">\bm{h}_{t-1}</span> (and each <span class="math inline">b_i = \bm{h}_{i-1}</span>), while each factor <span class="math inline">\partial f / \partial\bm{h}_{j-1}</span> is <span class="math inline">\bm{W}_h</span>, so</p>
 <p><span class="math display">\frac{d\bm{h}_t}{d\bm{W}_h} = \bm{h}_{t-1} + \sum_{i=1}^{t-1} \left( \prod_{j=i+1}^{t} \bm{W}_h \right) \bm{h}_{i-1}.</span></p>
 <p>Everything here is mild except the product <span class="math inline">\prod_{j=i+1}^{t} \bm{W}_h</span>, which is the same matrix <span class="math inline">\bm{W}_h</span> multiplied by itself over and over. As we saw earlier in the course with exploding and vanishing gradients, a chain of weight-matrix multiplications can grow without bound or shrink toward zero depending on the eigenvalues of the matrix — and here the matrices are not merely similar but identical. As a result, <span class="math inline">d\bm{h}_t / d\bm{W}_h</span> can <strong>explode or vanish</strong>. Viewing a recurrent network as a deep network whose layers all share one weight matrix, backpropagation produces exactly these repeated multiplications by the same matrix, which makes exploding and vanishing gradients especially severe for recurrent networks.</p>
 <hr>
@@ -569,7 +538,7 @@ Note
 <p><span class="math display">\bm{h}_t^{(1)} = f^{(1)}\!\big(\bm{x}_t, \bm{h}_{t-1}^{(1)}\big), \qquad \bm{h}_t^{(2)} = f^{(2)}\!\big(\bm{h}_t^{(1)}, \bm{h}_{t-1}^{(2)}\big), \quad \dots</span></p>
 <p>Just as we stack layers in a feedforward network, we can stack them in a recurrent one; there are simply more indices.</p>
 <p>Second, we can have <strong>bidirectional RNNs</strong>. So far we have processed the sequence from left to right, but we can process it in any order, and a common choice is to run two layers in parallel with separate parameters — one forward and one backward:</p>
-<p><span class="math display">\overrightarrow{\bm{h}}_t = \overrightarrow{f}\!\big(\bm{x}_t, \overrightarrow{\bm{h}}_{t-1}\big), \qquad \overleftarrow{\bm{h}}_t = \overleftarrow{f}\!\big(\bm{x}_{T-t}, \overleftarrow{\bm{h}}_{t-1}\big).</span></p>
+<p><span class="math display">\overrightarrow{\bm{h}}_t = \overrightarrow{f}\!\big(\bm{x}_t, \overrightarrow{\bm{h}}_{t-1}\big), \qquad \overleftarrow{\bm{h}}_t = \overleftarrow{f}\!\big(\bm{x}_t, \overleftarrow{\bm{h}}_{t+1}\big).</span></p>
 <p>Concatenating the forward and backward states at a step gives a representation with information about the full past and the full future. This would not make sense for predicting the next element — we cannot look ahead at what we are trying to predict — but it does make sense when we already have the whole input sequence and want to, for example, classify it.</p>
 <hr>
 </section>
@@ -587,7 +556,7 @@ Note
 <h3 class="anchored" data-anchor-id="sec-sequence-classification">Sequence classification</h3>
 <p>A different use is <strong>sequence classification</strong>: predicting a single class from a full input sequence, <span class="math inline">p(\bm{y} \mid \bm{x}_1, \dots, \bm{x}_T)</span>. Here we do not care about predicting each element; we take the whole sequence and make one prediction. We iterate the recurrent update to the end and feed the final hidden state through a single dense layer to get the scores:</p>
 <p><span class="math display">\bm{h}_t = f(\bm{x}_t, \bm{h}_{t-1}), \qquad \bm{o} = \bm{W}_o \bm{h}_T + \bm{b}_o.</span></p>
-<p>Since we have the full sequence when making the prediction, a bidirectional RNN can make sense here. The final hidden state <span class="math inline">\bm{h}_T</span> should carry information about the entire input. Sequence classification covers tasks such as predicting the topic of a document, whether a movie review is positive or negative, or whether an email — a sequence of words fed through the RNN, with the final state passed to a classifier — is spam.</p>
+<p>The final hidden state <span class="math inline">\bm{h}_T</span> should carry information about the entire input. Since we have the full sequence when making the prediction, a bidirectional RNN can make sense here, combining the final forward state <span class="math inline">\overrightarrow{\bm{h}}_T</span> with the final backward state <span class="math inline">\overleftarrow{\bm{h}}_1</span>. Sequence classification covers tasks such as predicting the topic of a document, whether a movie review is positive or negative, or whether an email — a sequence of words fed through the RNN, with the final state passed to a classifier — is spam.</p>
 <hr>
 </section>
 </section>
@@ -1123,9 +1092,6 @@ Sutskever, Ilya, Oriol Vinyals, and Quoc V Le. 2014. <span>“Sequence to Sequen
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../lectures/07-attention.html" class="pagination-link" aria-label="Lecture 7: Attention">
-        <span class="nav-page-text"><span class="chapter-title">Lecture 7: Attention</span></span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->
