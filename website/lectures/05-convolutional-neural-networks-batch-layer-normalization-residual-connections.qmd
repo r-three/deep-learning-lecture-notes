@@ -419,35 +419,37 @@ A ResNet block usually applies a $3\times3$ convolution, batch normalization, a 
 <svg viewBox="0 0 760 400" width="100%" style="max-width:760px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="nArr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
 <text x="20" y="28" font-size="22" font-weight="600" fill="#333">ResNet block</text>
-<rect x="20" y="52" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<text x="52" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">3×3</text>
-<text x="52" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text>
-<line x1="84" y1="75.0" x2="106" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
-<rect x="106" y="52" width="64" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
-<text x="138" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">batch</text>
-<text x="138" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">norm</text>
-<line x1="170" y1="75.0" x2="192" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
-<rect x="192" y="52" width="54" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
-<text x="219" y="80" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">ReLU</text>
-<line x1="246" y1="75.0" x2="268" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
-<rect x="268" y="52" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<text x="300" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">3×3</text>
-<text x="300" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text>
-<line x1="332" y1="75.0" x2="354" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
-<rect x="354" y="52" width="64" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
-<text x="386" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">batch</text>
-<text x="386" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">norm</text>
-<line x1="418" y1="75.0" x2="428" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
-<circle cx="444" cy="75.0" r="15" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-<text x="444" y="81" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">+</text>
-<line x1="459" y1="75.0" x2="481" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
-<rect x="481" y="52" width="54" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
-<text x="508" y="80" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">ReLU</text>
-<line x1="535" y1="75.0" x2="557" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
-<path d="M24,75.0 L24,132 L444,132 L444,90.0" fill="none" stroke="#8457C7" stroke-width="1.8" marker-end="url(#nArr)"/>
-<rect x="187.0" y="116" width="90" height="32" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
-<text x="232" y="137" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">1×1 conv</text>
-<text x="454" y="136" font-size="12" fill="#666">(sometimes, to match shape)</text>
+<line x1="10" y1="75.0" x2="60" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<circle cx="30" cy="75.0" r="3" fill="#8457C7"/>
+<rect x="60" y="52" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="92" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">3×3</text>
+<text x="92" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text>
+<line x1="124" y1="75.0" x2="146" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="146" y="52" width="64" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="178" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">batch</text>
+<text x="178" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">norm</text>
+<line x1="210" y1="75.0" x2="232" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="232" y="52" width="54" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="259" y="80" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">ReLU</text>
+<line x1="286" y1="75.0" x2="308" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="308" y="52" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="340" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">3×3</text>
+<text x="340" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">conv</text>
+<line x1="372" y1="75.0" x2="394" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="394" y="52" width="64" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="426" y="72" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">batch</text>
+<text x="426" y="90" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">norm</text>
+<line x1="458" y1="75.0" x2="468" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<circle cx="484" cy="75.0" r="15" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="484" y="81" text-anchor="middle" font-size="18" font-weight="600" fill="#794520">+</text>
+<line x1="499" y1="75.0" x2="521" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<rect x="521" y="52" width="54" height="46" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"/>
+<text x="548" y="80" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">ReLU</text>
+<line x1="575" y1="75.0" x2="597" y2="75.0" stroke="#888" stroke-width="1.5" marker-end="url(#nArr)"/>
+<path d="M30,75.0 L30,132 L484,132 L484,90.0" fill="none" stroke="#8457C7" stroke-width="1.8" marker-end="url(#nArr)"/>
+<rect x="227" y="116" width="90" height="32" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"/>
+<text x="272" y="137" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">1×1 conv</text>
+<text x="494" y="136" font-size="12" fill="#666">(sometimes, to match shape)</text>
 <text x="20" y="248" font-size="22" font-weight="600" fill="#333">ResNet</text>
 <rect x="20" y="272" width="64" height="46" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
 <text x="52" y="292" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">7×7</text>

@@ -65,62 +65,87 @@ Now consider what happens when a one-hot vector meets the first weight matrix $\
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 660 300" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
-<defs><marker id="eA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
-<text x="24" y="30" font-size="24" font-weight="600" fill="#333">Word embeddings: a one-hot indexes a column</text>
-<text x="40" y="66" font-size="16" fill="#205279" font-weight="600">"cat"</text>
-<line x1="78" y1="61" x2="110" y2="61" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"/>
-<text x="120" y="66" font-size="16" fill="#205279" font-weight="600">index 4</text>
-<line x1="196" y1="61" x2="228" y2="61" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"/>
-<text x="238" y="66" font-size="16" fill="#205279" font-weight="600">one-hot</text>
-<rect x="40" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="74" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="108" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="142" y="100" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
-<rect x="176" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="210" y="100" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="40" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="74" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="108" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="142" y="134" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
-<rect x="176" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="210" y="134" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="40" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="74" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="108" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="142" y="168" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
-<rect x="176" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="210" y="168" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="40" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="74" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="108" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="142" y="202" width="34" height="34" fill="#DBCDF0" stroke="#8457C7" stroke-width="2"/>
-<rect x="176" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="210" y="202" width="34" height="34" fill="#F3EDFB" stroke="#8457C7" stroke-width="1"/>
-<rect x="142" y="100" width="34" height="136" fill="none" stroke="#e53935" stroke-width="2.5"/>
-<text x="142" y="258" text-anchor="middle" font-size="14" fill="#666">embedding matrix W  (d × |V|, learned)</text>
-<text x="270" y="174" text-anchor="middle" font-size="24" fill="#555">×</text>
-<rect x="292" y="66" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
-<text x="309" y="83" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
-<rect x="292" y="94" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
-<text x="309" y="112" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
-<rect x="292" y="122" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
-<text x="309" y="140" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
-<rect x="292" y="151" width="34" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
-<text x="309" y="168" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">1</text>
-<rect x="292" y="179" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
-<text x="309" y="196" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
-<rect x="292" y="207" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
-<text x="309" y="225" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
-<text x="309" y="253" text-anchor="middle" font-size="14" fill="#666">one-hot (|V|)</text>
-<text x="370" y="174" text-anchor="middle" font-size="24" fill="#555">=</text>
-<rect x="412" y="100" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<rect x="412" y="134" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<rect x="412" y="168" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<rect x="412" y="202" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<rect x="412" y="100" width="34" height="136" fill="none" stroke="#e53935" stroke-width="2.5"/>
-<text x="429" y="258" text-anchor="middle" font-size="14" fill="#207965" font-weight="600">word embedding</text>
-<text x="24" y="288" font-size="14" fill="#666">The product selects the column of W indexed by the token — its learned word embedding.</text>
+<svg viewBox="0 0 660 335" width="100%" style="max-width:660px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="eA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker><marker id="eG" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L0,8 L8,4 z" fill="#2E9E85"/></marker></defs>
+<text x="24" y="30" font-size="20" font-weight="600" fill="#333">Word embeddings: a one-hot indexes a column</text>
+<text x="84" y="64" text-anchor="end" font-size="15" fill="#205279" font-weight="600">"cat"</text>
+<line x1="94" y1="59" x2="124" y2="59" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"/>
+<text x="134" y="64" font-size="15" fill="#205279" font-weight="600">index 4</text>
+<line x1="200" y1="59" x2="230" y2="59" stroke="#888" stroke-width="1.5" marker-end="url(#eA)"/>
+<text x="240" y="64" font-size="15" fill="#205279" font-weight="600">one-hot <tspan font-style="italic" font-family="Georgia,serif">x</tspan></text>
+<text x="67" y="112" text-anchor="middle" font-size="12" fill="#999" font-weight="400">1</text>
+<rect x="50" y="120" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="50" y="154" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="50" y="188" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="50" y="222" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<text x="101" y="112" text-anchor="middle" font-size="12" fill="#999" font-weight="400">2</text>
+<rect x="84" y="120" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="84" y="154" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="84" y="188" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="84" y="222" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<text x="135" y="112" text-anchor="middle" font-size="12" fill="#999" font-weight="400">3</text>
+<rect x="118" y="120" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="118" y="154" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="118" y="188" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="118" y="222" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<text x="169" y="112" text-anchor="middle" font-size="12" fill="#207965" font-weight="600">4</text>
+<rect x="152" y="120" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="169" y="141" text-anchor="middle" font-size="12" fill="#207965">0.2</text>
+<rect x="152" y="154" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="169" y="175" text-anchor="middle" font-size="12" fill="#207965">−1.1</text>
+<rect x="152" y="188" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="169" y="209" text-anchor="middle" font-size="12" fill="#207965">0.7</text>
+<rect x="152" y="222" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="169" y="243" text-anchor="middle" font-size="12" fill="#207965">0.4</text>
+<text x="203" y="112" text-anchor="middle" font-size="12" fill="#999" font-weight="400">5</text>
+<rect x="186" y="120" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="186" y="154" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="186" y="188" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="186" y="222" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<text x="237" y="112" text-anchor="middle" font-size="12" fill="#999" font-weight="400">6</text>
+<rect x="220" y="120" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="220" y="154" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="220" y="188" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="220" y="222" width="34" height="34" fill="#F8F5FC" stroke="#C9B8E6" stroke-width="1"/>
+<rect x="50" y="120" width="204" height="136" fill="none" stroke="#8457C7" stroke-width="1.5"/>
+<rect x="152" y="120" width="34" height="136" fill="none" stroke="#2E9E85" stroke-width="2.5"/>
+<text x="152" y="280" text-anchor="middle" font-size="17" font-weight="700" font-style="italic" font-family="Georgia,serif" fill="#442079">W</text>
+<text x="152" y="298" text-anchor="middle" font-size="13" fill="#666">embedding matrix, <tspan font-style="italic">d</tspan> × |<tspan font-style="italic">V</tspan>|</text>
+<text x="280" y="196" text-anchor="middle" font-size="24" fill="#555">×</text>
+<rect x="306" y="104" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="323" y="123" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<text x="347" y="122" font-size="11" fill="#999" font-weight="400">1</text>
+<rect x="306" y="132" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="323" y="151" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<text x="347" y="150" font-size="11" fill="#999" font-weight="400">2</text>
+<rect x="306" y="160" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="323" y="179" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<text x="347" y="178" font-size="11" fill="#999" font-weight="400">3</text>
+<rect x="306" y="188" width="34" height="28" fill="#C6DEF1" stroke="#5795C7" stroke-width="2"/>
+<text x="323" y="207" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">1</text>
+<text x="347" y="206" font-size="11" fill="#205279" font-weight="600">4</text>
+<rect x="306" y="216" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="323" y="235" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<text x="347" y="234" font-size="11" fill="#999" font-weight="400">5</text>
+<rect x="306" y="244" width="34" height="28" fill="#EEF4FA" stroke="#5795C7" stroke-width="1"/>
+<text x="323" y="263" text-anchor="middle" font-size="14" font-weight="400" fill="#205279">0</text>
+<text x="347" y="262" font-size="11" fill="#999" font-weight="400">6</text>
+<text x="323" y="292" text-anchor="middle" font-size="13" fill="#666">one-hot <tspan font-style="italic" font-family="Georgia,serif">x</tspan>, |<tspan font-style="italic">V</tspan>|</text>
+<text x="402" y="196" text-anchor="middle" font-size="24" fill="#555">=</text>
+<rect x="440" y="120" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="457" y="141" text-anchor="middle" font-size="12" fill="#207965">0.2</text>
+<rect x="440" y="154" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="457" y="175" text-anchor="middle" font-size="12" fill="#207965">−1.1</text>
+<rect x="440" y="188" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="457" y="209" text-anchor="middle" font-size="12" fill="#207965">0.7</text>
+<rect x="440" y="222" width="34" height="34" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1"/>
+<text x="457" y="243" text-anchor="middle" font-size="12" fill="#207965">0.4</text>
+<rect x="440" y="120" width="34" height="136" fill="none" stroke="#2E9E85" stroke-width="2.5"/>
+<text x="482" y="193" font-size="13" font-style="italic" fill="#666">d</text>
+<text x="457" y="280" text-anchor="middle" font-size="14" font-weight="600" fill="#207965">word embedding</text>
+<text x="457" y="298" text-anchor="middle" font-size="13" fill="#666">= column 4 of <tspan font-style="italic" font-family="Georgia,serif">W</tspan></text>
+<path d="M169,98 C169,74 457,74 457,112" fill="none" stroke="#2E9E85" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#eG)"/>
+<text x="24" y="326" font-size="14" fill="#666">The product selects the column of <tspan font-style="italic" font-family="Georgia,serif">W</tspan> indexed by the token — its learned word embedding.</text>
 </svg></div>
 ```
 
@@ -154,42 +179,55 @@ The only structural change is the term $\bm{W}_h \bm{h}_{t-1}$, a recurrent conn
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 620 344" width="100%" style="max-width:620px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 640 366" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="rA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
-<text x="24" y="30" font-size="24" font-weight="600" fill="#333">The vanilla RNN, unrolled</text>
-<text x="60" y="169" font-size="15" fill="#207965" font-weight="600">h₀</text>
-<line x1="80" y1="164.0" x2="120" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<rect x="120" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<text x="155" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₁</text>
-<rect x="120" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
-<text x="155" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₁</text>
-<line x1="155.0" y1="236" x2="155.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<rect x="120" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-<text x="155" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₁</text>
-<line x1="155.0" y1="140" x2="155.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<line x1="190" y1="164.0" x2="300" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<rect x="300" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<text x="335" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₂</text>
-<rect x="300" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
-<text x="335" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₂</text>
-<line x1="335.0" y1="236" x2="335.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<rect x="300" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-<text x="335" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₂</text>
-<line x1="335.0" y1="140" x2="335.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<line x1="370" y1="164.0" x2="480" y2="164.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<rect x="480" y="140" width="70" height="48" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
-<text x="515" y="170" text-anchor="middle" font-size="17" font-weight="600" fill="#207965">h₃</text>
-<rect x="480" y="236" width="70" height="48" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
-<text x="515" y="266" text-anchor="middle" font-size="17" font-weight="600" fill="#205279">x₃</text>
-<line x1="515.0" y1="236" x2="515.0" y2="188" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<rect x="480" y="44" width="70" height="48" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
-<text x="515" y="74" text-anchor="middle" font-size="17" font-weight="600" fill="#794520">o₃</text>
-<line x1="515.0" y1="140" x2="515.0" y2="92" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
-<text x="245" y="156" text-anchor="middle" font-size="13" fill="#666">W_h</text>
-<text x="169" y="216" font-size="13" fill="#666">W_x</text>
-<text x="169" y="100" font-size="13" fill="#666">W_o</text>
-<text x="24" y="312" font-size="14" fill="#666">The same weights W_x, W_h, W_o are reused at every step;</text>
-<text x="24" y="332" font-size="14" fill="#666">hₜ summarizes the sequence up to step t.</text>
+<text x="24" y="30" font-size="20" font-weight="600" fill="#333">The vanilla RNN, unrolled</text>
+<rect x="34" y="150" width="52" height="44" rx="7" fill="#F4FAF8" stroke="#57C7AE" stroke-width="1.5" stroke-dasharray="4 3"/>
+<text x="60" y="178" text-anchor="middle" font-size="17" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.05" dy="4.76">0</tspan></text>
+<rect x="148" y="56" width="64" height="44" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="180" y="84" text-anchor="middle" font-size="18" fill="#794520"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">o</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">1</tspan></text>
+<rect x="148" y="244" width="64" height="44" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="180" y="272" text-anchor="middle" font-size="18" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">x</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">1</tspan></text>
+<rect x="148" y="150" width="64" height="44" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="180" y="178" text-anchor="middle" font-size="18" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">1</tspan></text>
+<line x1="180" y1="242" x2="180" y2="197" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<line x1="180" y1="148" x2="180" y2="103" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="189" y="224" text-anchor="start" font-size="14" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">x</tspan></text>
+<text x="189" y="130" text-anchor="start" font-size="14" fill="#794520"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">o</tspan></text>
+<line x1="88" y1="172.0" x2="145.0" y2="172.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="117" y="163" text-anchor="middle" font-size="14" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">h</tspan></text>
+<text x="180" y="310" text-anchor="middle" font-size="12" fill="#999">t = 1</text>
+<rect x="318" y="56" width="64" height="44" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="350" y="84" text-anchor="middle" font-size="18" fill="#794520"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">o</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">2</tspan></text>
+<rect x="318" y="244" width="64" height="44" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="350" y="272" text-anchor="middle" font-size="18" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">x</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">2</tspan></text>
+<rect x="318" y="150" width="64" height="44" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="350" y="178" text-anchor="middle" font-size="18" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">2</tspan></text>
+<line x1="350" y1="242" x2="350" y2="197" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<line x1="350" y1="148" x2="350" y2="103" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="359" y="224" text-anchor="start" font-size="14" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">x</tspan></text>
+<text x="359" y="130" text-anchor="start" font-size="14" fill="#794520"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">o</tspan></text>
+<line x1="214.0" y1="172.0" x2="315.0" y2="172.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="265" y="163" text-anchor="middle" font-size="14" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">h</tspan></text>
+<text x="350" y="310" text-anchor="middle" font-size="12" fill="#999">t = 2</text>
+<rect x="488" y="56" width="64" height="44" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
+<text x="520" y="84" text-anchor="middle" font-size="18" fill="#794520"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">o</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">3</tspan></text>
+<rect x="488" y="244" width="64" height="44" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"/>
+<text x="520" y="272" text-anchor="middle" font-size="18" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">x</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">3</tspan></text>
+<rect x="488" y="150" width="64" height="44" rx="7" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
+<text x="520" y="178" text-anchor="middle" font-size="18" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="11.7" dy="5.04">3</tspan></text>
+<line x1="520" y1="242" x2="520" y2="197" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<line x1="520" y1="148" x2="520" y2="103" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="529" y="224" text-anchor="start" font-size="14" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">x</tspan></text>
+<text x="529" y="130" text-anchor="start" font-size="14" fill="#794520"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">o</tspan></text>
+<line x1="384.0" y1="172.0" x2="485.0" y2="172.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="435" y="163" text-anchor="middle" font-size="14" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">h</tspan></text>
+<text x="520" y="310" text-anchor="middle" font-size="12" fill="#999">t = 3</text>
+<line x1="554.0" y1="172.0" x2="602.0" y2="172.0" stroke="#888" stroke-width="1.5" marker-end="url(#rA)"/>
+<text x="577" y="163" text-anchor="middle" font-size="14" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.1" dy="3.92">h</tspan></text>
+<text x="610.0" y="177.0" font-size="18" fill="#999">⋯</text>
+<text x="24" y="338" font-size="14" fill="#666">The same weights <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="10" dy="3">x</tspan><tspan dy="-3">, </tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="10" dy="3">h</tspan><tspan dy="-3">, </tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="10" dy="3">o</tspan><tspan dy="-3"> are reused at every step;</tspan></text>
+<text x="24" y="358" font-size="14" fill="#666"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="10" dy="3">t</tspan><tspan dy="-3"> summarizes the sequence up to step </tspan><tspan font-style="italic">t</tspan>.</text>
 </svg></div>
 ```
 
