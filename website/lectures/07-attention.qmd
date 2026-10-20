@@ -25,7 +25,7 @@ Retrieval then involves two functions. The first is a **comparison function**, w
 
 A familiar example is a Python dictionary. Its comparison function tests for equality — in practice it hashes the keys and the query and checks for matching hashes, which is not equality exactly but is equality with very high probability. Given a query, it finds the key equal to the query, and there can be only one, since the keys are unique. Its reduction function returns the value corresponding to that key. One could imagine implementing a dictionary as a set of (key, value) tuples: compare the query to the first entry of every tuple, find the one whose key matches, and return its second entry. This is not how dictionaries are actually built, but it captures the behavior.
 
-A dictionary is not something we can put inside a neural network and backpropagate through: its assignments are hard, testing for equality and returning only the matching value. What we will do over this lecture is make this behavior soft and smooth, and use it as a core layer.
+A dictionary is not something we can put inside a neural network and backpropagate through: its assignments are hard, testing for equality and returning only the matching value, and hence non-differentiable. What we will do over this lecture is make this behavior soft and smooth, and use it as a core layer.
 
 ### The abstract picture {#sec-abstract}
 
@@ -115,7 +115,7 @@ $$f(\{\bm{v}_1, \dots, \bm{v}_N\}, \bm{a}) \in \mathbb{R}^{d_v}.$$
 For the dictionary, the comparison could output $1$ when $\bm{q}$ and $\bm{k}_i$ are equal and $0$ otherwise — a one-hot vector marking the match — and the reduction would return the value at the entry equal to $1$.
 
 ::: {.callout-note}
-**Attention operates on sets.** Although the keys and values can be drawn as the rows of a matrix, every operation here is an operation on a set: shuffling the keys and values (together) leaves the result unchanged. The same is true of a dictionary, whose keys and values have no inherent order. This property will return when we apply attention to sequences.
+**Attention operates on sets.** Although the keys and values can be drawn as the rows of a matrix, every operation here is an operation on a set: shuffling the keys and values (together) leaves the result unchanged. In other words, attention is permutation invariant in its key–value pairs. The same is true of a dictionary, whose keys and values have no inherent order. This property will return when we apply attention to sequences.
 :::
 
 ---
@@ -185,6 +185,8 @@ for instance by concatenating $\bm{c}_{t'}$ with the previous output before feed
 
 If we plot the attention weights over the input at each decoder step, we can see what the mechanism learns. For a translation, the weights tend to concentrate on the input word being translated, and shift as generation proceeds — even reordering when the languages order phrases differently, as when "European Economic Area" becomes "zone économique européenne." None of this is hard-coded; it is learned by gradient descent on the training data.
 
+![Attention weights for an English-to-French translation. Each row is a decoder step and each column an input word; brighter cells mean higher weight. The weights mostly follow the diagonal but reverse for "European Economic Area" → "zone économique européenne." Taken from @bahdanau2015neural.](../figures/lecture7/translation_attention_scores.png){width=60% fig-align="center"}
+
 ---
 
 ## Self-Attention {#sec-self-attention}
@@ -205,7 +207,7 @@ with $\bm{W}_Q, \bm{W}_K \in \mathbb{R}^{d_k \times m}$ and $\bm{W}_V \in \mathb
 
 $$\alpha(\bm{q}, \bm{k}_i) = \frac{\bm{q}^\top \bm{k}_i}{\sqrt{d_k}}.$$
 
-The normalization keeps the scores from having an overly large range: if $\bm{q}$ and $\bm{k}_i$ have entries that are standard normal, dividing the dot product by $\sqrt{d_k}$ keeps its variance the same, by an argument much like the one used to initialize weight matrices. Because the query and key are different linear maps of the input, the dot product measures a learned compatibility between them. The reduction function is the same softmax-weighted average as before,
+The normalization keeps the scores from having an overly large range: if $\bm{q}$ and $\bm{k}_i$ have entries that are distributed as a standard normal, dividing the dot product by $\sqrt{d_k}$ keeps its variance the same, by an argument much like the one used to initialize weight matrices. Without this scaling, the scores grow with $d_k$ and risk saturating the softmax (discussed below), which in turn can lead to vanishing gradients. Because the query and key are different linear maps of the input, the dot product measures a learned compatibility between them. The reduction function is the same softmax-weighted average as before,
 
 $$f(\{\bm{v}_1, \dots, \bm{v}_T\}, \bm{a}) = \operatorname{softmax}(\bm{a}) \cdot V.$$
 
@@ -213,12 +215,12 @@ Self-attention thus maps a length-$T$ sequence to a length-$T$ sequence: for eac
 
 ### Path length {#sec-path-length}
 
-Why is a sequence of weighted averages a reasonable thing to compute? One way to see the appeal is through **path length**, a notion close to the receptive field from Lecture 5: the number of operations required to mix information between two elements of the input. Take an input sequence of five elements and ask how many operations are needed to produce an output that depends on both $\bm{x}_1$ and $\bm{x}_5$.
+Why is a sequence of weighted averages a reasonable thing to compute? One way to see the appeal is through **path length**, a notion close to the receptive field from Lecture 5: the number of operations required to mix information between two elements of the input. Take an input sequence of five elements and ask how many sequential operations are needed to produce an output that depends on both $\bm{x}_1$ and $\bm{x}_5$.
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewBox="0 0 720 320" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
-<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Path length: operations to mix x₁ and x₅</text>
+<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Path length: number of operations to mix x₁ and x₅</text>
 <text x="30" y="70" font-size="16" font-weight="600" fill="#333">ConvNet (length-3)</text>
 <line x1="64" y1="180" x2="30" y2="250" stroke="#e53935" stroke-width="2.6"/>
 <line x1="64" y1="180" x2="64" y2="250" stroke="#aaa" stroke-width="1.2"/>
@@ -285,7 +287,7 @@ Why is a sequence of weighted averages a reasonable thing to compute? One way to
 </svg></div>
 ```
 
-For a convolutional network with length-3 kernels, one convolution produces outputs that each depend on three adjacent inputs; no single output yet depends on both $\bm{x}_1$ and $\bm{x}_5$. A second convolution bridges them, so the path length is $2$ — the same relationship between kernel size and receptive field we saw for images. For a recurrent network, the output that depends on both $\bm{x}_1$ and $\bm{x}_5$ is the one at the last step, reached after roughly five sequential updates, so the path length is $5$. For self-attention, every output is a softmax-weighted average of all the inputs, so every output already depends on every input: the path length is $1$.
+For a convolutional network with length-3 kernels, one convolution produces outputs that each depend on three adjacent inputs; no single output yet depends on both $\bm{x}_1$ and $\bm{x}_5$. A second convolution bridges them, so the path length is $2$ — the same relationship between kernel size and receptive field we saw for images. For a recurrent network, the output that depends on both $\bm{x}_1$ and $\bm{x}_5$ is the one at the last step, reached after roughly five sequential updates, so the path length is $5$. For self-attention, every output is a softmax-weighted average of all the inputs, so every output already directly depends on every input: the path length is $1$.
 
 Path length also measures the number of operations that cannot be parallelized. In a convolutional network the second convolution must wait for the first; in a recurrent network each step waits for the previous one. In self-attention, each output is an independent weighted average of the inputs, computed without reference to the other outputs, so all outputs can be computed in parallel. This matters because the hardware we train on is built for large parallel matrix computations, so avoiding sequential dependencies is valuable.
 
@@ -351,21 +353,21 @@ For the reduction, apply a softmax to each row of the $T \times T$ matrix — tu
 
 ## Position Encoding {#sec-position}
 
-There is something odd about applying self-attention to sequences. Since attention operates on sets, shuffling the keys and values leaves the output unchanged; shuffling the input sequence would produce the same output sequence, shuffled the same way. Self-attention is orderless, which makes little sense for sequences — shuffling the words of an English sentence changes, or destroys, its meaning. To process sequences, we must supply information about the position of each element.
+There is something odd about applying self-attention to sequences. Since attention operates on sets, shuffling the keys and values leaves the output unchanged (permutation invariance); shuffling the input sequence would produce the same output sequence, shuffled the same way (permutation equivariance). Self-attention is orderless, which makes little sense for sequences — shuffling the words of an English sentence changes, or destroys, its meaning. To process sequences, we must supply information about the position of each element.
 
 ::: {.callout-note}
 **Self-attention is orderless.** As a set operation, self-attention ignores the order of its inputs, so on its own it is ill-suited to sequences. We fix this by encoding position.
 :::
 
-One original approach is to learn a vector — an **embedding** — for each sequence position, and add it to the input before applying self-attention. Since the added values are position-dependent and learned, they encode position. The trouble is extrapolation: the sequence length $T$ varies across inputs, and if we learn embeddings up to the largest length seen in training, we cannot handle a longer sequence at test time. This absolute-embedding approach is uncommon today for that reason.
+One early approach is to learn a vector — an **embedding** — for each sequence position, and add it to the input before applying self-attention. Since the added values are position-dependent and learned, they encode position. The trouble is extrapolation: the sequence length $T$ varies across inputs, and if we learn embeddings up to the largest length seen in training, we cannot handle a longer sequence at test time. This absolute-embedding approach is uncommon today for that reason.
 
-More common now is a **relative encoding**, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we learn a position term. Three variants:
+More common now is a **relative encoding**, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we introduce a position term. Three variants:
 
 $$\text{(i)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top (\bm{k}_j + \bm{p}_{ij})}{\sqrt{d_k}}, \qquad \text{(ii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top \bm{k}_j}{\sqrt{d_k}} + p_{ij},$$
 
 where in (i) $\bm{p}_{ij} \in \mathbb{R}^{d_k}$ is a learned vector for each offset, and in (ii) $p_{ij}$ is a learned scalar acting as a relative bias that raises or lowers the score before the softmax. Both depend only on the offset $i - j$, up to a maximum beyond which a single far-apart encoding is reused, which allows extrapolation. Variant (i) is somewhat costly, requiring a learned $d_k$-dimensional vector for every offset.
 
-The third variant is **rotary position encoding** (RoPE) [@su2024roformer]. Define a rotation matrix $\bm{R}_i$ that rotates by an angle $i\theta$ for a fixed hyperparameter $\theta$, rotate the query by $i\theta$ and the key by $j\theta$, and compare:
+The third variant is **rotary position encoding** (RoPE) [@su2024roformer], and requires no learned quantities. Define a rotation matrix $\bm{R}_i$ that rotates a vector by an angle $i\theta$ for a fixed hyperparameter $\theta$, rotate the query by $i\theta$ and the key by $j\theta$, and compare:
 
 ::: {.boxed-eq}
 $$\text{(iii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{(\bm{R}_i \bm{q}_i)^\top (\bm{R}_j \bm{k}_j)}{\sqrt{d_k}}, \qquad \bm{R}_i = \text{rotate by angle } i\theta.$$
@@ -406,18 +408,18 @@ $$\text{Output} = \bm{W}_O \begin{bmatrix} \bm{h}^{(1)} \\ \bm{h}^{(2)} \\ \vdot
 <line x1="140.0" y1="322" x2="140.0" y2="295" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
 <rect x="86.0" y="236" width="108" height="56" rx="7" fill="#E6DDF5" stroke="#8457C7" stroke-width="1.5"/>
 <text x="140.0" y="259" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 1</text>
-<text x="140.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan dy="-3.36">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan dy="-3.36">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan dy="-3.36">​</tspan></text>
+<text x="140.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan font-size="8.16" dy="-8.56">(1)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan font-size="8.16" dy="-8.56">(1)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan font-size="8.16" dy="-8.56">(1)</tspan><tspan dy="5.2">​</tspan></text>
 <line x1="140.0" y1="236" x2="140.0" y2="199" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
 <line x1="260.0" y1="322" x2="260.0" y2="295" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
 <rect x="206.0" y="236" width="108" height="56" rx="7" fill="#D3C2EE" stroke="#8457C7" stroke-width="1.5"/>
 <text x="260.0" y="259" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 2</text>
-<text x="260.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan dy="-3.36">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan dy="-3.36">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan dy="-3.36">​</tspan></text>
+<text x="260.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan font-size="8.16" dy="-8.56">(2)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan font-size="8.16" dy="-8.56">(2)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan font-size="8.16" dy="-8.56">(2)</tspan><tspan dy="5.2">​</tspan></text>
 <line x1="260.0" y1="236" x2="260.0" y2="199" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
 <text x="380.0" y="270.0" text-anchor="middle" font-size="22" fill="#999">⋯</text>
 <line x1="500.0" y1="322" x2="500.0" y2="295" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
 <rect x="446.0" y="236" width="108" height="56" rx="7" fill="#BFA8E6" stroke="#8457C7" stroke-width="1.5"/>
 <text x="500.0" y="259" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head H</text>
-<text x="500.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan dy="-3.36">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan dy="-3.36">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan dy="-3.36">​</tspan></text>
+<text x="500.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan font-size="8.16" dy="-8.56">(H)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan font-size="8.16" dy="-8.56">(H)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan font-size="8.16" dy="-8.56">(H)</tspan><tspan dy="5.2">​</tspan></text>
 <line x1="500.0" y1="236" x2="500.0" y2="199" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"/>
 <rect x="80" y="170" width="120" height="26" fill="#E6DDF5" stroke="#8457C7" stroke-width="1"/>
 <text x="140.0" y="188" text-anchor="middle" font-size="13" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-size="8.84" dy="-5.2">(1)</tspan><tspan dy="5.2">​</tspan></text>
@@ -455,7 +457,7 @@ The output matrix $\bm{W}_O$ maps from the $H$ stacked head outputs back to $d_v
 - **Attention** is the neural-network version of an associative memory. Any attention mechanism specifies five ingredients: a **query**, **keys**, **values** (one per key), a **comparison function** scoring the query against each key, and a **reduction function** combining the values by those scores. It is an operation on sets.
 - A Python dictionary is attention with an equality comparison; a **one-nearest-neighbor classifier** is attention with a negative-distance comparison and an argmax reduction, made differentiable by replacing the argmax with a **softmax**.
 - In **sequence-to-sequence with attention**, the query is the previous decoder state, the keys and values are the encoder states, the comparison is a small learned MLP, and the reduction is a softmax-weighted average, giving a per-step context $\bm{c}_{t'}$ instead of a single fixed one.
-- **Self-attention** projects one input sequence into queries, keys, and values, compares with a scaled dot product $\bm{q}^\top \bm{k}_i / \sqrt{d_k}$, and reduces with a softmax-weighted average, mapping a length-$T$ sequence to a length-$T$ sequence. Its **path length** is $1$ and it is fully parallelizable — advantages over convolutional (path length $2$) and recurrent (path length $T$) layers.
+- **Self-attention** projects one input sequence into queries, keys, and values, compares with a scaled dot product $\bm{q}^\top \bm{k}_i / \sqrt{d_k}$, and reduces with a softmax-weighted average, mapping a length-$T$ sequence to a length-$T$ sequence. Its **path length** is $1$ and it is fully parallelizable — advantages over 1D convolutional (path length $O(T/\texttt{kernel length})$) and recurrent (path length $T$) layers.
 - Self-attention is two matrix multiplications: $\bm{Q}\bm{K}^\top / \sqrt{d_k}$ gives the scores, and a row-wise softmax times $V$ gives the output.
 - Because self-attention is **orderless**, sequences require **position encodings** — absolute learned embeddings (which cannot extrapolate) or relative encodings, including **RoPE**, which rotates queries and keys by position-dependent angles.
 - **Multi-headed self-attention** runs $H$ attention mechanisms in parallel and combines them with a learned output matrix.
