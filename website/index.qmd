@@ -68,6 +68,7 @@ prerequisites for the undergraduate version of this course, see
 | 4 | [Gradient descent, adaptive gradient methods](lectures/04-gradient-descent-adaptive-gradient-methods.qmd) |
 | 5 | [Convolutional neural networks, batch/layer normalization, residual connections](lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.qmd) |
 | 6 | [Sequences, recurrent neural networks, and sequence-to-sequence learning](lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.qmd) |
+| 7 | [Attention](lectures/07-attention.qmd) |
 
 ---
 
