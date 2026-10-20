@@ -207,7 +207,7 @@ with $\bm{W}_Q, \bm{W}_K \in \mathbb{R}^{d_k \times m}$ and $\bm{W}_V \in \mathb
 
 $$\alpha(\bm{q}, \bm{k}_i) = \frac{\bm{q}^\top \bm{k}_i}{\sqrt{d_k}}.$$
 
-The normalization keeps the scores from having an overly large range: if $\bm{q}$ and $\bm{k}_i$ have entries that are distributed as a standard normal, dividing the dot product by $\sqrt{d_k}$ keeps its variance the same, by an argument much like the one used to initialize weight matrices. If instead, we allow the dot product to grow unbounded, we risk saturating the softmax discussed below which in turn, can lead to vanishing gradients and optimization issues. Because the query and key are different linear maps of the input, the dot product measures a learned compatibility between them. The reduction function is the same softmax-weighted average as before,
+The normalization keeps the scores from having an overly large range: if $\bm{q}$ and $\bm{k}_i$ have entries that are distributed as a standard normal, dividing the dot product by $\sqrt{d_k}$ keeps its variance the same, by an argument much like the one used to initialize weight matrices. Without this scaling, the scores grow with $d_k$ and risk saturating the softmax (discussed below), which in turn can lead to vanishing gradients. Because the query and key are different linear maps of the input, the dot product measures a learned compatibility between them. The reduction function is the same softmax-weighted average as before,
 
 $$f(\{\bm{v}_1, \dots, \bm{v}_T\}, \bm{a}) = \operatorname{softmax}(\bm{a}) \cdot V.$$
 
@@ -287,7 +287,7 @@ Why is a sequence of weighted averages a reasonable thing to compute? One way to
 </svg></div>
 ```
 
-For a convolutional network with length-3 kernels, one convolution produces outputs such that each depend on three adjacent inputs; no single output yet depends on both $\bm{x}_1$ and $\bm{x}_5$. A second convolution bridges them, so the path length is $2$ — the same relationship between kernel size and receptive field we saw for images. For a recurrent network, the output that depends on both $\bm{x}_1$ and $\bm{x}_5$ is the one at the last step, reached after roughly five sequential updates, so the path length is $5$. For self-attention, every output is a softmax-weighted average of all the inputs, so every output already directly depends on every input: the path length is $1$.
+For a convolutional network with length-3 kernels, one convolution produces outputs that each depend on three adjacent inputs; no single output yet depends on both $\bm{x}_1$ and $\bm{x}_5$. A second convolution bridges them, so the path length is $2$ — the same relationship between kernel size and receptive field we saw for images. For a recurrent network, the output that depends on both $\bm{x}_1$ and $\bm{x}_5$ is the one at the last step, reached after roughly five sequential updates, so the path length is $5$. For self-attention, every output is a softmax-weighted average of all the inputs, so every output already directly depends on every input: the path length is $1$.
 
 Path length also measures the number of operations that cannot be parallelized. In a convolutional network the second convolution must wait for the first; in a recurrent network each step waits for the previous one. In self-attention, each output is an independent weighted average of the inputs, computed without reference to the other outputs, so all outputs can be computed in parallel. This matters because the hardware we train on is built for large parallel matrix computations, so avoiding sequential dependencies is valuable.
 
@@ -347,7 +347,7 @@ The whole mechanism is two matrix multiplications. Stack the queries into a $T \
 </svg></div>
 ```
 
-For the reduction, apply a softmax to each row of the $T \times T$ matrix — turning each row of scores into non-negative weights that sum to one — to obtain the **attention matrix**. Multiplying it by the $T \times d_v$ matrix of values gives the $T \times d_v$ output: $T$ outputs, each a weighted average of the values and so of dimension $d_v$. Drawn this way, the parallelism needs no argument: it is a product of matrix multiplication.
+For the reduction, apply a softmax to each row of the $T \times T$ matrix — turning each row of scores into non-negative weights that sum to one — to obtain the **attention matrix**. Multiplying it by the $T \times d_v$ matrix of values gives the $T \times d_v$ output: $T$ outputs, each a weighted average of the values and so of dimension $d_v$. Drawn this way, the parallelism needs no argument: it is a product of matrices.
 
 ---
 
@@ -359,15 +359,15 @@ There is something odd about applying self-attention to sequences. Since attenti
 **Self-attention is orderless.** As a set operation, self-attention ignores the order of its inputs, so on its own it is ill-suited to sequences. We fix this by encoding position.
 :::
 
-One original approach is to learn a vector — an **embedding** — for each sequence position, and add it to the input before applying self-attention. Since the added values are position-dependent and learned, they encode position. The trouble is extrapolation: the sequence length $T$ varies across inputs, and if we learn embeddings up to the largest length seen in training, we cannot handle a longer sequence at test time. This absolute-embedding approach is uncommon today for that reason.
+One early approach is to learn a vector — an **embedding** — for each sequence position, and add it to the input before applying self-attention. Since the added values are position-dependent and learned, they encode position. The trouble is extrapolation: the sequence length $T$ varies across inputs, and if we learn embeddings up to the largest length seen in training, we cannot handle a longer sequence at test time. This absolute-embedding approach is uncommon today for that reason.
 
-More common now is a **relative encoding**, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we learn a position term. Three variants:
+More common now is a **relative encoding**, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we introduce a position term. Three variants:
 
 $$\text{(i)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top (\bm{k}_j + \bm{p}_{ij})}{\sqrt{d_k}}, \qquad \text{(ii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top \bm{k}_j}{\sqrt{d_k}} + p_{ij},$$
 
 where in (i) $\bm{p}_{ij} \in \mathbb{R}^{d_k}$ is a learned vector for each offset, and in (ii) $p_{ij}$ is a learned scalar acting as a relative bias that raises or lowers the score before the softmax. Both depend only on the offset $i - j$, up to a maximum beyond which a single far-apart encoding is reused, which allows extrapolation. Variant (i) is somewhat costly, requiring a learned $d_k$-dimensional vector for every offset.
 
-The third variant is **rotary position encoding** (RoPE) [@su2024roformer]. Define a rotation matrix $\bm{R}_i$ that rotates a vector by an angle $i\theta$ for a fixed hyperparameter $\theta$, rotate the query by $i\theta$ and the key by $j\theta$, and compare:
+The third variant is **rotary position encoding** (RoPE) [@su2024roformer], and requires no learned quantities. Define a rotation matrix $\bm{R}_i$ that rotates a vector by an angle $i\theta$ for a fixed hyperparameter $\theta$, rotate the query by $i\theta$ and the key by $j\theta$, and compare:
 
 ::: {.boxed-eq}
 $$\text{(iii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{(\bm{R}_i \bm{q}_i)^\top (\bm{R}_j \bm{k}_j)}{\sqrt{d_k}}, \qquad \bm{R}_i = \text{rotate by angle } i\theta.$$
@@ -457,7 +457,7 @@ The output matrix $\bm{W}_O$ maps from the $H$ stacked head outputs back to $d_v
 - **Attention** is the neural-network version of an associative memory. Any attention mechanism specifies five ingredients: a **query**, **keys**, **values** (one per key), a **comparison function** scoring the query against each key, and a **reduction function** combining the values by those scores. It is an operation on sets.
 - A Python dictionary is attention with an equality comparison; a **one-nearest-neighbor classifier** is attention with a negative-distance comparison and an argmax reduction, made differentiable by replacing the argmax with a **softmax**.
 - In **sequence-to-sequence with attention**, the query is the previous decoder state, the keys and values are the encoder states, the comparison is a small learned MLP, and the reduction is a softmax-weighted average, giving a per-step context $\bm{c}_{t'}$ instead of a single fixed one.
-- **Self-attention** projects one input sequence into queries, keys, and values, compares with a scaled dot product $\bm{q}^\top \bm{k}_i / \sqrt{d_k}$, and reduces with a softmax-weighted average, mapping a length-$T$ sequence to a length-$T$ sequence. Its **path length** is $1$ and it is fully parallelizable — advantages over 1D convolutional (path length $T-$ kernel length) and recurrent (path length $T$) layers.
+- **Self-attention** projects one input sequence into queries, keys, and values, compares with a scaled dot product $\bm{q}^\top \bm{k}_i / \sqrt{d_k}$, and reduces with a softmax-weighted average, mapping a length-$T$ sequence to a length-$T$ sequence. Its **path length** is $1$ and it is fully parallelizable — advantages over 1D convolutional (path length $O(T/\texttt{kernel length})$) and recurrent (path length $T$) layers.
 - Self-attention is two matrix multiplications: $\bm{Q}\bm{K}^\top / \sqrt{d_k}$ gives the scores, and a row-wise softmax times $V$ gives the output.
 - Because self-attention is **orderless**, sequences require **position encodings** — absolute learned embeddings (which cannot extrapolate) or relative encodings, including **RoPE**, which rotates queries and keys by position-dependent angles.
 - **Multi-headed self-attention** runs $H$ attention mechanisms in parallel and combines them with a learned output matrix.
