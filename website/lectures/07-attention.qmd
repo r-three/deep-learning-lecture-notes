@@ -185,7 +185,7 @@ for instance by concatenating $\bm{c}_{t'}$ with the previous output before feed
 
 If we plot the attention weights over the input at each decoder step, we can see what the mechanism learns. For a translation, the weights tend to concentrate on the input word being translated, and shift as generation proceeds — even reordering when the languages order phrases differently, as when "European Economic Area" becomes "zone économique européenne." None of this is hard-coded; it is learned by gradient descent on the training data.
 
-![Attention weights for an English-to-French translation. Each row is a decoder step and each column an input word; brighter cells mean higher weight. The weights mostly follow the diagonal but reverse for "European Economic Area" → "zone économique européenne." Taken from @bahdanau2015neural.](../figures/lecture7/translation_attention_scores.png){width=70% fig-align="center"}
+![Attention weights for an English-to-French translation. Each row is a decoder step and each column an input word; brighter cells mean higher weight. The weights mostly follow the diagonal but reverse for "European Economic Area" → "zone économique européenne." Taken from @bahdanau2015neural.](../figures/lecture7/translation_attention_scores.png){width=60% fig-align="center"}
 
 ---
 
