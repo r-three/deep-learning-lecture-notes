@@ -56,7 +56,6 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../lectures/08-transformers-part-1.html" rel="next">
 <link href="../lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -240,31 +239,6 @@ window.Quarto = {
   <a href="../lectures/07-attention.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 7: Attention</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
-  </div>
-</li>
     </ul>
     </div>
 </nav>
@@ -328,49 +302,79 @@ window.Quarto = {
 <p><strong>Definition.</strong> An <em>attention mechanism</em> is specified by five ingredients: a <strong>query</strong>, a set of <strong>keys</strong>, a set of <strong>values</strong> (one value per key), a <strong>comparison function</strong> that scores the query against each key, and a <strong>reduction function</strong> that combines the values according to those scores.</p>
 </div>
 <p>A familiar example is a Python dictionary. Its comparison function tests for equality — in practice it hashes the keys and the query and checks for matching hashes, which is not equality exactly but is equality with very high probability. Given a query, it finds the key equal to the query, and there can be only one, since the keys are unique. Its reduction function returns the value corresponding to that key. One could imagine implementing a dictionary as a set of (key, value) tuples: compare the query to the first entry of every tuple, find the one whose key matches, and return its second entry. This is not how dictionaries are actually built, but it captures the behavior.</p>
-<p>A dictionary is not something we can put inside a neural network and backpropagate through: its assignments are hard, testing for equality and returning only the matching value. What we will do over this lecture is make this behavior soft and smooth, and use it as a core layer.</p>
+<p>A dictionary is not something we can put inside a neural network and backpropagate through: its assignments are hard, testing for equality and returning only the matching value, and hence non-differentiable. What we will do over this lecture is make this behavior soft and smooth, and use it as a core layer.</p>
 <section id="sec-abstract" class="level3">
 <h3 class="anchored" data-anchor-id="sec-abstract">The abstract picture</h3>
 <p>Drawing the mechanism helps. We have a set of keys and a query. The mechanism first compares the query to every key with the comparison function, producing a set of scores — one per key — that say how well the query matches that key. We also have a set of values, the same number as keys. The reduction function then returns something computed from the values, weighted by the scores. Reduction functions map a set of things to a single thing; a max, a sum, and an average are all reductions, and here the output has the size of a single value.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewbox="0 0 720 300" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewbox="0 0 720 322" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="aA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
-<text x="24" y="30" font-size="24" font-weight="600" fill="#333">An attention mechanism</text>
-<rect x="40" y="70" width="90" height="150" rx="4" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
-<line x1="40" y1="91.4" x2="130" y2="91.4" stroke="#5795C7" stroke-width="1"></line>
-<line x1="40" y1="112.9" x2="130" y2="112.9" stroke="#5795C7" stroke-width="1"></line>
-<line x1="40" y1="134.3" x2="130" y2="134.3" stroke="#5795C7" stroke-width="1"></line>
-<line x1="40" y1="155.7" x2="130" y2="155.7" stroke="#5795C7" stroke-width="1"></line>
-<line x1="40" y1="177.1" x2="130" y2="177.1" stroke="#5795C7" stroke-width="1"></line>
-<line x1="40" y1="198.6" x2="130" y2="198.6" stroke="#5795C7" stroke-width="1"></line>
-<text x="85" y="62" text-anchor="middle" font-size="14" fill="#666">keys</text>
-<rect x="60" y="244" width="120" height="30" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
-<text x="120" y="264" text-anchor="middle" font-size="14" font-weight="600" fill="#796020">query</text>
-<line x1="120" y1="244" x2="120" y2="224" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"></line>
-<text x="175" y="120" font-size="15" fill="#333">compare</text>
-<line x1="150" y1="138" x2="215" y2="138" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"></line>
-<rect x="250" y="72.0" width="31.5" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
-<rect x="250" y="93.4" width="54.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
-<rect x="250" y="114.9" width="18.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
-<rect x="250" y="136.3" width="81.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
-<rect x="250" y="157.7" width="45.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
-<rect x="250" y="179.1" width="27.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
-<rect x="250" y="200.6" width="63.0" height="17.4" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
-<line x1="250" y1="70" x2="250" y2="220" stroke="#C75794" stroke-width="1.5"></line>
-<text x="295" y="62" text-anchor="middle" font-size="14" fill="#666">scores a</text>
-<rect x="420" y="70" width="90" height="150" rx="4" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
-<line x1="420" y1="91.4" x2="510" y2="91.4" stroke="#57C7AE" stroke-width="1"></line>
-<line x1="420" y1="112.9" x2="510" y2="112.9" stroke="#57C7AE" stroke-width="1"></line>
-<line x1="420" y1="134.3" x2="510" y2="134.3" stroke="#57C7AE" stroke-width="1"></line>
-<line x1="420" y1="155.7" x2="510" y2="155.7" stroke="#57C7AE" stroke-width="1"></line>
-<line x1="420" y1="177.1" x2="510" y2="177.1" stroke="#57C7AE" stroke-width="1"></line>
-<line x1="420" y1="198.6" x2="510" y2="198.6" stroke="#57C7AE" stroke-width="1"></line>
-<text x="465" y="62" text-anchor="middle" font-size="14" fill="#666">values</text>
-<text x="540" y="120" font-size="15" fill="#333">reduce</text>
-<line x1="515" y1="138" x2="596" y2="138" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"></line>
-<rect x="600" y="120" width="100" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
-<text x="650" y="143" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
-<text x="24" y="292" font-size="14" fill="#666">Compare the query to every key to get scores; reduce the values by those scores to get the output.</text>
+<text x="24" y="30" font-size="20" font-weight="600" fill="#333">An attention mechanism</text>
+<rect x="240" y="74" width="222" height="196" rx="10" fill="none" stroke="#bbb" stroke-width="1.2" stroke-dasharray="5 4"></rect>
+<text x="100.0" y="92" text-anchor="middle" font-size="14" fill="#666">keys</text>
+<text x="292.0" y="92" text-anchor="middle" font-size="14" fill="#666">scores <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan></text>
+<text x="412.0" y="92" text-anchor="middle" font-size="14" fill="#666">values</text>
+<rect x="60" y="102" width="80" height="26" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
+<rect x="372" y="102" width="80" height="26" fill="#fff" stroke="#57C7AE" stroke-width="1"></rect>
+<rect x="372" y="102" width="80" height="26" fill="#57C7AE" fill-opacity="0.36" stroke="#57C7AE" stroke-width="1"></rect>
+<text x="100" y="120" text-anchor="middle" font-size="15" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">k</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">1</tspan></text>
+<text x="412" y="120" text-anchor="middle" font-size="15" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">v</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">1</tspan></text>
+<rect x="252" y="106" width="28" height="18" rx="2" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
+<text x="285" y="120" text-anchor="start" font-size="12" fill="#792051"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="7.8" dy="3.36">1</tspan></text>
+<rect x="60" y="128" width="80" height="26" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
+<rect x="372" y="128" width="80" height="26" fill="#fff" stroke="#57C7AE" stroke-width="1"></rect>
+<rect x="372" y="128" width="80" height="26" fill="#57C7AE" fill-opacity="0.48" stroke="#57C7AE" stroke-width="1"></rect>
+<text x="100" y="146" text-anchor="middle" font-size="15" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">k</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">2</tspan></text>
+<text x="412" y="146" text-anchor="middle" font-size="15" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">v</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">2</tspan></text>
+<rect x="252" y="132" width="44" height="18" rx="2" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
+<text x="301" y="146" text-anchor="start" font-size="12" fill="#792051"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="7.8" dy="3.36">2</tspan></text>
+<rect x="60" y="154" width="80" height="26" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
+<rect x="372" y="154" width="80" height="26" fill="#fff" stroke="#57C7AE" stroke-width="1"></rect>
+<rect x="372" y="154" width="80" height="26" fill="#57C7AE" fill-opacity="0.75" stroke="#57C7AE" stroke-width="1"></rect>
+<text x="100" y="172" text-anchor="middle" font-size="15" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">k</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">3</tspan></text>
+<text x="412" y="172" text-anchor="middle" font-size="15" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">v</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">3</tspan></text>
+<rect x="252" y="158" width="80" height="18" rx="2" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
+<text x="337" y="172" text-anchor="start" font-size="12" fill="#792051"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="7.8" dy="3.36">3</tspan></text>
+<rect x="60" y="180" width="80" height="26" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
+<rect x="372" y="180" width="80" height="26" fill="#fff" stroke="#57C7AE" stroke-width="1"></rect>
+<rect x="372" y="180" width="80" height="26" fill="#57C7AE" fill-opacity="0.27" stroke="#57C7AE" stroke-width="1"></rect>
+<text x="100" y="198" text-anchor="middle" font-size="15" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">k</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">4</tspan></text>
+<text x="412" y="198" text-anchor="middle" font-size="15" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">v</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="9.75" dy="4.2">4</tspan></text>
+<rect x="252" y="184" width="16" height="18" rx="2" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
+<text x="273" y="198" text-anchor="start" font-size="12" fill="#792051"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan><tspan font-family="Helvetica,Arial,sans-serif" font-weight="700" font-size="7.8" dy="3.36">4</tspan></text>
+<rect x="60" y="206" width="80" height="26" fill="#fff" stroke="#5795C7" stroke-width="1"></rect>
+<rect x="372" y="206" width="80" height="26" fill="#fff" stroke="#57C7AE" stroke-width="1"></rect>
+<text x="100.0" y="225" text-anchor="middle" font-size="15" fill="#205279">⋮</text>
+<text x="266" y="225" text-anchor="middle" font-size="15" fill="#792051">⋮</text>
+<text x="412.0" y="225" text-anchor="middle" font-size="15" fill="#207965">⋮</text>
+<rect x="60" y="232" width="80" height="26" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
+<rect x="372" y="232" width="80" height="26" fill="#fff" stroke="#57C7AE" stroke-width="1"></rect>
+<rect x="372" y="232" width="80" height="26" fill="#57C7AE" fill-opacity="0.42" stroke="#57C7AE" stroke-width="1"></rect>
+<text x="100" y="250" text-anchor="middle" font-size="15" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">k</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.75" dy="4.2">N</tspan></text>
+<text x="412" y="250" text-anchor="middle" font-size="15" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">v</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.75" dy="4.2">N</tspan></text>
+<rect x="252" y="236" width="36" height="18" rx="2" fill="#F2C6DE" stroke="#C75794" stroke-width="1"></rect>
+<text x="293" y="250" text-anchor="start" font-size="12" fill="#792051"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="7.8" dy="3.36">N</tspan></text>
+<rect x="60" y="102" width="80" height="156" rx="3" fill="none" stroke="#5795C7" stroke-width="1.5"></rect>
+<rect x="372" y="102" width="80" height="156" rx="3" fill="none" stroke="#57C7AE" stroke-width="1.5"></rect>
+<line x1="252" y1="102" x2="252" y2="258" stroke="#C75794" stroke-width="1.5"></line>
+<rect x="58" y="153" width="84" height="28" rx="4" fill="none" stroke="#E0A800" stroke-width="2"></rect>
+<rect x="246" y="153" width="118" height="28" rx="4" fill="none" stroke="#E0A800" stroke-width="2"></rect>
+<rect x="370" y="153" width="84" height="28" rx="4" fill="none" stroke="#E0A800" stroke-width="2"></rect>
+<text x="52" y="172" text-anchor="end" font-size="11" fill="#B07F00">best</text>
+<text x="52" y="184" text-anchor="end" font-size="11" fill="#B07F00">match</text>
+<line x1="144" y1="180" x2="236" y2="180" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"></line>
+<rect x="166.0" y="122" width="48" height="28" rx="7" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></rect>
+<text x="190" y="141" text-anchor="middle" font-size="16" fill="#796020"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">q</tspan></text>
+<line x1="190.0" y1="152" x2="190.0" y2="177" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"></line>
+<text x="190.0" y="202" text-anchor="middle" font-size="13" fill="#333">compare</text>
+<text x="190.0" y="220" text-anchor="middle" font-size="13" fill="#555"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">α</tspan>(<tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">q</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">k</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.45" dy="3.64">i</tspan><tspan dy="-3.6">)</tspan></text>
+<line x1="464" y1="180" x2="586" y2="180" stroke="#888" stroke-width="1.5" marker-end="url(#aA)"></line>
+<text x="526.0" y="168" text-anchor="middle" font-size="13" fill="#333">reduce</text>
+<text x="526.0" y="202" text-anchor="middle" font-size="13" fill="#555"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">f</tspan>(·, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan>)</text>
+<text x="630.0" y="159.0" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
+<rect x="590" y="167.0" width="80" height="26" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="630.0" y="211.0" text-anchor="middle" font-size="12" fill="#666">size of one value, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9" dy="3">v</tspan></text>
+<text x="24" y="304" font-size="14" fill="#666">Compare <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">q</tspan> to every key <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">k</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="10" dy="3">i</tspan><tspan dy="-3"> to get scores </tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan>; reduce the values, weighted by <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">a</tspan>, to one output.</text>
 </svg></div>
 <p>Some notation. The keys are vectors <span class="math inline">\bm{k}_i \in \mathbb{R}^{d_k}</span> for <span class="math inline">i \in \{1, \dots, N\}</span>, so there are <span class="math inline">N</span> of them. The query is <span class="math inline">\bm{q} \in \mathbb{R}^{d_q}</span>; depending on the comparison function, <span class="math inline">\bm{q}</span> can have its own dimensionality, though in many mechanisms <span class="math inline">d_q = d_k</span>. The values are <span class="math inline">\bm{v}_i \in \mathbb{R}^{d_v}</span>, one per key. The comparison function <span class="math inline">\alpha</span> takes the query and one key and returns a scalar score,</p>
 <p><span class="math display">a_i = \alpha(\bm{q}, \bm{k}_i) \in \mathbb{R}, \qquad \bm{a} \in \mathbb{R}^N,</span></p>
@@ -387,7 +391,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Attention operates on sets.</strong> Although the keys and values can be drawn as the rows of a matrix, every operation here is an operation on a set: shuffling the keys and values (together) leaves the result unchanged. The same is true of a dictionary, whose keys and values have no inherent order. This property will return when we apply attention to sequences.</p>
+<p><strong>Attention operates on sets.</strong> Although the keys and values can be drawn as the rows of a matrix, every operation here is an operation on a set: shuffling the keys and values (together) leaves the result unchanged. In other words, attention is permutation invariant in its key–value pairs. The same is true of a dictionary, whose keys and values have no inherent order. This property will return when we apply attention to sequences.</p>
 </div>
 </div>
 <hr>
@@ -403,7 +407,7 @@ Note
 <p>The one-hot argmax selects the label of the entry with the largest score, that is, the smallest distance.</p>
 <p>We would not put this in a neural network as written, because the <span class="math inline">\operatorname{argmax}</span> has a derivative of zero almost everywhere. But we have seen a function that does roughly what argmax does, in a soft way: the <strong>softmax</strong> (which, as noted before, is better thought of as a soft argmax). Replacing the argmax with a softmax makes the classifier differentiable:</p>
 <div class="boxed-eq">
-<p><span class="math display">\text{To make the one-nearest-neighbor classifier soft (differentiable), replace } \operatorname{argmax} \text{ with } \operatorname{softmax}.</span></p>
+<p>To make the one-nearest-neighbor classifier soft (differentiable), replace <span class="math inline">\operatorname{argmax}</span> with <span class="math inline">\operatorname{softmax}</span>.</p>
 </div>
 <p>Strictly, this is no longer a one-nearest-neighbor classifier. It finds the points closest to the query and averages their labels in proportion to their closeness. The attention mechanisms we build into networks will look much like this soft one-nearest-neighbor classifier, with a different comparison function and with values that are something other than labels.</p>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -447,6 +451,12 @@ Note
 <p><span class="math display">\bm{s}_{t'} = g(\bm{s}_{t'-1}, \bm{y}_{t'-1}, \bm{c}_{t'}),</span></p>
 <p>for instance by concatenating <span class="math inline">\bm{c}_{t'}</span> with the previous output before feeding it in. This encoder–decoder RNN with attention is generally more effective for sequence-to-sequence tasks, because we no longer force all information about the input into a single state; instead we recompute a focused context at each output step.</p>
 <p>If we plot the attention weights over the input at each decoder step, we can see what the mechanism learns. For a translation, the weights tend to concentrate on the input word being translated, and shift as generation proceeds — even reordering when the languages order phrases differently, as when “European Economic Area” becomes “zone économique européenne.” None of this is hard-coded; it is learned by gradient descent on the training data.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="../figures/lecture7/translation_attention_scores.png" class="img-fluid figure-img" style="width:60.0%"></p>
+<figcaption>Attention weights for an English-to-French translation. Each row is a decoder step and each column an input word; brighter cells mean higher weight. The weights mostly follow the diagonal but reverse for “European Economic Area” → “zone économique européenne.” Taken from <span class="citation" data-cites="bahdanau2015neural">Bahdanau et al. (<a href="#ref-bahdanau2015neural" role="doc-biblioref">2015</a>)</span>.</figcaption>
+</figure>
+</div>
 <hr>
 </section>
 <section id="sec-self-attention" class="level2">
@@ -461,15 +471,15 @@ Note
 </div>
 <p>with <span class="math inline">\bm{W}_Q, \bm{W}_K \in \mathbb{R}^{d_k \times m}</span> and <span class="math inline">\bm{W}_V \in \mathbb{R}^{d_v \times m}</span>, all learnable. There are <span class="math inline">T</span> queries, <span class="math inline">T</span> keys, and <span class="math inline">T</span> values. The comparison function is about as simple as possible: the dot product of the query with a key, normalized by <span class="math inline">\sqrt{d_k}</span>,</p>
 <p><span class="math display">\alpha(\bm{q}, \bm{k}_i) = \frac{\bm{q}^\top \bm{k}_i}{\sqrt{d_k}}.</span></p>
-<p>The normalization keeps the scores from having an overly large range: if <span class="math inline">\bm{q}</span> and <span class="math inline">\bm{k}_i</span> have entries that are standard normal, dividing the dot product by <span class="math inline">\sqrt{d_k}</span> keeps its variance the same, by an argument much like the one used to initialize weight matrices. Because the query and key are different linear maps of the input, the dot product measures a learned compatibility between them. The reduction function is the same softmax-weighted average as before,</p>
+<p>The normalization keeps the scores from having an overly large range: if <span class="math inline">\bm{q}</span> and <span class="math inline">\bm{k}_i</span> have entries that are distributed as a standard normal, dividing the dot product by <span class="math inline">\sqrt{d_k}</span> keeps its variance the same, by an argument much like the one used to initialize weight matrices. Without this scaling, the scores grow with <span class="math inline">d_k</span> and risk saturating the softmax (discussed below), which in turn can lead to vanishing gradients. Because the query and key are different linear maps of the input, the dot product measures a learned compatibility between them. The reduction function is the same softmax-weighted average as before,</p>
 <p><span class="math display">f(\{\bm{v}_1, \dots, \bm{v}_T\}, \bm{a}) = \operatorname{softmax}(\bm{a}) \cdot V.</span></p>
 <p>Self-attention thus maps a length-<span class="math inline">T</span> sequence to a length-<span class="math inline">T</span> sequence: for each of the <span class="math inline">T</span> queries we compute a comparison against all keys and a reduction over all values, giving one output per position. Where a recurrent layer produced a sequence of hidden states, self-attention produces a sequence of weighted averages of the projected input.</p>
 <section id="sec-path-length" class="level3">
 <h3 class="anchored" data-anchor-id="sec-path-length">Path length</h3>
-<p>Why is a sequence of weighted averages a reasonable thing to compute? One way to see the appeal is through <strong>path length</strong>, a notion close to the receptive field from Lecture 5: the number of operations required to mix information between two elements of the input. Take an input sequence of five elements and ask how many operations are needed to produce an output that depends on both <span class="math inline">\bm{x}_1</span> and <span class="math inline">\bm{x}_5</span>.</p>
+<p>Why is a sequence of weighted averages a reasonable thing to compute? One way to see the appeal is through <strong>path length</strong>, a notion close to the receptive field from Lecture 5: the number of operations required to mix information between two elements of the input. Take an input sequence of five elements and ask how many sequential operations are needed to produce an output that depends on both <span class="math inline">\bm{x}_1</span> and <span class="math inline">\bm{x}_5</span>.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 720 320" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
-<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Path length: operations to mix x₁ and x₅</text>
+<text x="20" y="28" font-size="24" font-weight="600" fill="#333">Path length: number of operations to mix x₁ and x₅</text>
 <text x="30" y="70" font-size="16" font-weight="600" fill="#333">ConvNet (length-3)</text>
 <line x1="64" y1="180" x2="30" y2="250" stroke="#e53935" stroke-width="2.6"></line>
 <line x1="64" y1="180" x2="64" y2="250" stroke="#aaa" stroke-width="1.2"></line>
@@ -534,48 +544,60 @@ Note
 <text x="558" y="285" text-anchor="middle" font-size="15" fill="#792051" font-weight="600">path length: 1</text>
 <text x="20" y="308" font-size="14" fill="#666">Path length is also the number of non-parallelizable steps; self-attention outputs are computed in parallel.</text>
 </svg></div>
-<p>For a convolutional network with length-3 kernels, one convolution produces outputs that each depend on three adjacent inputs; no single output yet depends on both <span class="math inline">\bm{x}_1</span> and <span class="math inline">\bm{x}_5</span>. A second convolution bridges them, so the path length is <span class="math inline">2</span> — the same relationship between kernel size and receptive field we saw for images. For a recurrent network, the output that depends on both <span class="math inline">\bm{x}_1</span> and <span class="math inline">\bm{x}_5</span> is the one at the last step, reached after roughly five sequential updates, so the path length is <span class="math inline">5</span>. For self-attention, every output is a softmax-weighted average of all the inputs, so every output already depends on every input: the path length is <span class="math inline">1</span>.</p>
+<p>For a convolutional network with length-3 kernels, one convolution produces outputs that each depend on three adjacent inputs; no single output yet depends on both <span class="math inline">\bm{x}_1</span> and <span class="math inline">\bm{x}_5</span>. A second convolution bridges them, so the path length is <span class="math inline">2</span> — the same relationship between kernel size and receptive field we saw for images. For a recurrent network, the output that depends on both <span class="math inline">\bm{x}_1</span> and <span class="math inline">\bm{x}_5</span> is the one at the last step, reached after roughly five sequential updates, so the path length is <span class="math inline">5</span>. For self-attention, every output is a softmax-weighted average of all the inputs, so every output already directly depends on every input: the path length is <span class="math inline">1</span>.</p>
 <p>Path length also measures the number of operations that cannot be parallelized. In a convolutional network the second convolution must wait for the first; in a recurrent network each step waits for the previous one. In self-attention, each output is an independent weighted average of the inputs, computed without reference to the other outputs, so all outputs can be computed in parallel. This matters because the hardware we train on is built for large parallel matrix computations, so avoiding sequential dependencies is valuable.</p>
 </section>
 <section id="sec-matrix" class="level3">
 <h3 class="anchored" data-anchor-id="sec-matrix">Self-attention as matrix operations</h3>
 <p>The whole mechanism is two matrix multiplications. Stack the queries into a <span class="math inline">T \times d_k</span> matrix and the keys into a <span class="math inline">d_k \times T</span> matrix. Their product is a <span class="math inline">T \times T</span> matrix in which entry <span class="math inline">(i, j)</span> is the dot product of query <span class="math inline">i</span> with key <span class="math inline">j</span>; dividing every entry by <span class="math inline">\sqrt{d_k}</span> gives the matrix of attention scores.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewbox="0 0 720 362" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
-<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Self-attention as two matrix multiplications</text>
-<text x="20" y="58" font-size="16" font-weight="600" fill="#442079">Comparison</text>
-<rect x="60" y="72" width="42" height="84" rx="3" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect>
-<text x="81" y="66" text-anchor="middle" font-size="13" fill="#666">d_k</text>
-<text x="52" y="118" text-anchor="end" font-size="13" fill="#666">T</text>
-<text x="81" y="174" text-anchor="middle" font-size="13" fill="#442079" font-weight="600">queries</text>
-<text x="118" y="122" font-size="20" fill="#555">×</text>
-<rect x="160" y="90" width="84" height="42" rx="3" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
-<text x="202" y="84" text-anchor="middle" font-size="13" fill="#666">T</text>
-<text x="152" y="115" text-anchor="end" font-size="13" fill="#666">d_k</text>
-<text x="202" y="150" text-anchor="middle" font-size="13" fill="#205279" font-weight="600">keys</text>
-<text x="258" y="122" font-size="20" fill="#555">=</text>
-<rect x="280" y="72" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
-<text x="322" y="66" text-anchor="middle" font-size="13" fill="#666">T</text>
-<text x="272" y="118" text-anchor="end" font-size="13" fill="#666">T</text>
-<text x="322" y="174" text-anchor="middle" font-size="13" fill="#792051" font-weight="600">scores</text>
-<text x="372" y="122" font-size="16" fill="#555">÷ √d_k</text>
-<text x="20" y="212" font-size="16" font-weight="600" fill="#442079">Reduction</text>
-<rect x="90" y="226" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
-<text x="132" y="220" text-anchor="middle" font-size="13" fill="#666">T</text>
-<text x="82" y="272" text-anchor="end" font-size="13" fill="#666">T</text>
-<text x="132" y="328" text-anchor="middle" font-size="13" fill="#792051" font-weight="600">attention matrix</text>
-<text x="66" y="246" text-anchor="end" font-size="11" fill="#792051">softmax(</text>
-<text x="180" y="276" font-size="20" fill="#555">×</text>
-<rect x="210" y="226" width="42" height="84" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
-<text x="231" y="220" text-anchor="middle" font-size="13" fill="#666">d_v</text>
-<text x="202" y="272" text-anchor="end" font-size="13" fill="#666">T</text>
-<text x="231" y="328" text-anchor="middle" font-size="13" fill="#207965" font-weight="600">values</text>
-<text x="262" y="276" font-size="20" fill="#555">=</text>
-<rect x="290" y="226" width="42" height="84" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
-<text x="311" y="220" text-anchor="middle" font-size="13" fill="#666">d_v</text>
-<text x="282" y="272" text-anchor="end" font-size="13" fill="#666">T</text>
-<text x="311" y="328" text-anchor="middle" font-size="13" fill="#794520" font-weight="600">output</text>
-<text x="20" y="352" font-size="14" fill="#666">Each row of the attention matrix is a softmax; multiplying by the values gives one weighted average per position.</text>
+<svg viewbox="0 0 720 470" width="100%" style="max-width:720px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="mA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<text x="20" y="30" font-size="20" font-weight="600" fill="#333">Self-attention as two matrix multiplications</text>
+<text x="20" y="66" font-size="15" font-weight="600" fill="#442079">1. Comparison</text>
+<rect x="70" y="84" width="42" height="84" rx="3" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect>
+<rect x="70" y="105" width="42" height="21" fill="#8457C7" fill-opacity="0.45" stroke="#3A2A5C" stroke-width="1.5"></rect>
+<text x="141.0" y="133.0" text-anchor="middle" font-size="22" fill="#555">×</text>
+<rect x="170" y="105" width="84" height="42" rx="3" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<rect x="212" y="105" width="21" height="42" fill="#5795C7" fill-opacity="0.45" stroke="#3A2A5C" stroke-width="1.5"></rect>
+<text x="286.0" y="133.0" text-anchor="middle" font-size="22" fill="#555">=</text>
+<rect x="330" y="84" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
+<rect x="372" y="105" width="21" height="21" fill="#C75794" stroke="#3A2A5C" stroke-width="1.8"></rect>
+<text x="91.0" y="190" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">queries</text>
+<text x="91.0" y="208" text-anchor="middle" font-size="14" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">Q</tspan></text>
+<text x="91.0" y="225" text-anchor="middle" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan> × <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="8.16" dy="3.36">k</tspan><tspan dy="-3.36">​</tspan></text>
+<text x="212.0" y="190" text-anchor="middle" font-size="13" font-weight="600" fill="#205279">keys</text>
+<text x="212.0" y="208" text-anchor="middle" font-size="14" fill="#205279"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">K</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="9.52" dy="-5.6">T</tspan><tspan dy="5.6">​</tspan></text>
+<text x="212.0" y="225" text-anchor="middle" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="8.16" dy="3.36">k</tspan><tspan dy="-3.36">​</tspan> × <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan></text>
+<text x="372.0" y="190" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">scores</text>
+<text x="372.0" y="208" text-anchor="middle" font-size="14" fill="#792051"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">S</tspan> = <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">Q</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">K</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="9.52" dy="-5.6">T</tspan><tspan dy="5.6">​</tspan> / √<tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="9.52" dy="3.92">k</tspan><tspan dy="-3.92">​</tspan></text>
+<text x="372.0" y="225" text-anchor="middle" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan> × <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan></text>
+<text x="424" y="119" font-size="12" fill="#555">entry (<tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">i</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">j</tspan>) = query <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">i</tspan> · key <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">j</tspan></text>
+<line x1="422" y1="115" x2="396" y2="115.5" stroke="#999" stroke-width="1"></line>
+<line x1="372.0" y1="232" x2="372.0" y2="294" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<text x="382.0" y="270.0" font-size="13" fill="#555">softmax along each row</text>
+<text x="20" y="282" font-size="15" font-weight="600" fill="#442079">2. Reduction</text>
+<text x="40" y="330" font-size="15" fill="#444"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">A</tspan> = softmax(<tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">S</tspan>)</text>
+<text x="40" y="356" font-size="15" fill="#444">output = <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">A</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">V</tspan></text>
+<rect x="330" y="300" width="84" height="84" rx="3" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
+<rect x="330" y="321" width="84" height="21" fill="#C75794" fill-opacity="0.45" stroke="#3A2A5C" stroke-width="1.5"></rect>
+<text x="437.0" y="349.0" text-anchor="middle" font-size="22" fill="#555">×</text>
+<rect x="460" y="300" width="42" height="84" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="525.0" y="349.0" text-anchor="middle" font-size="22" fill="#555">=</text>
+<rect x="548" y="300" width="42" height="84" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<rect x="548" y="321" width="42" height="21" fill="#C78557" fill-opacity="0.45" stroke="#3A2A5C" stroke-width="1.5"></rect>
+<text x="372.0" y="406" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">attention matrix</text>
+<text x="372.0" y="424" text-anchor="middle" font-size="14" fill="#792051"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">A</tspan></text>
+<text x="372.0" y="441" text-anchor="middle" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan> × <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan></text>
+<text x="481.0" y="406" text-anchor="middle" font-size="13" font-weight="600" fill="#207965">values</text>
+<text x="481.0" y="424" text-anchor="middle" font-size="14" fill="#207965"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">V</tspan></text>
+<text x="481.0" y="441" text-anchor="middle" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan> × <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="8.16" dy="3.36">v</tspan><tspan dy="-3.36">​</tspan></text>
+<text x="569.0" y="406" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">output</text>
+<text x="569.0" y="424" text-anchor="middle" font-size="14" fill="#794520"></text>
+<text x="569.0" y="441" text-anchor="middle" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">T</tspan> × <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="8.16" dy="3.36">v</tspan><tspan dy="-3.36">​</tspan></text>
+<text x="600" y="336" font-size="12" fill="#555">row <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">i</tspan>: weighted</text>
+<text x="600" y="351" font-size="12" fill="#555">average of the values</text>
+<text x="20" y="468" font-size="14" fill="#666">Each row of the attention matrix is a softmax, so each row of the output is one weighted average of the values.</text>
 </svg></div>
 <p>For the reduction, apply a softmax to each row of the <span class="math inline">T \times T</span> matrix — turning each row of scores into non-negative weights that sum to one — to obtain the <strong>attention matrix</strong>. Multiplying it by the <span class="math inline">T \times d_v</span> matrix of values gives the <span class="math inline">T \times d_v</span> output: <span class="math inline">T</span> outputs, each a weighted average of the values and so of dimension <span class="math inline">d_v</span>. Drawn this way, the parallelism needs no argument: it is a product of matrices.</p>
 <hr>
@@ -583,7 +605,7 @@ Note
 </section>
 <section id="sec-position" class="level2">
 <h2 class="anchored" data-anchor-id="sec-position">Position Encoding</h2>
-<p>There is something odd about applying self-attention to sequences. Since attention operates on sets, shuffling the keys and values leaves the output unchanged; shuffling the input sequence would produce the same output sequence, shuffled the same way. Self-attention is orderless, which makes little sense for sequences — shuffling the words of an English sentence changes, or destroys, its meaning. To process sequences, we must supply information about the position of each element.</p>
+<p>There is something odd about applying self-attention to sequences. Since attention operates on sets, shuffling the keys and values leaves the output unchanged (permutation invariance); shuffling the input sequence would produce the same output sequence, shuffled the same way (permutation equivariance). Self-attention is orderless, which makes little sense for sequences — shuffling the words of an English sentence changes, or destroys, its meaning. To process sequences, we must supply information about the position of each element.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -597,11 +619,11 @@ Note
 <p><strong>Self-attention is orderless.</strong> As a set operation, self-attention ignores the order of its inputs, so on its own it is ill-suited to sequences. We fix this by encoding position.</p>
 </div>
 </div>
-<p>One original approach is to learn a vector — an <strong>embedding</strong> — for each sequence position, and add it to the input before applying self-attention. Since the added values are position-dependent and learned, they encode position. The trouble is extrapolation: the sequence length <span class="math inline">T</span> varies across inputs, and if we learn embeddings up to the largest length seen in training, we cannot handle a longer sequence at test time. This absolute-embedding approach is uncommon today for that reason.</p>
-<p>More common now is a <strong>relative encoding</strong>, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we learn a position term. Three variants:</p>
+<p>One early approach is to learn a vector — an <strong>embedding</strong> — for each sequence position, and add it to the input before applying self-attention. Since the added values are position-dependent and learned, they encode position. The trouble is extrapolation: the sequence length <span class="math inline">T</span> varies across inputs, and if we learn embeddings up to the largest length seen in training, we cannot handle a longer sequence at test time. This absolute-embedding approach is uncommon today for that reason.</p>
+<p>More common now is a <strong>relative encoding</strong>, which depends on the offset between a query and a key rather than on absolute positions, and which we implement by modifying the comparison function. For each offset up to some maximum, we introduce a position term. Three variants:</p>
 <p><span class="math display">\text{(i)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top (\bm{k}_j + \bm{p}_{ij})}{\sqrt{d_k}}, \qquad \text{(ii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{\bm{q}_i^\top \bm{k}_j}{\sqrt{d_k}} + p_{ij},</span></p>
 <p>where in (i) <span class="math inline">\bm{p}_{ij} \in \mathbb{R}^{d_k}</span> is a learned vector for each offset, and in (ii) <span class="math inline">p_{ij}</span> is a learned scalar acting as a relative bias that raises or lowers the score before the softmax. Both depend only on the offset <span class="math inline">i - j</span>, up to a maximum beyond which a single far-apart encoding is reused, which allows extrapolation. Variant (i) is somewhat costly, requiring a learned <span class="math inline">d_k</span>-dimensional vector for every offset.</p>
-<p>The third variant is <strong>rotary position encoding</strong> (RoPE) <span class="citation" data-cites="su2024roformer">(<a href="#ref-su2024roformer" role="doc-biblioref">Su et al. 2024</a>)</span>. Define a rotation matrix <span class="math inline">\bm{R}_i</span> that rotates by an angle <span class="math inline">i\theta</span> for a fixed hyperparameter <span class="math inline">\theta</span>, rotate the query by <span class="math inline">i\theta</span> and the key by <span class="math inline">j\theta</span>, and compare:</p>
+<p>The third variant is <strong>rotary position encoding</strong> (RoPE) <span class="citation" data-cites="su2024roformer">(<a href="#ref-su2024roformer" role="doc-biblioref">Su et al. 2024</a>)</span>, and requires no learned quantities. Define a rotation matrix <span class="math inline">\bm{R}_i</span> that rotates a vector by an angle <span class="math inline">i\theta</span> for a fixed hyperparameter <span class="math inline">\theta</span>, rotate the query by <span class="math inline">i\theta</span> and the key by <span class="math inline">j\theta</span>, and compare:</p>
 <div class="boxed-eq">
 <p><span class="math display">\text{(iii)}\quad \alpha(\bm{q}_i, \bm{k}_j) = \frac{(\bm{R}_i \bm{q}_i)^\top (\bm{R}_j \bm{k}_j)}{\sqrt{d_k}}, \qquad \bm{R}_i = \text{rotate by angle } i\theta.</span></p>
 </div>
@@ -621,34 +643,51 @@ Note
 <p><span class="math display">\text{Output} = \bm{W}_O \begin{bmatrix} \bm{h}^{(1)} \\ \bm{h}^{(2)} \\ \vdots \\ \bm{h}^{(H)} \end{bmatrix}, \qquad \bm{W}_O \in \mathbb{R}^{d_v \times H d_v}.</span></p>
 </div>
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewbox="0 0 640 356" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewbox="0 0 640 446" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="mA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
-<text x="20" y="28" font-size="22" font-weight="600" fill="#333">Multi-headed self-attention</text>
-<rect x="260" y="270" width="120" height="34" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
-<text x="320" y="292" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">input x</text>
-<rect x="60" y="166" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect>
-<text x="115" y="188" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
-<text x="115" y="206" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 1</text>
-<line x1="320" y1="270" x2="115" y2="216" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<line x1="115" y1="166" x2="320" y2="136" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<rect x="200" y="166" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect>
-<text x="255" y="188" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
-<text x="255" y="206" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 2</text>
-<line x1="320" y1="270" x2="255" y2="216" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<line x1="255" y1="166" x2="320" y2="136" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<text x="395" y="200" text-anchor="middle" font-size="22" fill="#999">···</text>
-<rect x="480" y="166" width="110" height="50" rx="7" fill="#DBCDF0" stroke="#8457C7" stroke-width="1.5"></rect>
-<text x="535" y="188" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">self-attn</text>
-<text x="535" y="206" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head H</text>
-<line x1="320" y1="270" x2="535" y2="216" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<line x1="535" y1="166" x2="320" y2="136" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<rect x="250" y="100" width="140" height="36" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
-<text x="320" y="122" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">W_O · concat</text>
-<line x1="320" y1="100" x2="320" y2="76" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<rect x="260" y="40" width="120" height="34" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
-<text x="320" y="62" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
-<text x="20" y="328" font-size="14" fill="#666">H heads attend in parallel with separate W_Q, W_K, W_V;</text>
-<text x="20" y="346" font-size="14" fill="#666">W_O mixes and projects their stacked outputs.</text>
+<text x="20" y="30" font-size="20" font-weight="600" fill="#333">Multi-headed self-attention</text>
+<rect x="260" y="352" width="120" height="32" rx="7" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
+<text x="320" y="373" text-anchor="middle" font-size="14" font-weight="600" fill="#205279">input <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">x</tspan></text>
+<line x1="320" y1="352" x2="320" y2="322" stroke="#888" stroke-width="1.5"></line>
+<line x1="140.0" y1="322" x2="500.0" y2="322" stroke="#888" stroke-width="1.5"></line>
+<circle cx="320" cy="322" r="2.5" fill="#888"></circle>
+<line x1="140.0" y1="322" x2="140.0" y2="295" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<rect x="86.0" y="236" width="108" height="56" rx="7" fill="#E6DDF5" stroke="#8457C7" stroke-width="1.5"></rect>
+<text x="140.0" y="259" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 1</text>
+<text x="140.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan font-size="8.16" dy="-8.56">(1)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan font-size="8.16" dy="-8.56">(1)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan font-size="8.16" dy="-8.56">(1)</tspan><tspan dy="5.2">​</tspan></text>
+<line x1="140.0" y1="236" x2="140.0" y2="199" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<line x1="260.0" y1="322" x2="260.0" y2="295" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<rect x="206.0" y="236" width="108" height="56" rx="7" fill="#D3C2EE" stroke="#8457C7" stroke-width="1.5"></rect>
+<text x="260.0" y="259" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head 2</text>
+<text x="260.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan font-size="8.16" dy="-8.56">(2)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan font-size="8.16" dy="-8.56">(2)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan font-size="8.16" dy="-8.56">(2)</tspan><tspan dy="5.2">​</tspan></text>
+<line x1="260.0" y1="236" x2="260.0" y2="199" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<text x="380.0" y="270.0" text-anchor="middle" font-size="22" fill="#999">⋯</text>
+<line x1="500.0" y1="322" x2="500.0" y2="295" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<rect x="446.0" y="236" width="108" height="56" rx="7" fill="#BFA8E6" stroke="#8457C7" stroke-width="1.5"></rect>
+<text x="500.0" y="259" text-anchor="middle" font-size="13" font-weight="600" fill="#442079">head H</text>
+<text x="500.0" y="279" text-anchor="middle" font-size="12" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">Q</tspan><tspan font-size="8.16" dy="-8.56">(H)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">K</tspan><tspan font-size="8.16" dy="-8.56">(H)</tspan><tspan dy="5.2">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="8.16" dy="3.36">V</tspan><tspan font-size="8.16" dy="-8.56">(H)</tspan><tspan dy="5.2">​</tspan></text>
+<line x1="500.0" y1="236" x2="500.0" y2="199" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<rect x="80" y="170" width="120" height="26" fill="#E6DDF5" stroke="#8457C7" stroke-width="1"></rect>
+<text x="140.0" y="188" text-anchor="middle" font-size="13" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-size="8.84" dy="-5.2">(1)</tspan><tspan dy="5.2">​</tspan></text>
+<rect x="200" y="170" width="120" height="26" fill="#D3C2EE" stroke="#8457C7" stroke-width="1"></rect>
+<text x="260.0" y="188" text-anchor="middle" font-size="13" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-size="8.84" dy="-5.2">(2)</tspan><tspan dy="5.2">​</tspan></text>
+<rect x="320" y="170" width="120" height="26" fill="#F6F2FC" stroke="#8457C7" stroke-width="1"></rect>
+<text x="380.0" y="188" text-anchor="middle" font-size="13" fill="#442079">⋯</text>
+<rect x="440" y="170" width="120" height="26" fill="#BFA8E6" stroke="#8457C7" stroke-width="1"></rect>
+<text x="500.0" y="188" text-anchor="middle" font-size="13" fill="#442079"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">h</tspan><tspan font-size="8.84" dy="-5.2">(H)</tspan><tspan dy="5.2">​</tspan></text>
+<rect x="80" y="170" width="480" height="26" rx="2" fill="none" stroke="#8457C7" stroke-width="1.5"></rect>
+<text x="80" y="162" font-size="12" fill="#666">stack the heads</text>
+<text x="568" y="188" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">H</tspan> <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="8.16" dy="3.36">v</tspan><tspan dy="-3.36">​</tspan></text>
+<line x1="320" y1="170" x2="320" y2="145" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<rect x="270" y="112" width="100" height="30" rx="7" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="320" y="132" text-anchor="middle" font-size="15" fill="#794520">× <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="10.2" dy="4.2">O</tspan><tspan dy="-4.2">​</tspan></text>
+<text x="380" y="131" font-size="12" fill="#666">mixes the heads</text>
+<line x1="320" y1="112" x2="320" y2="87" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<rect x="260.0" y="56" width="120" height="28" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="320" y="75" text-anchor="middle" font-size="14" font-weight="600" fill="#794520">output</text>
+<text x="388.0" y="75" font-size="12" fill="#777"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="8.16" dy="3.36">v</tspan><tspan dy="-3.36">​</tspan></text>
+<text x="20" y="416" font-size="14" fill="#666"><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">H</tspan> heads attend in parallel, each with its own <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.52" dy="3.92">Q</tspan><tspan dy="-3.92">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.52" dy="3.92">K</tspan><tspan dy="-3.92">​</tspan>, <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.52" dy="3.92">V</tspan><tspan dy="-3.92">​</tspan>;</text>
+<text x="20" y="436" font-size="14" fill="#666">their outputs are stacked, and <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700">W</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-weight="700" font-size="9.52" dy="3.92">O</tspan><tspan dy="-3.92">​</tspan> mixes them back to <tspan font-family="Georgia,'Times New Roman',serif" font-style="italic">d</tspan><tspan font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="9.52" dy="3.92">v</tspan><tspan dy="-3.92">​</tspan>.</text>
 </svg></div>
 <p>The output matrix <span class="math inline">\bm{W}_O</span> maps from the <span class="math inline">H</span> stacked head outputs back to <span class="math inline">d_v</span>-dimensional vectors, mixing information across heads, so that multi-headed self-attention still outputs <span class="math inline">d_v</span>-sized vectors at each position. This is a modest change over single-head self-attention, but it lets the layer perform several kinds of processing at once. Multi-headed self-attention is a component of the transformer, which we take up next.</p>
 <hr>
@@ -670,7 +709,7 @@ Note
 <li><strong>Attention</strong> is the neural-network version of an associative memory. Any attention mechanism specifies five ingredients: a <strong>query</strong>, <strong>keys</strong>, <strong>values</strong> (one per key), a <strong>comparison function</strong> scoring the query against each key, and a <strong>reduction function</strong> combining the values by those scores. It is an operation on sets.</li>
 <li>A Python dictionary is attention with an equality comparison; a <strong>one-nearest-neighbor classifier</strong> is attention with a negative-distance comparison and an argmax reduction, made differentiable by replacing the argmax with a <strong>softmax</strong>.</li>
 <li>In <strong>sequence-to-sequence with attention</strong>, the query is the previous decoder state, the keys and values are the encoder states, the comparison is a small learned MLP, and the reduction is a softmax-weighted average, giving a per-step context <span class="math inline">\bm{c}_{t'}</span> instead of a single fixed one.</li>
-<li><strong>Self-attention</strong> projects one input sequence into queries, keys, and values, compares with a scaled dot product <span class="math inline">\bm{q}^\top \bm{k}_i / \sqrt{d_k}</span>, and reduces with a softmax-weighted average, mapping a length-<span class="math inline">T</span> sequence to a length-<span class="math inline">T</span> sequence. Its <strong>path length</strong> is <span class="math inline">1</span> and it is fully parallelizable — advantages over convolutional (path length <span class="math inline">2</span>) and recurrent (path length <span class="math inline">T</span>) layers.</li>
+<li><strong>Self-attention</strong> projects one input sequence into queries, keys, and values, compares with a scaled dot product <span class="math inline">\bm{q}^\top \bm{k}_i / \sqrt{d_k}</span>, and reduces with a softmax-weighted average, mapping a length-<span class="math inline">T</span> sequence to a length-<span class="math inline">T</span> sequence. Its <strong>path length</strong> is <span class="math inline">1</span> and it is fully parallelizable — advantages over 1D convolutional (path length <span class="math inline">O(T/\texttt{kernel length})</span>) and recurrent (path length <span class="math inline">T</span>) layers.</li>
 <li>Self-attention is two matrix multiplications: <span class="math inline">\bm{Q}\bm{K}^\top / \sqrt{d_k}</span> gives the scores, and a row-wise softmax times <span class="math inline">V</span> gives the output.</li>
 <li>Because self-attention is <strong>orderless</strong>, sequences require <strong>position encodings</strong> — absolute learned embeddings (which cannot extrapolate) or relative encodings, including <strong>RoPE</strong>, which rotates queries and keys by position-dependent angles.</li>
 <li><strong>Multi-headed self-attention</strong> runs <span class="math inline">H</span> attention mechanisms in parallel and combines them with a learned output matrix.</li>
@@ -1109,9 +1148,6 @@ Vaswani, Ashish, Noam Shazeer, Niki Parmar, et al. 2017. <span>“Attention Is A
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../lectures/08-transformers-part-1.html" class="pagination-link" aria-label="Lecture 8: Transformers, Part 1">
-        <span class="nav-page-text"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->
