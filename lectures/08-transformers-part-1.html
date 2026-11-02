@@ -56,7 +56,6 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../lectures/09-transformers-part-2-large-language-models.html" rel="next">
 <link href="../lectures/07-attention.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -245,26 +244,6 @@ window.Quarto = {
   <a href="../lectures/08-transformers-part-1.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 8: Transformers, Part 1</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
-  </div>
-</li>
     </ul>
     </div>
 </nav>
@@ -286,7 +265,7 @@ window.Quarto = {
   <li><a href="#sec-mod-ln" id="toc-sec-mod-ln" class="nav-link" data-scroll-target="#sec-mod-ln">1. Layer norm position</a></li>
   <li><a href="#sec-mod-bias" id="toc-sec-mod-bias" class="nav-link" data-scroll-target="#sec-mod-bias">2. Removal of biases</a></li>
   <li><a href="#sec-mod-glu" id="toc-sec-mod-glu" class="nav-link" data-scroll-target="#sec-mod-glu">3. Gated feed-forward networks</a></li>
-  <li><a href="#sec-mod-subquadratic" id="toc-sec-mod-subquadratic" class="nav-link" data-scroll-target="#sec-mod-subquadratic">4. Sub-quadratic self-attention</a></li>
+  <li><a href="#sec-mod-subquadratic" id="toc-sec-mod-subquadratic" class="nav-link" data-scroll-target="#sec-mod-subquadratic">4. Efficient self-attention</a></li>
   <li><a href="#sec-mod-gqa" id="toc-sec-mod-gqa" class="nav-link" data-scroll-target="#sec-mod-gqa">5. Grouped-query attention</a></li>
   </ul></li>
   <li><a href="#sec-encoder-only" id="toc-sec-encoder-only" class="nav-link" data-scroll-target="#sec-encoder-only">Encoder-Only Transformers</a></li>
@@ -488,7 +467,7 @@ Note
 </section>
 <section id="sec-mod-bias" class="level3">
 <h3 class="anchored" data-anchor-id="sec-mod-bias">2. Removal of biases</h3>
-<p>The block has biases in two places: the feed-forward network and the layer norm. Dropping the feed-forward biases gives <span class="math inline">\bm{W}_2\, \phi(\bm{W}_1 \bm{x}_t)</span>; dropping the layer-norm bias <span class="math inline">\bm{\beta}</span> gives <span class="math inline">\bm{\gamma} \odot (\bm{h}_t - \mu_t)/\sigma_t</span>, which is called <strong>RMSNorm</strong> <span class="citation" data-cites="zhang2019root">(<a href="#ref-zhang2019root" role="doc-biblioref">Zhang and Sennrich 2019</a>)</span>, since it divides by a root-mean-square quantity. If a model with biases and a model without them work about the same, the one without is preferable — fewer parameters and slightly cheaper. In practice removing the biases does not hurt, plausibly because a transformer can build a constant feature that acts as a bias when it meets a weight matrix, or because the many layer norms make biases redundant. This change is widespread.</p>
+<p>The block has biases in two places: the feed-forward network and the layer norm. Dropping the feed-forward biases gives <span class="math inline">\bm{W}_2\, \phi(\bm{W}_1 \bm{x}_t)</span>; dropping the layer-norm bias <span class="math inline">\bm{\beta}</span> gives <span class="math inline">\bm{\gamma} \odot (\bm{h}_t - \mu_t)/\sigma_t</span>; also dropping the mean subtraction gives <span class="math inline">\bm{\gamma} \odot \bm{h}_t / \sqrt{\tfrac{1}{d}\sum_i h_{t,i}^2}</span>, which is called <strong>RMSNorm</strong> <span class="citation" data-cites="zhang2019root">(<a href="#ref-zhang2019root" role="doc-biblioref">Zhang and Sennrich 2019</a>)</span>, since it divides by a root-mean-square quantity. If a model with biases and a model without them work about the same, the one without is preferable — fewer parameters and slightly cheaper. In practice removing the biases does not hurt, plausibly because a transformer can build a constant feature that acts as a bias when it meets a weight matrix, or because the many layer norms make biases redundant. This change is widespread.</p>
 </section>
 <section id="sec-mod-glu" class="level3">
 <h3 class="anchored" data-anchor-id="sec-mod-glu">3. Gated feed-forward networks</h3>
@@ -496,12 +475,12 @@ Note
 <div class="boxed-eq">
 <p><span class="math display">\bm{W}_3\big(\phi(\bm{W}_2 \bm{x}_t) \odot \bm{W}_1 \bm{x}_t\big),</span></p>
 </div>
-<p>where <span class="math inline">\bm{W}_1 \bm{x}_t</span> is a plain linear transformation, <span class="math inline">\phi(\bm{W}_2 \bm{x}_t)</span> is a second linear transformation passed through a nonlinearity, the two are multiplied element-wise (the “gating”), and <span class="math inline">\bm{W}_3</span> projects the result to the output <span class="citation" data-cites="shazeer2020glu">(<a href="#ref-shazeer2020glu" role="doc-biblioref">Shazeer 2020</a>)</span>. The nonlinearity people most often use is <strong>Swish</strong>, applied element-wise as <span class="math inline">\phi(x) = x\,\sigma(x)</span>. Recall that multiplying <span class="math inline">x</span> by the Heaviside step function would give a ReLU; a sigmoid is a soft step, so Swish looks like a soft ReLU — dipping slightly negative before rising. A gated feed-forward network with a Swish nonlinearity is often called a <strong>SwiGLU</strong>. Unlike the previous two changes, switching to a gated linear unit does seem to produce better models, so it is now widely used.</p>
+<p>where <span class="math inline">\bm{W}_1 \bm{x}_t</span> is a plain linear transformation, <span class="math inline">\phi(\bm{W}_2 \bm{x}_t)</span> is a second linear transformation passed through a nonlinearity (so here <span class="math inline">\bm{W}_1</span> and <span class="math inline">\bm{W}_2</span> both map the input to the hidden layer, unlike the <span class="math inline">\bm{W}_2</span> above), the two are multiplied element-wise (the “gating”), and <span class="math inline">\bm{W}_3</span> projects the result to the output <span class="citation" data-cites="shazeer2020glu">(<a href="#ref-shazeer2020glu" role="doc-biblioref">Shazeer 2020</a>)</span>. The nonlinearity people most often use is <strong>Swish</strong>, applied element-wise as <span class="math inline">\phi(x) = x\,\sigma(x)</span>. Recall that multiplying <span class="math inline">x</span> by the Heaviside step function would give a ReLU; a sigmoid is a soft step, so Swish looks like a soft ReLU — dipping slightly negative before rising. A gated feed-forward network with a Swish nonlinearity is often called a <strong>SwiGLU</strong>. Unlike the previous two changes, switching to a gated linear unit does seem to produce better models, so it is now widely used.</p>
 </section>
 <section id="sec-mod-subquadratic" class="level3">
-<h3 class="anchored" data-anchor-id="sec-mod-subquadratic">4. Sub-quadratic self-attention</h3>
+<h3 class="anchored" data-anchor-id="sec-mod-subquadratic">4. Efficient self-attention</h3>
 <p>Self-attention is quadratic in the sequence length: it computes a query–key dot product for every pair of positions, <span class="math inline">T \times T</span> of them. This is a modification people sometimes make and sometimes do not, and it helps to see why it is often unnecessary before seeing what it is.</p>
-<p>Two observations temper the concern. First, for typical transformer dimensions — the width <span class="math inline">d_{\text{model}}</span> along the residual stream and the hidden width <span class="math inline">d_{\text{ff}}</span> of the feed-forward networks — and modest sequence lengths (say <span class="math inline">T &lt; 1000</span>), the compute spent in the feed-forward networks is much greater than the compute spent in multi-headed self-attention; the quadratic term is not where most of the cost is. Second, the quadratic <em>memory</em> cost of materializing the <span class="math inline">T \times T</span> attention matrices — <span class="math inline">L \times H \times T \times T</span> values across <span class="math inline">L</span> blocks and <span class="math inline">H</span> heads — can be avoided by being careful about where intermediate values are stored on the hardware. On a GPU, moving data between the large VRAM and the small on-chip SRAM is far more expensive than the arithmetic itself, and by never materializing the full attention matrices — computing serially and keeping the working set small — the communication cost is controlled. This is <strong>Flash Attention</strong> <span class="citation" data-cites="dao2022flashattention">(<a href="#ref-dao2022flashattention" role="doc-biblioref">Dao et al. 2022</a>)</span>.</p>
+<p>Two observations temper the concern. First, for typical transformer dimensions — the width <span class="math inline">d_{\text{model}}</span> along the residual stream and the hidden width <span class="math inline">d_{\text{ff}}</span> of the feed-forward networks — and modest sequence lengths (say <span class="math inline">T &lt; 1000</span>), the compute spent in the feed-forward networks is much greater than the compute spent in multi-headed self-attention; the quadratic term is not where most of the cost is. Second, the quadratic <em>memory</em> cost of materializing the <span class="math inline">T \times T</span> attention matrices — <span class="math inline">L \times H \times T \times T</span> values across <span class="math inline">L</span> blocks and <span class="math inline">H</span> heads — can be avoided by being careful about where intermediate values are stored on the hardware. On a GPU, moving data between the large VRAM and the small on-chip SRAM is far more expensive than the arithmetic itself, and by never materializing the full attention matrices — computing block by block with a running (online) softmax and keeping the working set small — the communication cost is controlled. This is <strong>Flash Attention</strong> <span class="citation" data-cites="dao2022flashattention">(<a href="#ref-dao2022flashattention" role="doc-biblioref">Dao et al. 2022</a>)</span>.</p>
 <p>For sequences that are not modest — a document of many thousands of words — the quadratic time cost does matter, and there are many approaches to it. The simplest is <strong>local self-attention</strong>: rather than attending globally, where every output depends on every input, attend only over a window around the current position. Drawn as a <span class="math inline">T \times T</span> attention matrix, only a band around the diagonal is computed, so the cost becomes roughly <span class="math inline">K \cdot T</span> for a window of width <span class="math inline">K</span> — linear. This resembles a convolution, though it is not one: within the window it still computes a softmax-weighted average over query–key dot products rather than applying a fixed kernel. What is lost is global visibility: the path length is no longer <span class="math inline">1</span> but grows as in a convolutional network. To keep long-range dependencies reachable, a common pattern interleaves mostly local blocks with the occasional global one.</p>
 </section>
 <section id="sec-mod-gqa" class="level3">
@@ -558,7 +537,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>A common origin.</strong> Several of these modifications — gated linear units, RMSNorm, multi-query attention, and relative attention biases — trace to the same researcher, Noam Shazeer.</p>
+<p><strong>A common origin.</strong> Several of these modifications — gated linear units, multi-query attention, and relative attention biases — trace to the same researcher, Noam Shazeer.</p>
 </div>
 </div>
 <hr>
@@ -729,7 +708,7 @@ Note
 <ul>
 <li>The <strong>transformer</strong> is built from self-attention, position encodings, multi-headed self-attention, <strong>layer normalization</strong> (which normalizes over the feature axis rather than the batch axis, unlike batch norm), residual connections, position-wise feed-forward networks, and embeddings plus a classifier.</li>
 <li>The <strong>transformer layer block</strong> applies multi-headed self-attention (with a residual connection and layer norm) then a position-wise feed-forward network (with a residual connection and layer norm), and is repeated <span class="math inline">L</span> times. Only self-attention mixes information across positions; the whole block is parallelizable over time, which motivated the transformer as an alternative to recurrent networks.</li>
-<li>Five common <strong>modifications</strong>: pre-layer norm (an uninterrupted residual stream), removing biases (<strong>RMSNorm</strong>), gated feed-forward networks (<strong>SwiGLU</strong>), sub-quadratic self-attention (Flash Attention for memory, local attention for long sequences), and <strong>grouped-query attention</strong> (interpolating between multi-head and multi-query).</li>
+<li>Five common <strong>modifications</strong>: pre-layer norm (an uninterrupted residual stream), removing biases (<strong>RMSNorm</strong>), gated feed-forward networks (<strong>SwiGLU</strong>), efficient self-attention (Flash Attention for memory, local attention for long sequences), and <strong>grouped-query attention</strong> (interpolating between multi-head and multi-query).</li>
 <li>An <strong>encoder-only transformer</strong> maps a length-<span class="math inline">T</span> sequence to a length-<span class="math inline">T</span> sequence and supports sequence classification (via a CLS token), span extraction, and sequence labeling.</li>
 <li><strong>Pre-training</strong> is the first step of transfer learning; it helps because the transformer has a limited inductive bias, and structure can be learned from large, possibly unlabeled data. For text, one pre-trains with <strong>language modeling</strong> or <strong>masked language modeling</strong>.</li>
 <li><strong>BERT</strong> implements masked language modeling by masking 15% of tokens and predicting them — sequence labeling on the masked positions — teaching the model word meaning and grammar without supervision.</li>
@@ -1186,9 +1165,6 @@ Zhang, Biao, and Rico Sennrich. 2019. <span>“Root Mean Square Layer Normalizat
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../lectures/09-transformers-part-2-large-language-models.html" class="pagination-link" aria-label="Lecture 9: Transformers, Part 2, Large Language Models">
-        <span class="nav-page-text"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->
