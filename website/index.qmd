@@ -69,6 +69,7 @@ prerequisites for the undergraduate version of this course, see
 | 5 | [Convolutional neural networks, batch/layer normalization, residual connections](lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.qmd) |
 | 6 | [Sequences, recurrent neural networks, and sequence-to-sequence learning](lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.qmd) |
 | 7 | [Attention](lectures/07-attention.qmd) |
+| 8 | [Transformers part 1](lectures/08-transformers-part-1.qmd) |
 
 ---
 

@@ -23,6 +23,7 @@ book:
     - lectures/05-convolutional-neural-networks-batch-layer-normalization-residual-connections.qmd
     - lectures/06-sequences-recurrent-neural-networks-and-sequence-to-sequence-learning.qmd
     - lectures/07-attention.qmd
+    - lectures/08-transformers-part-1.qmd
 
 format:
   html:
