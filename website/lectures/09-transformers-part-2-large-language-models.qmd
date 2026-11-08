@@ -71,7 +71,7 @@ We have not changed the transformer at all. We feed in `<bos>`, run self-attenti
 
 We have shown how to generate from the model but not how to train it. One could train it exactly as it is used: feed in the first token, predict the second with a cross-entropy loss, feed in the first two, predict the third, and so on. This works but is sequential, processing one token at a time. There is a trick that lets us train a decoder-only transformer for autoregressive generation entirely in parallel across sequence positions — not strictly necessary, but no one omits it, since the sequential version is far less efficient.
 
-Suppose we feed in the full ground-truth sequence — say "the cat sat on the mat" — take the output activations, and train the model to predict "cat" at the second position. If we did this in an ordinary encoder-only transformer, the model could attend to the very word it is trying to predict and drive the loss to zero, but it would then fail at generation time, where the next word is not available. So we cannot simply feed in the full sequence and train for next-step prediction. Instead we force the model to have the attention pattern from the generation case above, by zeroing out the attention weights into the future.
+Suppose we feed in the full ground-truth sequence — say "the cat sat on the mat" — take the output activations, and train the model to predict "cat" at the second position. If we did this in an ordinary encoder-only transformer, the model could attend to the very word it is trying to predict and drive the loss to zero, but it would then fail at generation time, where the next word is not available. So we cannot simply feed in the full sequence and train for next-step prediction. Instead we force the model to have the attention pattern from the generation case above, by setting the scores of future positions to $-\infty$ before the softmax, so the remaining weights still sum to 1.
 
 ::: {.definition-block}
 **Definition.** A *causal mask* zeroes out the attention weights to future positions in self-attention. Feeding in the full sequence and applying the causal mask lets a decoder-only transformer be trained for next-step prediction in parallel across all positions, since no position can access information from the future.
@@ -81,7 +81,7 @@ Because the position-wise feed-forward networks act on each position independent
 
 ### KV caching {#sec-kv-cache}
 
-A second observation concerns generation. Do the keys and values change as more of the sequence is generated? If we have computed the keys and values for positions $1$ through $3$ and then generate position $4$, the keys and values for $1$ through $3$ do not change: they are computed from the representations at those positions, and because the causal mask prevents positions $1$–$3$ from attending to anything at position $4$ or beyond, those representations are unaffected by whatever comes later. So the keys and values do not change as the sequence grows, and we can **cache** them at test time — storing each key and value vector in memory and growing the cache with each new token, rather than recomputing the past. This is **KV caching**, and it saves computation during generation. The caveat is memory: for a very long sequence, each head in each layer must store key and value vectors as long as the sequence, which can become large.
+A second observation concerns generation. Do the keys and values change as more of the sequence is generated? If we have computed the keys and values for positions $1$ through $3$ and then generate position $4$, the keys and values for $1$ through $3$ do not change: they are computed from the representations at those positions, and because the causal mask prevents positions $1$–$3$ from attending to anything at position $4$ or beyond, those representations are unaffected by whatever comes later. So the keys and values do not change as the sequence grows, and we can **cache** them at test time — storing each key and value vector in memory and growing the cache with each new token, rather than recomputing the past. This is **KV caching**, and it saves computation during generation. The caveat is memory: for a very long sequence, each head in each layer must store one key and one value vector per position in the sequence, which can become large.
 
 ---
 
@@ -108,7 +108,7 @@ So people trained transformers on text, and since there was more text, trained l
 <text x="80" y="178" text-anchor="end" font-size="14" fill="#555">loss</text>
 <text x="80" y="196" text-anchor="end" font-size="13" fill="#888">(log)</text>
 <text x="250" y="278" text-anchor="middle" font-size="14" fill="#555">parameters (log)</text>
-<text x="20" y="298" font-size="13" fill="#666">Across many orders of magnitude, larger model and more data</text>
+<text x="20" y="298" font-size="13" fill="#666">Across many orders of magnitude, a larger model and more data</text>
 <text x="20" y="316" font-size="13" fill="#666">give a lower, predictable test loss.</text>
 </svg></div>
 ```
@@ -141,7 +141,7 @@ In-context learning resembles learning — supplying question-answering examples
 
 Many uses of a large language model do not require careful prompting — one states a request and the model complies. Getting from a base model, pre-trained on web text, to one that reliably follows instructions takes further training. This class of methods is called **post-training** (an odd name, since a model that is pre-trained and then post-trained is never simply "trained"); these are language-model techniques rather than core deep learning, so we cover them briefly.
 
-One common step is **instruction tuning**, also called supervised fine-tuning: train the model on a mixture of diverse query–response pairs spanning many tasks — writing a story, answering a homework question, classifying a tweet's sentiment. In classical terms, if the training data samples many tasks, the test data samples other tasks, and instruction tuning improves generalization to new tasks, that is, instruction-following [@wei2022finetuned].
+One common step is **instruction tuning**, also called supervised fine-tuning: train the model on a mixture of diverse query–response pairs spanning many tasks — writing a story, answering a homework question, classifying a tweet's sentiment. In classical terms, the training data samples many tasks and the test data samples others; instruction tuning improves generalization to these new tasks, that is, instruction following [@wei2022finetuned].
 
 A second step is **learning from feedback**. Given a good and a bad response to the same input, train the model to make the good response more likely and the bad one less likely. This differs from ordinary fine-tuning, which only supplies good responses; here the model is told what to do more of and what to do less of. The techniques used come from reinforcement learning, so this is often called reinforcement learning from human feedback [@ouyang2022training]. Prompting, in-context learning, instruction tuning, and learning from feedback are all ways to elicit the behavior we want from a model whose next-token predictions were shaped by language modeling on web text.
 
@@ -149,7 +149,7 @@ A second step is **learning from feedback**. Given a good and a bad response to 
 
 ## The Encoder-Decoder Transformer {#sec-encoder-decoder}
 
-We can now build encoder-only and decoder-only transformers. The **encoder-decoder transformer** combines them, and was in fact the first transformer proposed, as an alternative to the encoder–decoder RNN with attention (Lecture 6). The encoder-only transformer plays the role of that RNN's encoder — processing an input sequence with full visibility into a sequence of hidden states — and the decoder-only transformer plays the role of its decoder, autoregressively generating an output conditioned on the input.
+We can now build encoder-only and decoder-only transformers. The **encoder-decoder transformer** combines them, and was in fact the first transformer proposed, as an alternative to the encoder–decoder RNN with attention (Lecture 7). The encoder-only transformer plays the role of that RNN's encoder — processing an input sequence with full visibility into a sequence of hidden states — and the decoder-only transformer plays the role of its decoder, autoregressively generating an output conditioned on the input.
 
 The question is how to feed the encoder's outputs to the decoder. In the encoder–decoder RNN we used attention, and we do the same here, adding one more attention mechanism — the **encoder-decoder attention**, or **cross-attention** — into the decoder. Filling in the five ingredients (Lecture 7):
 
@@ -231,7 +231,7 @@ Three conventions, none universal, are common:
 $$d_{\text{ff}} = 4\, d_{\text{model}}, \qquad H \, d_{kv} = d_{\text{model}}, \qquad L \text{ and } d_{\text{model}} \text{ grow together}.$$
 :::
 
-The feed-forward network projects into a space four times as wide before projecting back. Setting $H\,d_{kv} = d_{\text{model}}$ makes the total size of the queries, keys, and values across all heads equal to $d_{\text{model}}$, so doubling the number of heads halves $d_{kv}$. And when scaling a model up, one typically increases depth and width together rather than only one — matching the scaling story above, where "parameters" grows along both axes.
+The feed-forward network projects into a space four times as wide before projecting back. Setting $H\,d_{kv} = d_{\text{model}}$ makes the queries, keys, and values each $d_{\text{model}}$-dimensional when concatenated across all heads, so doubling the number of heads halves $d_{kv}$. And when scaling a model up, one typically increases depth and width together rather than only one — matching the scaling story above, where "parameters" grows along both axes.
 
 ---
 
@@ -280,7 +280,7 @@ To use a transformer we need a sequence, but an image is a grid of pixels with c
 </svg></div>
 ```
 
-An image of height $h$, width $w$, and $C$ channels becomes a sequence of length $m = hw / P^2$ of vectors of dimension $C P^2$. (With $P = 1$ this is one pixel per element.) Each patch's vector carries spatial context. To classify, we then follow the encoder-only recipe: map the image to a length-$m$ sequence, prepend a `<CLS>` representation, and linearly project each sequence element from $C P^2$ to $d_{\text{model}}$ with a learned projection — needed because $C P^2$ (e.g., $27$ for a $3\times3$ patch of a 3-channel image) is not the width we want. Everything after that is an ordinary encoder-only transformer, with the `<CLS>` output fed to a classifier. The transformer itself is unchanged; only the way an image is turned into a sequence is new [@dosovitskiy2021image].
+An image of height $h$, width $w$, and $C$ channels becomes a sequence of length $m = hw / P^2$ of vectors of dimension $C P^2$. (With $P = 1$ this is one pixel per element.) Each patch's vector carries spatial context. To classify, we then follow the encoder-only recipe: map the image to a length-$m$ sequence, linearly project each sequence element from $C P^2$ to $d_{\text{model}}$ with a learned projection — needed because $C P^2$ (e.g., $27$ for a $3\times3$ patch of a 3-channel image) is not the width we want — and then prepend a learned `<CLS>` representation. Everything after that is an ordinary encoder-only transformer, with the `<CLS>` output fed to a classifier. The transformer itself is unchanged; only the way an image is turned into a sequence is new [@dosovitskiy2021image].
 
 This works well, with one caveat: it works especially well after pre-training. Suppose we pre-train on a large dataset and fine-tune on a task of interest, and measure downstream performance as a function of the pre-training dataset size.
 
