@@ -163,8 +163,8 @@ This is the same as the encoder–decoder attention of the sequence-to-sequence 
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 780 240" width="100%" style="max-width:780px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
-<defs><marker id="eA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
+<svg viewBox="0 0 780 248" width="100%" style="max-width:780px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="eA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker><marker id="eG" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#57C7AE"/></marker></defs>
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Encoder-decoder transformer: cross-attention in the decoder</text>
 <rect x="20" y="150" width="86" height="42" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"/>
 <text x="63" y="175" text-anchor="middle" font-size="11" font-weight="600" fill="#207965">Encoder stack</text>
@@ -201,9 +201,9 @@ This is the same as the encoder–decoder attention of the sequence-to-sequence 
 <path d="M134,116 Q134,100 184,100 Q233,100 233,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"/>
 <path d="M502,116 Q502,100 540,100 Q579,100 579,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"/>
 <path d="M305,116 Q305,88 364,88 Q423,88 423,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"/>
-<path d="M63,192 L63,186 L356,186 L356,164" fill="none" stroke="#57C7AE" stroke-width="1.8" marker-end="url(#eA)"/>
-<text x="364" y="194" font-size="12" fill="#207965">encoder outputs (keys, values)</text>
-<text x="20" y="228" font-size="13" fill="#666">Cross-attention: queries from the decoder, keys and values from the encoder outputs; inserted between self-attention and the FFN.</text>
+<path d="M63,192 L63,200 Q63,206 69,206 L350,206 Q356,206 356,200 L356,164" fill="none" stroke="#57C7AE" stroke-width="1.8" marker-end="url(#eG)"/>
+<text x="366" y="210" font-size="12" fill="#207965">encoder outputs (keys, values)</text>
+<text x="20" y="234" font-size="13" fill="#666">Cross-attention: queries from the decoder, keys and values from the encoder outputs; inserted between self-attention and the FFN.</text>
 </svg></div>
 ```
 
@@ -245,7 +245,7 @@ To use a transformer we need a sequence, but an image is a grid of pixels with c
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 700 280" width="100%" style="max-width:700px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 700 300" width="100%" style="max-width:700px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="vA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"/></marker></defs>
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Vision transformer: image → patches → sequence</text>
 <rect x="58" y="78" width="156" height="156" fill="#EAF3EF" stroke="#5795C7" stroke-width="1.3"/>
@@ -261,22 +261,37 @@ To use a transformer we need a sequence, but an image is a grid of pixels with c
 <line x1="154" y1="70" x2="154" y2="226" stroke="#5795C7" stroke-width="0.8"/>
 <line x1="50" y1="200" x2="206" y2="200" stroke="#5795C7" stroke-width="0.8"/>
 <line x1="180" y1="70" x2="180" y2="226" stroke="#5795C7" stroke-width="0.8"/>
-<rect x="50" y="70" width="52" height="52" fill="none" stroke="#e53935" stroke-width="2.5"/>
-<text x="42" y="148" text-anchor="end" font-size="13" fill="#666">h</text>
-<text x="128" y="252" text-anchor="middle" font-size="13" fill="#666">w × C channels</text>
-<line x1="222" y1="96" x2="300" y2="96" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"/>
-<text x="236" y="60" font-size="12" fill="#666">flatten P×P patch</text>
+<rect x="50" y="70" width="26" height="26" fill="#F7D9C4" fill-opacity="0.75" stroke="#e53935" stroke-width="2.2"/>
+<text x="63" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="#e53935">one P×P patch</text>
+<line x1="38" y1="70" x2="38" y2="226" stroke="#999" stroke-width="1"/>
+<line x1="34" y1="70" x2="42" y2="70" stroke="#999" stroke-width="1"/>
+<line x1="34" y1="226" x2="42" y2="226" stroke="#999" stroke-width="1"/>
+<text x="30" y="152" text-anchor="end" font-size="13" fill="#666">h</text>
+<line x1="50" y1="246" x2="206" y2="246" stroke="#999" stroke-width="1"/>
+<line x1="50" y1="242" x2="50" y2="250" stroke="#999" stroke-width="1"/>
+<line x1="206" y1="242" x2="206" y2="250" stroke="#999" stroke-width="1"/>
+<text x="128" y="264" text-anchor="middle" font-size="13" fill="#666">w</text>
+<line x1="222" y1="238" x2="211" y2="231" stroke="#999" stroke-width="1"/>
+<text x="226" y="242" font-size="13" fill="#666">C channels</text>
+<line x1="222" y1="83" x2="286" y2="83" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"/>
+<text x="254" y="60" text-anchor="middle" font-size="12" fill="#666">flatten each patch</text>
 <rect x="310" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
 <rect x="356" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
 <rect x="402" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
-<rect x="448" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
-<text x="407" y="62" text-anchor="middle" font-size="12" fill="#666">C·P²-dim</text>
-<text x="456" y="130" font-size="16" fill="#999">···</text>
-<text x="402" y="214" text-anchor="middle" font-size="13" fill="#666">m = hw / P²  sequence elements</text>
-<line x1="512" y1="130.0" x2="546" y2="130.0" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"/>
-<text x="552" y="124" font-size="13" fill="#442079" font-weight="600">project</text>
-<text x="552" y="142" font-size="12" fill="#442079">to d_model</text>
-<text x="20" y="266" font-size="13" fill="#666">Prepend a &lt;CLS&gt; element, project each patch to d_model, then run an ordinary encoder-only transformer.</text>
+<text x="443" y="136" text-anchor="middle" font-size="16" fill="#999">···</text>
+<rect x="462" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"/>
+<line x1="300" y1="70" x2="294" y2="70" stroke="#999" stroke-width="1"/>
+<line x1="300" y1="190" x2="294" y2="190" stroke="#999" stroke-width="1"/>
+<line x1="297" y1="70" x2="297" y2="190" stroke="#999" stroke-width="1"/>
+<text x="397" y="58" text-anchor="middle" font-size="12" fill="#666">each vector is C·P²-dim</text>
+<line x1="310" y1="202" x2="484" y2="202" stroke="#999" stroke-width="1"/>
+<line x1="310" y1="198" x2="310" y2="206" stroke="#999" stroke-width="1"/>
+<line x1="484" y1="198" x2="484" y2="206" stroke="#999" stroke-width="1"/>
+<text x="397" y="222" text-anchor="middle" font-size="13" fill="#666">m = hw / P²  sequence elements</text>
+<line x1="496" y1="130" x2="530" y2="130" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"/>
+<text x="536" y="124" font-size="13" fill="#442079" font-weight="600">project</text>
+<text x="536" y="142" font-size="12" fill="#442079">to d_model</text>
+<text x="20" y="288" font-size="13" fill="#666">Prepend a &lt;CLS&gt; element, project each patch to d_model, then run an ordinary encoder-only transformer.</text>
 </svg></div>
 ```
 
@@ -286,20 +301,23 @@ This works well, with one caveat: it works especially well after pre-training. S
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewBox="0 0 500 328" width="100%" style="max-width:500px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewBox="0 0 545 334" width="100%" style="max-width:545px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="pA" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#555"/></marker></defs>
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Pre-training and inductive bias</text>
-<line x1="110" y1="64" x2="110" y2="244" stroke="#555" stroke-width="1.6"/>
-<line x1="110" y1="244" x2="410" y2="244" stroke="#555" stroke-width="1.6"/>
-<path d="M 110.0,190.0 L 117.5,175.2 L 125.0,169.1 L 132.5,164.4 L 140.0,160.4 L 147.5,156.9 L 155.0,153.7 L 162.5,150.8 L 170.0,148.1 L 177.5,145.6 L 185.0,143.2 L 192.5,140.9 L 200.0,138.7 L 207.5,136.6 L 215.0,134.6 L 222.5,132.7 L 230.0,130.8 L 237.5,129.0 L 245.0,127.2 L 252.5,125.5 L 260.0,123.8 L 267.5,122.2 L 275.0,120.6 L 282.5,119.0 L 290.0,117.5 L 297.5,116.0 L 305.0,114.5 L 312.5,113.1 L 320.0,111.7 L 327.5,110.3 L 335.0,108.9 L 342.5,107.6 L 350.0,106.3 L 357.5,105.0 L 365.0,103.7 L 372.5,102.4 L 380.0,101.2 L 387.5,100.0 L 395.0,98.8 L 402.5,97.6 L 410.0,96.4" fill="none" stroke="#EE6677" stroke-width="3"/>
-<path d="M 110.0,222.4 L 117.5,220.2 L 125.0,217.6 L 132.5,214.7 L 140.0,211.7 L 147.5,208.6 L 155.0,205.3 L 162.5,202.0 L 170.0,198.6 L 177.5,195.2 L 185.0,191.7 L 192.5,188.1 L 200.0,184.5 L 207.5,180.9 L 215.0,177.2 L 222.5,173.5 L 230.0,169.7 L 237.5,165.9 L 245.0,162.0 L 252.5,158.2 L 260.0,154.3 L 267.5,150.3 L 275.0,146.4 L 282.5,142.4 L 290.0,138.4 L 297.5,134.3 L 305.0,130.3 L 312.5,126.2 L 320.0,122.1 L 327.5,117.9 L 335.0,113.8 L 342.5,109.6 L 350.0,105.4 L 357.5,101.2 L 365.0,97.0 L 372.5,92.7 L 380.0,88.5 L 387.5,84.2 L 395.0,79.9 L 402.5,75.5 L 410.0,71.2" fill="none" stroke="#4477AA" stroke-width="3"/>
-<text x="416" y="94" font-size="14" fill="#4477AA" font-weight="600">vision</text>
-<text x="416" y="110" font-size="14" fill="#4477AA" font-weight="600">transformer</text>
-<text x="416" y="136" font-size="14" fill="#EE6677" font-weight="600">convnet</text>
+<line x1="110" y1="244" x2="110" y2="58" stroke="#555" stroke-width="1.6" marker-end="url(#pA)"/>
+<line x1="110" y1="244" x2="424" y2="244" stroke="#555" stroke-width="1.6" marker-end="url(#pA)"/>
+<path d="M 110.0,190.0 L 110.0,189.2 L 110.1,188.4 L 110.2,187.7 L 110.3,186.9 L 110.5,186.1 L 110.8,185.3 L 111.0,184.5 L 111.3,183.8 L 111.7,183.0 L 112.1,182.2 L 112.5,181.4 L 113.0,180.6 L 113.5,179.9 L 114.1,179.1 L 114.7,178.3 L 115.3,177.5 L 116.0,176.7 L 116.8,176.0 L 117.5,175.2 L 118.3,174.4 L 119.2,173.6 L 120.1,172.8 L 121.0,172.1 L 122.0,171.3 L 123.0,170.5 L 124.1,169.7 L 125.2,168.9 L 126.3,168.2 L 127.5,167.4 L 128.8,166.6 L 130.0,165.8 L 131.3,165.0 L 132.7,164.3 L 134.1,163.5 L 135.5,162.7 L 137.0,161.9 L 138.5,161.1 L 140.1,160.4 L 141.7,159.6 L 143.3,158.8 L 145.0,158.0 L 146.8,157.2 L 148.5,156.5 L 150.3,155.7 L 152.2,154.9 L 154.1,154.1 L 156.0,153.3 L 158.0,152.6 L 160.0,151.8 L 162.1,151.0 L 164.2,150.2 L 166.3,149.4 L 168.5,148.7 L 170.8,147.9 L 173.0,147.1 L 175.3,146.3 L 177.7,145.5 L 180.1,144.8 L 182.5,144.0 L 185.0,143.2 L 187.5,142.4 L 190.1,141.6 L 192.7,140.9 L 195.3,140.1 L 198.0,139.3 L 200.8,138.5 L 203.5,137.7 L 206.3,137.0 L 209.2,136.2 L 212.1,135.4 L 215.0,134.6 L 218.0,133.8 L 221.0,133.1 L 224.1,132.3 L 227.2,131.5 L 230.3,130.7 L 233.5,129.9 L 236.8,129.2 L 240.0,128.4 L 243.3,127.6 L 246.7,126.8 L 250.1,126.0 L 253.5,125.3 L 257.0,124.5 L 260.5,123.7 L 264.1,122.9 L 267.7,122.1 L 271.3,121.4 L 275.0,120.6 L 278.8,119.8 L 282.5,119.0 L 286.3,118.2 L 290.2,117.5 L 294.1,116.7 L 298.0,115.9 L 302.0,115.1 L 306.0,114.3 L 310.1,113.6 L 314.2,112.8 L 318.3,112.0 L 322.5,111.2 L 326.8,110.4 L 331.0,109.7 L 335.3,108.9 L 339.7,108.1 L 344.1,107.3 L 348.5,106.5 L 353.0,105.8 L 357.5,105.0 L 362.1,104.2 L 366.7,103.4 L 371.3,102.6 L 376.0,101.9 L 380.8,101.1 L 385.5,100.3 L 390.3,99.5 L 395.2,98.7 L 400.1,98.0 L 405.0,97.2 L 410.0,96.4" fill="none" stroke="#EE6677" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 110.0,222.4 L 110.0,222.4 L 110.1,222.4 L 110.2,222.4 L 110.3,222.3 L 110.5,222.3 L 110.8,222.2 L 111.0,222.2 L 111.3,222.1 L 111.7,222.0 L 112.1,221.9 L 112.5,221.8 L 113.0,221.6 L 113.5,221.5 L 114.1,221.3 L 114.7,221.1 L 115.3,220.9 L 116.0,220.7 L 116.8,220.5 L 117.5,220.2 L 118.3,219.9 L 119.2,219.7 L 120.1,219.3 L 121.0,219.0 L 122.0,218.7 L 123.0,218.3 L 124.1,217.9 L 125.2,217.5 L 126.3,217.1 L 127.5,216.6 L 128.8,216.2 L 130.0,215.7 L 131.3,215.2 L 132.7,214.6 L 134.1,214.1 L 135.5,213.5 L 137.0,212.9 L 138.5,212.3 L 140.1,211.7 L 141.7,211.0 L 143.3,210.3 L 145.0,209.6 L 146.8,208.9 L 148.5,208.1 L 150.3,207.4 L 152.2,206.6 L 154.1,205.7 L 156.0,204.9 L 158.0,204.0 L 160.0,203.1 L 162.1,202.2 L 164.2,201.3 L 166.3,200.3 L 168.5,199.3 L 170.8,198.3 L 173.0,197.3 L 175.3,196.2 L 177.7,195.1 L 180.1,194.0 L 182.5,192.9 L 185.0,191.7 L 187.5,190.5 L 190.1,189.3 L 192.7,188.1 L 195.3,186.8 L 198.0,185.5 L 200.8,184.2 L 203.5,182.8 L 206.3,181.5 L 209.2,180.1 L 212.1,178.6 L 215.0,177.2 L 218.0,175.7 L 221.0,174.2 L 224.1,172.7 L 227.2,171.1 L 230.3,169.5 L 233.5,167.9 L 236.8,166.3 L 240.0,164.6 L 243.3,162.9 L 246.7,161.2 L 250.1,159.4 L 253.5,157.6 L 257.0,155.8 L 260.5,154.0 L 264.1,152.1 L 267.7,150.2 L 271.3,148.3 L 275.0,146.4 L 278.8,144.4 L 282.5,142.4 L 286.3,140.3 L 290.2,138.3 L 294.1,136.2 L 298.0,134.1 L 302.0,131.9 L 306.0,129.7 L 310.1,127.5 L 314.2,125.3 L 318.3,123.0 L 322.5,120.7 L 326.8,118.4 L 331.0,116.0 L 335.3,113.6 L 339.7,111.2 L 344.1,108.7 L 348.5,106.3 L 353.0,103.7 L 357.5,101.2 L 362.1,98.6 L 366.7,96.0 L 371.3,93.4 L 376.0,90.7 L 380.8,88.0 L 385.5,85.3 L 390.3,82.5 L 395.2,79.8 L 400.1,76.9 L 405.0,74.1 L 410.0,71.2" fill="none" stroke="#4477AA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="304" y1="88" x2="342" y2="102" stroke="#999" stroke-width="1"/>
+<circle cx="347.8" cy="106.7" r="4.5" fill="#fff" stroke="#333" stroke-width="1.8"/>
+<text x="300" y="92" text-anchor="end" font-size="12" fill="#555">vision transformer overtakes</text>
+<text x="418" y="68" font-size="14" fill="#4477AA" font-weight="600">vision transformer</text>
+<text x="418" y="101" font-size="14" fill="#EE6677" font-weight="600">convnet</text>
 <text x="100" y="148" text-anchor="end" font-size="13" fill="#555">downstream</text>
 <text x="100" y="164" text-anchor="end" font-size="13" fill="#555">performance</text>
-<text x="260" y="272" text-anchor="middle" font-size="13" fill="#555">size of pre-training dataset</text>
-<text x="20" y="298" font-size="13" fill="#666">The vision transformer needs more pre-training than a convnet,</text>
-<text x="20" y="316" font-size="13" fill="#666">but surpasses it once pre-trained enough.</text>
+<text x="267" y="272" text-anchor="middle" font-size="13" fill="#555">size of pre-training dataset</text>
+<text x="20" y="300" font-size="13" fill="#666">The vision transformer needs more pre-training than a convnet,</text>
+<text x="20" y="318" font-size="13" fill="#666">but surpasses it once pre-trained enough.</text>
 </svg></div>
 ```
 
