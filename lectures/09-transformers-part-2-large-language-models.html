@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.10.18">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -13,13 +13,10 @@
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
 */
+code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
-div.columns{display: flex; gap: 1.5em;}
-div.column{flex: auto;}
-@media screen {
-div.columns{gap: min(4vw, 1.5em);}
-div.column{overflow-x: auto;}
-}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
 div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
 ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
@@ -56,7 +53,6 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" rel="next">
 <link href="../lectures/08-transformers-part-1.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -64,10 +60,10 @@ div.csl-indent {
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bb62276ab45c84d9efd712f51ff97b5a.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-de63f62b328812d8e578a4d74e282472.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-67d765188173d06cfd0f34779d32db47.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-7e81e40a0a2695db1344b21614152a91.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "sidebar",
   "copy-button": false,
@@ -250,21 +246,6 @@ window.Quarto = {
   <a href="../lectures/09-transformers-part-2-large-language-models.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 9: Transformers, Part 2, Large Language Models</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
-  </div>
-</li>
     </ul>
     </div>
 </nav>
@@ -381,7 +362,7 @@ Warning
 <section id="sec-causal-mask" class="level3">
 <h3 class="anchored" data-anchor-id="sec-causal-mask">Training with a causal mask</h3>
 <p>We have shown how to generate from the model but not how to train it. One could train it exactly as it is used: feed in the first token, predict the second with a cross-entropy loss, feed in the first two, predict the third, and so on. This works but is sequential, processing one token at a time. There is a trick that lets us train a decoder-only transformer for autoregressive generation entirely in parallel across sequence positions — not strictly necessary, but no one omits it, since the sequential version is far less efficient.</p>
-<p>Suppose we feed in the full ground-truth sequence — say “the cat sat on the mat” — take the output activations, and train the model to predict “cat” at the second position. If we did this in an ordinary encoder-only transformer, the model could attend to the very word it is trying to predict and drive the loss to zero, but it would then fail at generation time, where the next word is not available. So we cannot simply feed in the full sequence and train for next-step prediction. Instead we force the model to have the attention pattern from the generation case above, by zeroing out the attention weights into the future.</p>
+<p>Suppose we feed in the full ground-truth sequence — say “the cat sat on the mat” — take the output activations, and train the model to predict “cat” at the second position. If we did this in an ordinary encoder-only transformer, the model could attend to the very word it is trying to predict and drive the loss to zero, but it would then fail at generation time, where the next word is not available. So we cannot simply feed in the full sequence and train for next-step prediction. Instead we force the model to have the attention pattern from the generation case above, by setting the scores of future positions to <span class="math inline">-\infty</span> before the softmax.</p>
 <div class="definition-block">
 <p><strong>Definition.</strong> A <em>causal mask</em> zeroes out the attention weights to future positions in self-attention. Feeding in the full sequence and applying the causal mask lets a decoder-only transformer be trained for next-step prediction in parallel across all positions, since no position can access information from the future.</p>
 </div>
@@ -389,7 +370,7 @@ Warning
 </section>
 <section id="sec-kv-cache" class="level3">
 <h3 class="anchored" data-anchor-id="sec-kv-cache">KV caching</h3>
-<p>A second observation concerns generation. Do the keys and values change as more of the sequence is generated? If we have computed the keys and values for positions <span class="math inline">1</span> through <span class="math inline">3</span> and then generate position <span class="math inline">4</span>, the keys and values for <span class="math inline">1</span> through <span class="math inline">3</span> do not change: they are computed from the representations at those positions, and because the causal mask prevents positions <span class="math inline">1</span>–<span class="math inline">3</span> from attending to anything at position <span class="math inline">4</span> or beyond, those representations are unaffected by whatever comes later. So the keys and values do not change as the sequence grows, and we can <strong>cache</strong> them at test time — storing each key and value vector in memory and growing the cache with each new token, rather than recomputing the past. This is <strong>KV caching</strong>, and it saves computation during generation. The caveat is memory: for a very long sequence, each head in each layer must store key and value vectors as long as the sequence, which can become large.</p>
+<p>A second observation concerns generation. Do the keys and values change as more of the sequence is generated? If we have computed the keys and values for positions <span class="math inline">1</span> through <span class="math inline">3</span> and then generate position <span class="math inline">4</span>, the keys and values for <span class="math inline">1</span> through <span class="math inline">3</span> do not change: they are computed from the representations at those positions, and because the causal mask prevents positions <span class="math inline">1</span>–<span class="math inline">3</span> from attending to anything at position <span class="math inline">4</span> or beyond, those representations are unaffected by whatever comes later. So the keys and values do not change as the sequence grows, and we can <strong>cache</strong> them at test time — storing each key and value vector in memory and growing the cache with each new token, rather than recomputing the past. This is <strong>KV caching</strong>, and it saves computation during generation. The caveat is memory: for a very long sequence, each head in each layer must store one key and one value vector per position in the sequence, which can become large.</p>
 <hr>
 </section>
 </section>
@@ -411,7 +392,7 @@ Warning
 <text x="80" y="178" text-anchor="end" font-size="14" fill="#555">loss</text>
 <text x="80" y="196" text-anchor="end" font-size="13" fill="#888">(log)</text>
 <text x="250" y="278" text-anchor="middle" font-size="14" fill="#555">parameters (log)</text>
-<text x="20" y="298" font-size="13" fill="#666">Across many orders of magnitude, larger model and more data</text>
+<text x="20" y="298" font-size="13" fill="#666">Across many orders of magnitude, a larger model and more data</text>
 <text x="20" y="316" font-size="13" fill="#666">give a lower, predictable test loss.</text>
 </svg></div>
 <p>Plotting test loss against the number of parameters, both on log scales, gives close to a straight line, and it holds across many orders of magnitude. This is unlike most of the modeling in this course, where one cannot say in advance what the validation loss will be. It amounts to a recipe: with the compute and the data to train a larger model, one can confidently expect a lower test loss. Ongoing research largely concerns changing the <em>slope</em> of this line, but the line itself is a striking regularity <span class="citation" data-cites="kaplan2020scaling">(<a href="#ref-kaplan2020scaling" role="doc-biblioref">Kaplan et al. 2020</a>)</span>.</p>
@@ -436,14 +417,14 @@ Warning
 <section id="sec-post-training" class="level3">
 <h3 class="anchored" data-anchor-id="sec-post-training">Post-training</h3>
 <p>Many uses of a large language model do not require careful prompting — one states a request and the model complies. Getting from a base model, pre-trained on web text, to one that reliably follows instructions takes further training. This class of methods is called <strong>post-training</strong> (an odd name, since a model that is pre-trained and then post-trained is never simply “trained”); these are language-model techniques rather than core deep learning, so we cover them briefly.</p>
-<p>One common step is <strong>instruction tuning</strong>, also called supervised fine-tuning: train the model on a mixture of diverse query–response pairs spanning many tasks — writing a story, answering a homework question, classifying a tweet’s sentiment. In classical terms, if the training data samples many tasks, the test data samples other tasks, and instruction tuning improves generalization to new tasks, that is, instruction-following <span class="citation" data-cites="wei2022finetuned">(<a href="#ref-wei2022finetuned" role="doc-biblioref">Wei et al. 2022</a>)</span>.</p>
+<p>One common step is <strong>instruction tuning</strong>, also called supervised fine-tuning: train the model on a mixture of diverse query–response pairs spanning many tasks — writing a story, answering a homework question, classifying a tweet’s sentiment. In classical terms, the training data samples many tasks and the test data samples others; instruction tuning improves generalization to these new tasks, that is, instruction following <span class="citation" data-cites="wei2022finetuned">(<a href="#ref-wei2022finetuned" role="doc-biblioref">Wei et al. 2022</a>)</span>.</p>
 <p>A second step is <strong>learning from feedback</strong>. Given a good and a bad response to the same input, train the model to make the good response more likely and the bad one less likely. This differs from ordinary fine-tuning, which only supplies good responses; here the model is told what to do more of and what to do less of. The techniques used come from reinforcement learning, so this is often called reinforcement learning from human feedback <span class="citation" data-cites="ouyang2022training">(<a href="#ref-ouyang2022training" role="doc-biblioref"><span class="nocase">Ouyang et al.</span> 2022</a>)</span>. Prompting, in-context learning, instruction tuning, and learning from feedback are all ways to elicit the behavior we want from a model whose next-token predictions were shaped by language modeling on web text.</p>
 <hr>
 </section>
 </section>
 <section id="sec-encoder-decoder" class="level2">
 <h2 class="anchored" data-anchor-id="sec-encoder-decoder">The Encoder-Decoder Transformer</h2>
-<p>We can now build encoder-only and decoder-only transformers. The <strong>encoder-decoder transformer</strong> combines them, and was in fact the first transformer proposed, as an alternative to the encoder–decoder RNN with attention (Lecture 6). The encoder-only transformer plays the role of that RNN’s encoder — processing an input sequence with full visibility into a sequence of hidden states — and the decoder-only transformer plays the role of its decoder, autoregressively generating an output conditioned on the input.</p>
+<p>We can now build encoder-only and decoder-only transformers. The <strong>encoder-decoder transformer</strong> combines them, and was in fact the first transformer proposed, as an alternative to the encoder–decoder RNN with attention (Lecture 7). The encoder-only transformer plays the role of that RNN’s encoder — processing an input sequence with full visibility into a sequence of hidden states — and the decoder-only transformer plays the role of its decoder, autoregressively generating an output conditioned on the input.</p>
 <p>The question is how to feed the encoder’s outputs to the decoder. In the encoder–decoder RNN we used attention, and we do the same here, adding one more attention mechanism — the <strong>encoder-decoder attention</strong>, or <strong>cross-attention</strong> — into the decoder. Filling in the five ingredients (Lecture 7):</p>
 <ul>
 <li><strong>Queries:</strong> the decoder states.</li>
@@ -454,8 +435,8 @@ Warning
 </ul>
 <p>This is the same as the encoder–decoder attention of the sequence-to-sequence RNN. We insert it into each decoder block, between the multi-headed self-attention and the feed-forward network, each sublayer wrapped in a residual connection and followed by a layer norm as before.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewbox="0 0 780 240" width="100%" style="max-width:780px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
-<defs><marker id="eA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
+<svg viewbox="0 0 780 248" width="100%" style="max-width:780px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="eA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker><marker id="eG" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#57C7AE"></path></marker></defs>
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Encoder-decoder transformer: cross-attention in the decoder</text>
 <rect x="20" y="150" width="86" height="42" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
 <text x="63" y="175" text-anchor="middle" font-size="11" font-weight="600" fill="#207965">Encoder stack</text>
@@ -492,9 +473,9 @@ Warning
 <path d="M134,116 Q134,100 184,100 Q233,100 233,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"></path>
 <path d="M502,116 Q502,100 540,100 Q579,100 579,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"></path>
 <path d="M305,116 Q305,88 364,88 Q423,88 423,131.0" fill="none" stroke="#8457C7" stroke-width="1.4" marker-end="url(#eA)"></path>
-<path d="M63,192 L63,186 L356,186 L356,164" fill="none" stroke="#57C7AE" stroke-width="1.8" marker-end="url(#eA)"></path>
-<text x="364" y="194" font-size="12" fill="#207965">encoder outputs (keys, values)</text>
-<text x="20" y="228" font-size="13" fill="#666">Cross-attention: queries from the decoder, keys and values from the encoder outputs; inserted between self-attention and the FFN.</text>
+<path d="M63,192 L63,200 Q63,206 69,206 L350,206 Q356,206 356,200 L356,164" fill="none" stroke="#57C7AE" stroke-width="1.8" marker-end="url(#eG)"></path>
+<text x="366" y="210" font-size="12" fill="#207965">encoder outputs (keys, values)</text>
+<text x="20" y="234" font-size="13" fill="#666">Cross-attention: queries from the decoder, keys and values from the encoder outputs; inserted between self-attention and the FFN.</text>
 </svg></div>
 <p>The encoder is unchanged, and the decoder differs from a decoder-only transformer only by the added cross-attention sublayer, which takes the encoder outputs as its keys and values. To train an encoder-decoder transformer, we can always use supervised sequence-to-sequence data — feed the English sentence into the encoder and train the decoder to generate the French translation, as with the sequence-to-sequence RNN. To train on unlabeled data, we use an objective similar to masked language modeling: corrupt some text by masking spans, and train the model to predict the missing parts <span class="citation" data-cites="raffel2020exploring">(<a href="#ref-raffel2020exploring" role="doc-biblioref">Raffel et al. 2020</a>)</span>. Given “Thank you for inviting me to your party,” we might mask “for inviting” and “party” to get “Thank you <code>&lt;mask&gt;</code> me to your <code>&lt;mask&gt;</code>,” with target “for inviting <code>&lt;sep&gt;</code> party” — the two recovered spans separated by a <code>&lt;sep&gt;</code> token. Because the missing spans are generated autoregressively as an output sequence, a masked span can cover several tokens — unlike masked language modeling in an encoder-only model, where each masked position corresponds to a single token.</p>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -526,7 +507,7 @@ Note
 <div class="boxed-eq">
 <p><span class="math display">d_{\text{ff}} = 4\, d_{\text{model}}, \qquad H \, d_{kv} = d_{\text{model}}, \qquad L \text{ and } d_{\text{model}} \text{ grow together}.</span></p>
 </div>
-<p>The feed-forward network projects into a space four times as wide before projecting back. Setting <span class="math inline">H\,d_{kv} = d_{\text{model}}</span> makes the total size of the queries, keys, and values across all heads equal to <span class="math inline">d_{\text{model}}</span>, so doubling the number of heads halves <span class="math inline">d_{kv}</span>. And when scaling a model up, one typically increases depth and width together rather than only one — matching the scaling story above, where “parameters” grows along both axes.</p>
+<p>The feed-forward network projects into a space four times as wide before projecting back. Setting <span class="math inline">H\,d_{kv} = d_{\text{model}}</span> makes the queries, keys, and values each <span class="math inline">d_{\text{model}}</span>-dimensional when concatenated across all heads, so doubling the number of heads halves <span class="math inline">d_{kv}</span>. And when scaling a model up, one typically increases depth and width together rather than only one — matching the scaling story above, where “parameters” grows along both axes.</p>
 <hr>
 </section>
 <section id="sec-vit" class="level2">
@@ -535,7 +516,7 @@ Note
 <p>Recall the convolution’s inductive bias: locality and shift invariance, a reasonable structural assumption for images. The transformer has a much weaker inductive bias — only that every output may depend on every input. This is more generic and makes fewer assumptions, which may be good or bad, but it means a transformer can <em>learn</em> the appropriate structure rather than having it built in. Trained on a vision task, self-attention could learn locality, for instance, by attending only to a small region of the input; more generally it can learn arbitrary dependencies, especially with position encodings.</p>
 <p>To use a transformer we need a sequence, but an image is a grid of pixels with channels. Reading pixels one at a time would give an enormous sequence — a <span class="math inline">1024 \times 1024 \times 3</span> image would become a sequence of length roughly three million. Instead we split the image into <strong>patches</strong>: take each <span class="math inline">P \times P</span> patch across all channels, flatten it into a vector, and let each patch be one sequence element.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewbox="0 0 700 280" width="100%" style="max-width:700px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewbox="0 0 700 300" width="100%" style="max-width:700px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="vA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Vision transformer: image → patches → sequence</text>
 <rect x="58" y="78" width="156" height="156" fill="#EAF3EF" stroke="#5795C7" stroke-width="1.3"></rect>
@@ -551,40 +532,58 @@ Note
 <line x1="154" y1="70" x2="154" y2="226" stroke="#5795C7" stroke-width="0.8"></line>
 <line x1="50" y1="200" x2="206" y2="200" stroke="#5795C7" stroke-width="0.8"></line>
 <line x1="180" y1="70" x2="180" y2="226" stroke="#5795C7" stroke-width="0.8"></line>
-<rect x="50" y="70" width="52" height="52" fill="none" stroke="#e53935" stroke-width="2.5"></rect>
-<text x="42" y="148" text-anchor="end" font-size="13" fill="#666">h</text>
-<text x="128" y="252" text-anchor="middle" font-size="13" fill="#666">w × C channels</text>
-<line x1="222" y1="96" x2="300" y2="96" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"></line>
-<text x="236" y="60" font-size="12" fill="#666">flatten P×P patch</text>
+<rect x="50" y="70" width="26" height="26" fill="#F7D9C4" fill-opacity="0.75" stroke="#e53935" stroke-width="2.2"></rect>
+<text x="63" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="#e53935">one P×P patch</text>
+<line x1="38" y1="70" x2="38" y2="226" stroke="#999" stroke-width="1"></line>
+<line x1="34" y1="70" x2="42" y2="70" stroke="#999" stroke-width="1"></line>
+<line x1="34" y1="226" x2="42" y2="226" stroke="#999" stroke-width="1"></line>
+<text x="30" y="152" text-anchor="end" font-size="13" fill="#666">h</text>
+<line x1="50" y1="246" x2="206" y2="246" stroke="#999" stroke-width="1"></line>
+<line x1="50" y1="242" x2="50" y2="250" stroke="#999" stroke-width="1"></line>
+<line x1="206" y1="242" x2="206" y2="250" stroke="#999" stroke-width="1"></line>
+<text x="128" y="264" text-anchor="middle" font-size="13" fill="#666">w</text>
+<line x1="222" y1="238" x2="211" y2="231" stroke="#999" stroke-width="1"></line>
+<text x="226" y="242" font-size="13" fill="#666">C channels</text>
+<line x1="222" y1="83" x2="286" y2="83" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"></line>
+<text x="254" y="60" text-anchor="middle" font-size="12" fill="#666">flatten each patch</text>
 <rect x="310" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
 <rect x="356" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
 <rect x="402" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
-<rect x="448" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
-<text x="407" y="62" text-anchor="middle" font-size="12" fill="#666">C·P²-dim</text>
-<text x="456" y="130" font-size="16" fill="#999">···</text>
-<text x="402" y="214" text-anchor="middle" font-size="13" fill="#666">m = hw / P²  sequence elements</text>
-<line x1="512" y1="130.0" x2="546" y2="130.0" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"></line>
-<text x="552" y="124" font-size="13" fill="#442079" font-weight="600">project</text>
-<text x="552" y="142" font-size="12" fill="#442079">to d_model</text>
-<text x="20" y="266" font-size="13" fill="#666">Prepend a &lt;CLS&gt; element, project each patch to d_model, then run an ordinary encoder-only transformer.</text>
+<text x="443" y="136" text-anchor="middle" font-size="16" fill="#999">···</text>
+<rect x="462" y="70" width="22" height="120" rx="3" fill="#F7D9C4" stroke="#C78557" stroke-width="1.4"></rect>
+<line x1="300" y1="70" x2="294" y2="70" stroke="#999" stroke-width="1"></line>
+<line x1="300" y1="190" x2="294" y2="190" stroke="#999" stroke-width="1"></line>
+<line x1="297" y1="70" x2="297" y2="190" stroke="#999" stroke-width="1"></line>
+<text x="397" y="58" text-anchor="middle" font-size="12" fill="#666">each vector is C·P²-dim</text>
+<line x1="310" y1="202" x2="484" y2="202" stroke="#999" stroke-width="1"></line>
+<line x1="310" y1="198" x2="310" y2="206" stroke="#999" stroke-width="1"></line>
+<line x1="484" y1="198" x2="484" y2="206" stroke="#999" stroke-width="1"></line>
+<text x="397" y="222" text-anchor="middle" font-size="13" fill="#666">m = hw / P²  sequence elements</text>
+<line x1="496" y1="130" x2="530" y2="130" stroke="#888" stroke-width="1.5" marker-end="url(#vA)"></line>
+<text x="536" y="124" font-size="13" fill="#442079" font-weight="600">project</text>
+<text x="536" y="142" font-size="12" fill="#442079">to d_model</text>
+<text x="20" y="288" font-size="13" fill="#666">Prepend a &lt;CLS&gt; element, project each patch to d_model, then run an ordinary encoder-only transformer.</text>
 </svg></div>
-<p>An image of height <span class="math inline">h</span>, width <span class="math inline">w</span>, and <span class="math inline">C</span> channels becomes a sequence of length <span class="math inline">m = hw / P^2</span> of vectors of dimension <span class="math inline">C P^2</span>. (With <span class="math inline">P = 1</span> this is one pixel per element.) Each patch’s vector carries spatial context. To classify, we then follow the encoder-only recipe: map the image to a length-<span class="math inline">m</span> sequence, prepend a <code>&lt;CLS&gt;</code> representation, and linearly project each sequence element from <span class="math inline">C P^2</span> to <span class="math inline">d_{\text{model}}</span> with a learned projection — needed because <span class="math inline">C P^2</span> (e.g., <span class="math inline">27</span> for a <span class="math inline">3\times3</span> patch of a 3-channel image) is not the width we want. Everything after that is an ordinary encoder-only transformer, with the <code>&lt;CLS&gt;</code> output fed to a classifier. The transformer itself is unchanged; only the way an image is turned into a sequence is new <span class="citation" data-cites="dosovitskiy2021image">(<a href="#ref-dosovitskiy2021image" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span>.</p>
+<p>An image of height <span class="math inline">h</span>, width <span class="math inline">w</span>, and <span class="math inline">C</span> channels becomes a sequence of length <span class="math inline">m = hw / P^2</span> of vectors of dimension <span class="math inline">C P^2</span>. (With <span class="math inline">P = 1</span> this is one pixel per element.) Each patch’s vector carries spatial context. To classify, we then follow the encoder-only recipe: map the image to a length-<span class="math inline">m</span> sequence and linearly project each sequence element from <span class="math inline">C P^2</span> to <span class="math inline">d_{\text{model}}</span> with a learned projection — needed because <span class="math inline">C P^2</span> (e.g., <span class="math inline">27</span> for a <span class="math inline">3\times3</span> patch of a 3-channel image) is not the width we want. Finally, we prepend a learned <code>&lt;CLS&gt;</code> representation. Everything after that is an ordinary encoder-only transformer, with the <code>&lt;CLS&gt;</code> output fed to a classifier. The transformer itself is unchanged; only the way an image is turned into a sequence is new <span class="citation" data-cites="dosovitskiy2021image">(<a href="#ref-dosovitskiy2021image" role="doc-biblioref">Dosovitskiy et al. 2021</a>)</span>.</p>
 <p>This works well, with one caveat: it works especially well after pre-training. Suppose we pre-train on a large dataset and fine-tune on a task of interest, and measure downstream performance as a function of the pre-training dataset size.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewbox="0 0 500 328" width="100%" style="max-width:500px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewbox="0 0 545 334" width="100%" style="max-width:545px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<defs><marker id="pA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#555"></path></marker></defs>
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Pre-training and inductive bias</text>
-<line x1="110" y1="64" x2="110" y2="244" stroke="#555" stroke-width="1.6"></line>
-<line x1="110" y1="244" x2="410" y2="244" stroke="#555" stroke-width="1.6"></line>
-<path d="M 110.0,190.0 L 117.5,175.2 L 125.0,169.1 L 132.5,164.4 L 140.0,160.4 L 147.5,156.9 L 155.0,153.7 L 162.5,150.8 L 170.0,148.1 L 177.5,145.6 L 185.0,143.2 L 192.5,140.9 L 200.0,138.7 L 207.5,136.6 L 215.0,134.6 L 222.5,132.7 L 230.0,130.8 L 237.5,129.0 L 245.0,127.2 L 252.5,125.5 L 260.0,123.8 L 267.5,122.2 L 275.0,120.6 L 282.5,119.0 L 290.0,117.5 L 297.5,116.0 L 305.0,114.5 L 312.5,113.1 L 320.0,111.7 L 327.5,110.3 L 335.0,108.9 L 342.5,107.6 L 350.0,106.3 L 357.5,105.0 L 365.0,103.7 L 372.5,102.4 L 380.0,101.2 L 387.5,100.0 L 395.0,98.8 L 402.5,97.6 L 410.0,96.4" fill="none" stroke="#EE6677" stroke-width="3"></path>
-<path d="M 110.0,222.4 L 117.5,220.2 L 125.0,217.6 L 132.5,214.7 L 140.0,211.7 L 147.5,208.6 L 155.0,205.3 L 162.5,202.0 L 170.0,198.6 L 177.5,195.2 L 185.0,191.7 L 192.5,188.1 L 200.0,184.5 L 207.5,180.9 L 215.0,177.2 L 222.5,173.5 L 230.0,169.7 L 237.5,165.9 L 245.0,162.0 L 252.5,158.2 L 260.0,154.3 L 267.5,150.3 L 275.0,146.4 L 282.5,142.4 L 290.0,138.4 L 297.5,134.3 L 305.0,130.3 L 312.5,126.2 L 320.0,122.1 L 327.5,117.9 L 335.0,113.8 L 342.5,109.6 L 350.0,105.4 L 357.5,101.2 L 365.0,97.0 L 372.5,92.7 L 380.0,88.5 L 387.5,84.2 L 395.0,79.9 L 402.5,75.5 L 410.0,71.2" fill="none" stroke="#4477AA" stroke-width="3"></path>
-<text x="416" y="94" font-size="14" fill="#4477AA" font-weight="600">vision</text>
-<text x="416" y="110" font-size="14" fill="#4477AA" font-weight="600">transformer</text>
-<text x="416" y="136" font-size="14" fill="#EE6677" font-weight="600">convnet</text>
+<line x1="110" y1="244" x2="110" y2="58" stroke="#555" stroke-width="1.6" marker-end="url(#pA)"></line>
+<line x1="110" y1="244" x2="424" y2="244" stroke="#555" stroke-width="1.6" marker-end="url(#pA)"></line>
+<path d="M 110.0,190.0 L 110.0,189.2 L 110.1,188.4 L 110.2,187.7 L 110.3,186.9 L 110.5,186.1 L 110.8,185.3 L 111.0,184.5 L 111.3,183.8 L 111.7,183.0 L 112.1,182.2 L 112.5,181.4 L 113.0,180.6 L 113.5,179.9 L 114.1,179.1 L 114.7,178.3 L 115.3,177.5 L 116.0,176.7 L 116.8,176.0 L 117.5,175.2 L 118.3,174.4 L 119.2,173.6 L 120.1,172.8 L 121.0,172.1 L 122.0,171.3 L 123.0,170.5 L 124.1,169.7 L 125.2,168.9 L 126.3,168.2 L 127.5,167.4 L 128.8,166.6 L 130.0,165.8 L 131.3,165.0 L 132.7,164.3 L 134.1,163.5 L 135.5,162.7 L 137.0,161.9 L 138.5,161.1 L 140.1,160.4 L 141.7,159.6 L 143.3,158.8 L 145.0,158.0 L 146.8,157.2 L 148.5,156.5 L 150.3,155.7 L 152.2,154.9 L 154.1,154.1 L 156.0,153.3 L 158.0,152.6 L 160.0,151.8 L 162.1,151.0 L 164.2,150.2 L 166.3,149.4 L 168.5,148.7 L 170.8,147.9 L 173.0,147.1 L 175.3,146.3 L 177.7,145.5 L 180.1,144.8 L 182.5,144.0 L 185.0,143.2 L 187.5,142.4 L 190.1,141.6 L 192.7,140.9 L 195.3,140.1 L 198.0,139.3 L 200.8,138.5 L 203.5,137.7 L 206.3,137.0 L 209.2,136.2 L 212.1,135.4 L 215.0,134.6 L 218.0,133.8 L 221.0,133.1 L 224.1,132.3 L 227.2,131.5 L 230.3,130.7 L 233.5,129.9 L 236.8,129.2 L 240.0,128.4 L 243.3,127.6 L 246.7,126.8 L 250.1,126.0 L 253.5,125.3 L 257.0,124.5 L 260.5,123.7 L 264.1,122.9 L 267.7,122.1 L 271.3,121.4 L 275.0,120.6 L 278.8,119.8 L 282.5,119.0 L 286.3,118.2 L 290.2,117.5 L 294.1,116.7 L 298.0,115.9 L 302.0,115.1 L 306.0,114.3 L 310.1,113.6 L 314.2,112.8 L 318.3,112.0 L 322.5,111.2 L 326.8,110.4 L 331.0,109.7 L 335.3,108.9 L 339.7,108.1 L 344.1,107.3 L 348.5,106.5 L 353.0,105.8 L 357.5,105.0 L 362.1,104.2 L 366.7,103.4 L 371.3,102.6 L 376.0,101.9 L 380.8,101.1 L 385.5,100.3 L 390.3,99.5 L 395.2,98.7 L 400.1,98.0 L 405.0,97.2 L 410.0,96.4" fill="none" stroke="#EE6677" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M 110.0,222.4 L 110.0,222.4 L 110.1,222.4 L 110.2,222.4 L 110.3,222.3 L 110.5,222.3 L 110.8,222.2 L 111.0,222.2 L 111.3,222.1 L 111.7,222.0 L 112.1,221.9 L 112.5,221.8 L 113.0,221.6 L 113.5,221.5 L 114.1,221.3 L 114.7,221.1 L 115.3,220.9 L 116.0,220.7 L 116.8,220.5 L 117.5,220.2 L 118.3,219.9 L 119.2,219.7 L 120.1,219.3 L 121.0,219.0 L 122.0,218.7 L 123.0,218.3 L 124.1,217.9 L 125.2,217.5 L 126.3,217.1 L 127.5,216.6 L 128.8,216.2 L 130.0,215.7 L 131.3,215.2 L 132.7,214.6 L 134.1,214.1 L 135.5,213.5 L 137.0,212.9 L 138.5,212.3 L 140.1,211.7 L 141.7,211.0 L 143.3,210.3 L 145.0,209.6 L 146.8,208.9 L 148.5,208.1 L 150.3,207.4 L 152.2,206.6 L 154.1,205.7 L 156.0,204.9 L 158.0,204.0 L 160.0,203.1 L 162.1,202.2 L 164.2,201.3 L 166.3,200.3 L 168.5,199.3 L 170.8,198.3 L 173.0,197.3 L 175.3,196.2 L 177.7,195.1 L 180.1,194.0 L 182.5,192.9 L 185.0,191.7 L 187.5,190.5 L 190.1,189.3 L 192.7,188.1 L 195.3,186.8 L 198.0,185.5 L 200.8,184.2 L 203.5,182.8 L 206.3,181.5 L 209.2,180.1 L 212.1,178.6 L 215.0,177.2 L 218.0,175.7 L 221.0,174.2 L 224.1,172.7 L 227.2,171.1 L 230.3,169.5 L 233.5,167.9 L 236.8,166.3 L 240.0,164.6 L 243.3,162.9 L 246.7,161.2 L 250.1,159.4 L 253.5,157.6 L 257.0,155.8 L 260.5,154.0 L 264.1,152.1 L 267.7,150.2 L 271.3,148.3 L 275.0,146.4 L 278.8,144.4 L 282.5,142.4 L 286.3,140.3 L 290.2,138.3 L 294.1,136.2 L 298.0,134.1 L 302.0,131.9 L 306.0,129.7 L 310.1,127.5 L 314.2,125.3 L 318.3,123.0 L 322.5,120.7 L 326.8,118.4 L 331.0,116.0 L 335.3,113.6 L 339.7,111.2 L 344.1,108.7 L 348.5,106.3 L 353.0,103.7 L 357.5,101.2 L 362.1,98.6 L 366.7,96.0 L 371.3,93.4 L 376.0,90.7 L 380.8,88.0 L 385.5,85.3 L 390.3,82.5 L 395.2,79.8 L 400.1,76.9 L 405.0,74.1 L 410.0,71.2" fill="none" stroke="#4477AA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+<line x1="304" y1="88" x2="342" y2="102" stroke="#999" stroke-width="1"></line>
+<circle cx="347.8" cy="106.7" r="4.5" fill="#fff" stroke="#333" stroke-width="1.8"></circle>
+<text x="300" y="92" text-anchor="end" font-size="12" fill="#555">vision transformer overtakes</text>
+<text x="418" y="68" font-size="14" fill="#4477AA" font-weight="600">vision transformer</text>
+<text x="418" y="101" font-size="14" fill="#EE6677" font-weight="600">convnet</text>
 <text x="100" y="148" text-anchor="end" font-size="13" fill="#555">downstream</text>
 <text x="100" y="164" text-anchor="end" font-size="13" fill="#555">performance</text>
-<text x="260" y="272" text-anchor="middle" font-size="13" fill="#555">size of pre-training dataset</text>
-<text x="20" y="298" font-size="13" fill="#666">The vision transformer needs more pre-training than a convnet,</text>
-<text x="20" y="316" font-size="13" fill="#666">but surpasses it once pre-trained enough.</text>
+<text x="267" y="272" text-anchor="middle" font-size="13" fill="#555">size of pre-training dataset</text>
+<text x="20" y="300" font-size="13" fill="#666">The vision transformer needs more pre-training than a convnet,</text>
+<text x="20" y="318" font-size="13" fill="#666">but surpasses it once pre-trained enough.</text>
 </svg></div>
 <p>For a convolutional network, performance improves with the pre-training budget. For a vision transformer, performance is worse at a small pre-training budget but better at a large one. The reason is inductive bias. Pre-training teaches the model the structure of the problem — for vision, recognizing shape templates such as round, square, or striped things. A convolutional network already assumes locality and shift invariance, so it needs less pre-training to do well; a vision transformer assumes almost nothing and must learn the structure, which requires more pre-training. But locality and shift invariance are not the right structure for every vision task, so given enough pre-training, a vision transformer can learn a better structural assumption and surpass the convolutional network.</p>
 <hr>
@@ -1053,9 +1052,6 @@ Wei, Jason, Maarten Bosma, Vincent Y Zhao, et al. 2022. <span>“Finetuned Langu
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="pagination-link" aria-label="Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs">
-        <span class="nav-page-text"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->
