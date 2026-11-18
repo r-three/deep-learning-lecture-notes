@@ -73,7 +73,7 @@ The layer computes its output using $\bm{W}_\text{pre} + \bm{B}\bm{A}$, but duri
 
 ### Initialization {#sec-lora-init}
 
-Adding a random low-rank matrix to every weight matrix of a carefully pre-trained model would distort it — adding noise to parameters learned on a large task is likely to degrade the model. The standard remedy is to initialize $\bm{B}$ to zeros and $\bm{A}$ from a Gaussian, as usual. Then $\bm{B}\bm{A} = \bm{0}$ at the start, so LoRA fine-tuning begins from exactly the pre-trained model and only departs from it as training proceeds. (Because $\bm{B}$ starts at zero, one might worry that no gradient can flow; it does, because the pre-trained path acts like a residual connection around the $\bm{B}\bm{A}$ update, letting gradients reach $\bm{A}$.) There is no strong theory behind this, but empirically it works: LoRA fine-tuning is generally not much worse than fine-tuning the full model.
+Adding a random low-rank matrix to every weight matrix of a carefully pre-trained model would distort it — adding noise to parameters learned on a large task is likely to degrade the model. The standard remedy is to initialize $\bm{B}$ to zeros and $\bm{A}$ from a Gaussian, as usual. Then $\bm{B}\bm{A} = \bm{0}$ at the start, so LoRA fine-tuning begins from exactly the pre-trained model and only departs from it as training proceeds. (Because $\bm{B}$ starts at zero, one might worry that no gradient can flow; it does: $\bm{B}$'s gradient depends on $\bm{A}\bm{x}$, which is nonzero since $\bm{A}$ is random, so $\bm{B}$ moves off zero after one step and $\bm{A}$ receives gradient from then on.) There is no strong theory behind this, but empirically it works: LoRA fine-tuning is generally not much worse than fine-tuning the full model.
 
 ### Why do this {#sec-lora-why}
 
@@ -206,7 +206,7 @@ To build a layer, recall what an ordinary layer does with feature vectors: proje
 $$\bm{H} = \sigma\!\big(\hat{\bm{D}}^{-1/2}\, \hat{\bm{A}}\, \hat{\bm{D}}^{-1/2}\, \bm{X}\, \bm{W}\big) \in \mathbb{R}^{n \times d'}, \qquad \bm{W} \in \mathbb{R}^{d \times d'}.$$
 :::
 
-Per node, this is $\bm{h}_i = \sigma\!\big(\sum_{i \sim j} \tfrac{1}{\sqrt{d_i d_j}}\, \bm{x}_j \bm{W}\big)$: project the neighbors through $\bm{W}$, sum them with degree normalization, and apply the nonlinearity $\sigma$ (an elementwise nonlinearity such as a ReLU).
+Per node, this is $\bm{h}_i = \sigma\!\big(\sum_{i \sim j \text{ or } j = i} \tfrac{1}{\sqrt{\hat d_i \hat d_j}}\, \bm{x}_j \bm{W}\big)$, with $\hat d_i = d_i + 1$: project the neighbors through $\bm{W}$, sum them with degree normalization, and apply the nonlinearity $\sigma$ (an elementwise nonlinearity such as a ReLU).
 
 Why call it convolutional? Take an image, extract patches, and form a graph in which each pixel's neighbors are the pixels in its patch. Then this layer applies the same weight matrix $\bm{W}$ to every node and sums over its neighbors — a local, translation-invariant operation, just like a convolution (up to the degree normalization, which is constant when the patches are the same size and can be absorbed into $\bm{W}$). Stacking layers extends the reach: after one layer a node's representation depends on its neighbors, after two on its neighbors' neighbors, and so on — a notion much like the receptive field of a convolutional network (Lecture 5).
 
