@@ -37,7 +37,7 @@ Since $\bm{B}\bm{A}$ has rank at most $r$, this makes $\Delta\bm{W}$ **low-rank*
 **Definition.** *Low-rank adaptation* (LoRA) fine-tunes a model by adding a low-rank update $\bm{B}\bm{A}$ to each chosen weight matrix, keeping the pre-trained matrix $\bm{W}_\text{pre}$ fixed and training only the new parameters $\bm{B}$ and $\bm{A}$.
 :::
 
-The layer computes its output using $\bm{W}_\text{pre} + \bm{B}\bm{A}$, but during training $\bm{W}_\text{pre}$ is frozen and only $\bm{B}$ and $\bm{A}$ are updated. These are new parameters that did not exist in the model before — an additional weight matrix, summed with the pre-trained one.
+The layer computes its output using $\bm{W}_\text{pre} + \bm{B}\bm{A}$, but during training $\bm{W}_\text{pre}$ is frozen and only $\bm{B}$ and $\bm{A}$ are updated. These are new parameters that did not exist in the model before — an additional weight matrix, summed with the pre-trained one. In practice the update is also scaled by a constant, so the layer uses $\bm{W}_\text{pre} + \tfrac{\alpha}{r}\bm{B}\bm{A}$; keeping the hyperparameter $\alpha$ (called `lora_alpha` in the PEFT library) fixed while varying $r$ reduces the need to re-tune the learning rate when the rank changes [@hu2021lora].
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -73,29 +73,29 @@ The layer computes its output using $\bm{W}_\text{pre} + \bm{B}\bm{A}$, but duri
 
 ### Initialization {#sec-lora-init}
 
-Adding a random low-rank matrix to every weight matrix of a carefully pre-trained model would distort it — adding noise to parameters learned on a large task is likely to degrade the model. The standard remedy is to initialize $\bm{B}$ to zeros and $\bm{A}$ from a Gaussian, as usual. Then $\bm{B}\bm{A} = \bm{0}$ at the start, so LoRA fine-tuning begins from exactly the pre-trained model and only departs from it as training proceeds. (Because $\bm{B}$ starts at zero, one might worry that no gradient can flow; it does: $\bm{B}$'s gradient depends on $\bm{A}\bm{x}$, which is nonzero since $\bm{A}$ is random, so $\bm{B}$ moves off zero after one step and $\bm{A}$ receives gradient from then on.) There is no strong theory behind this, but empirically it works: LoRA fine-tuning is generally not much worse than fine-tuning the full model.
+Adding a random low-rank matrix to every weight matrix of a carefully pre-trained model would distort it — adding noise to parameters learned on a large task is likely to degrade the model. The standard remedy is to initialize $\bm{B}$ to zeros and $\bm{A}$ from a Gaussian, as usual. Then $\bm{B}\bm{A} = \bm{0}$ at the start, so LoRA fine-tuning begins from exactly the pre-trained model and only departs from it as training proceeds. (Because $\bm{B}$ starts at zero, one might worry that no gradient can flow; it does: $\bm{B}$'s gradient depends on $\bm{A}\bm{x}$, which is nonzero since $\bm{A}$ is random, so $\bm{B}$ moves off zero after one step and $\bm{A}$ receives gradient from then on. If both started at zero, neither would ever receive a gradient.) There is no strong theory behind this, but empirically it works: LoRA fine-tuning is generally not much worse than fine-tuning the full model.
 
 ### Why do this {#sec-lora-why}
 
 Several benefits follow, and they explain why LoRA is worth the trouble.
 
-- **The rank $r$ can be small, and varies by task.** For some datasets a rank-one update ($r = 1$) matches full fine-tuning; for others one needs $r = 8$ or $16$. But usually $r$ can be much smaller than $n_\text{in}$ and $n_\text{out}$. One way to see why: the pre-trained model was trained on a very broad task, and a fine-tuning task is usually a specialized subset of that — we need only steer the model, not relearn everything. The idea that fine-tuning can succeed in a low-dimensional subspace is sometimes phrased as the *intrinsic dimensionality* of the fine-tuning task being small [@aghajanyan2021intrinsic].
-- **Storing and communicating a LoRA is cheaper.** Full fine-tuning produces an update for every parameter, so sharing it costs as much as sharing a whole model — if the parameters take 10 gigabytes, so does the update. A LoRA update needs only $n_\text{out}\, r + n_\text{in}\, r$ values per matrix instead of $n_\text{out}\, n_\text{in}$, so storing the result of low-rank adaptation typically takes only 1–10% of the full model's storage.
-- **Not all weight matrices need updating.** The original LoRA paper [@hu2021lora], fine-tuning transformers, updated only the attention projection matrices (query, key, value, and output); one could instead update the feed-forward matrices, or both, and all three are done in practice — and one may optionally adapt small extra parameters such as the RMSNorm gain as well. Updating fewer matrices makes the LoRA smaller still.
+- **The rank $r$ can be small, and varies by task.** In the original paper, $r = 1$ performed about as well as much larger ranks on some tasks when adapting the query and value projections [@hu2021lora], though no single small rank works for every task; in practice, values such as $r = 8$ or $16$ are common. But usually $r$ can be much smaller than $n_\text{in}$ and $n_\text{out}$. One way to see why: the pre-trained model was trained on a very broad task, and a fine-tuning task is usually a specialized subset of that — we need only steer the model, not relearn everything. The idea that fine-tuning can succeed in a low-dimensional subspace is sometimes phrased as the *intrinsic dimensionality* of the fine-tuning task being small [@aghajanyan2021intrinsic].
+- **Storing and communicating a LoRA is cheaper.** Full fine-tuning produces an update for every parameter, so sharing it costs as much as sharing a whole model — if the parameters take 10 gigabytes, so does the update. A LoRA update needs only $n_\text{out}\, r + n_\text{in}\, r$ values per matrix instead of $n_\text{out}\, n_\text{in}$, so storing the result of low-rank adaptation typically takes at most a few percent of the full model's storage, and often under 1%. (As an extreme example, adapting only the query and value projections of GPT-3 with $r = 4$ shrinks the checkpoint from 350 GB to about 35 MB [@hu2021lora].)
+- **Not all weight matrices need updating.** The original LoRA paper [@hu2021lora], fine-tuning transformers, restricted itself to the attention projection matrices (query, key, value, and output), and in most experiments adapted only the query and value projections; one could instead update the feed-forward matrices, or both, and all three are done in practice — and one may optionally adapt small extra parameters such as the RMSNorm gain as well. Updating fewer matrices makes the LoRA smaller still.
 - **Inference cost is unchanged.** After training, we can pre-compute $\bm{W}_\text{pre} + \bm{B}\bm{A}$ and fold the update into a single matrix, so a forward pass costs exactly what it did before. During training the two must be kept separate, since $\bm{W}_\text{pre}$ is fixed and $\bm{B}\bm{A}$ is trained, but afterward they merge. (This is not true of methods that inject new layers, which add computation at inference.) Left unmerged, a LoRA also enables serving: keep one copy of the pre-trained backbone, batch requests from many users, and add the appropriate per-user LoRA to each entry of the batch — giving each user their own fine-tuned variant without a separate full model each.
-- **Training memory is reduced.** When training with Adam (Lecture 4), we store, besides the parameters and cached activations, the first- and second-moment gradient accumulators, each as large as the parameters being updated. With LoRA we only maintain accumulators for $\bm{B}$ and $\bm{A}$, which are far smaller, lowering the memory cost of training — sometimes enough to fine-tune a larger model on hardware with less memory. We return to training memory in Lecture 12.
+- **Training memory is reduced.** When training with Adam (Lecture 4), we store, besides the parameters and cached activations, the first- and second-moment gradient accumulators, each as large as the parameters being updated. With LoRA we only maintain gradients and accumulators for $\bm{B}$ and $\bm{A}$, which are far smaller, lowering the memory cost of training — sometimes enough to fine-tune a larger model on hardware with less memory. We return to training memory in Lecture 12.
 
 ---
 
 ## Graph Neural Networks {#sec-gnn}
 
-We have applied neural networks to feature vectors, images, and sequences. Some data is instead structured as a **graph**, which generalizes several of these. A running example is a social network: each node is a person, and an edge between two nodes means they are connected — friends, or one following another. A task we might want is to classify the nodes: this node is a bot, that one is a human.
+We have applied neural networks to feature vectors, images, and sequences. Some data is instead structured as a **graph**, which generalizes several of these. A running example is a social network: each node is a person, and an edge between two nodes means they are connected — for example, they are friends. We assume the graph is undirected, so connections go both ways. A task we might want is to classify the nodes: this node is a bot, that one is a human.
 
-Let the graph have $n$ nodes, each with a $d$-dimensional feature vector $\bm{x}_i \in \mathbb{R}^d$ — in the social network, attributes such as when the person joined, how many posts they have made, how many friends they have. Stacking the node feature vectors as rows gives a **node feature matrix** $\bm{X} \in \mathbb{R}^{n \times d}$. We also record the connectivity in an **adjacency matrix** $\bm{A} \in \mathbb{R}^{n \times n}$, with a $1$ where two nodes are connected and $0$ otherwise. Writing $i \sim j$ for "node $i$ is connected to node $j$,"
+Let the graph have $n$ nodes, each with a $p$-dimensional feature vector $\bm{x}_i \in \mathbb{R}^p$ — in the social network, attributes such as when the person joined, how many posts they have made, how many friends they have. Stacking the node feature vectors as rows gives a **node feature matrix** $\bm{X} \in \mathbb{R}^{n \times p}$. We also record the connectivity in an **adjacency matrix** $\bm{A} \in \mathbb{R}^{n \times n}$, with a $1$ where two nodes are connected and $0$ otherwise. Writing $i \sim j$ for "node $i$ is connected to node $j$,"
 
 $$\bm{A}_{ij} = \begin{cases} 1 & \text{if } i \sim j, \\ 0 & \text{otherwise.} \end{cases}$$
 
-For an unweighted graph the entries are just $0$ or $1$.
+Since the graph is undirected, $\bm{A}$ is symmetric; for a weighted graph, $\bm{A}_{ij}$ would hold the edge weight instead of $1$.
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -120,8 +120,8 @@ For an unweighted graph the entries are just $0$ or $1$.
 <text x="70" y="214" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">5</text>
 <circle cx="180" cy="210" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"/>
 <text x="180" y="214" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">6</text>
-<text x="140" y="250" text-anchor="middle" font-size="13" fill="#666">n nodes, features xᵢ ∈ ℝᵈ</text>
-<text x="385" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">X  (n × d)</text>
+<text x="140" y="250" text-anchor="middle" font-size="13" fill="#666">n nodes, features xᵢ ∈ ℝᵖ</text>
+<text x="385" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">X  (n × p)</text>
 <rect x="320" y="70" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
 <rect x="320" y="90" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
 <rect x="320" y="110" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"/>
@@ -186,7 +186,7 @@ For an unweighted graph the entries are just $0$ or $1$.
 
 ### Aggregating over neighbors {#sec-gnn-aggregate}
 
-With two matrices in hand, it is natural to multiply them. Consider $\bm{A}\bm{X}$, which is $n \times d$. Its $i$th row is
+With two matrices in hand, it is natural to multiply them. Consider $\bm{A}\bm{X}$, which is $n \times p$. Its $i$th row is
 
 $$(\bm{A}\bm{X})_i = \sum_{i \sim j} \bm{x}_j,$$
 
@@ -200,15 +200,15 @@ The first divides each row by its degree; the second uses the geometric mean of 
 
 ### The graph convolutional network {#sec-gcn}
 
-To build a layer, recall what an ordinary layer does with feature vectors: project them through a learned matrix and apply a nonlinearity, $\sigma(\bm{W}\bm{x})$. We do the same here, projecting each node's feature vector through a learned $\bm{W} \in \mathbb{R}^{d \times d'}$ and combining it with the normalized neighbor aggregation. One correction is needed first: with the aggregation as written, node $i$'s own feature vector does not contribute to its new representation unless the node is connected to itself. Since it usually is not, we add self-connections by replacing $\bm{A}$ with $\hat{\bm{A}} = \bm{A} + \bm{I}$ (and correspondingly $\hat{\bm{D}}$). This gives the **graph convolutional network** [@kipf2017semi]:
+To build a layer, recall what an ordinary layer does with feature vectors: project them through a learned matrix and apply a nonlinearity, $\sigma(\bm{W}\bm{x})$. We do the same here, projecting each node's feature vector through a learned $\bm{W} \in \mathbb{R}^{p \times p'}$ and combining it with the normalized neighbor aggregation. (Since nodes are rows of $\bm{X}$, we treat each $\bm{x}_i$ as a row vector and multiply on the right: $\bm{x}_i\bm{W}$ for one node, $\bm{X}\bm{W}$ for all. This is the same layer as before, transposed: $(\bm{x}_i\bm{W})^\top = \bm{W}^\top\bm{x}_i$.) One correction is needed first: with the aggregation as written, node $i$'s own feature vector does not contribute to its new representation unless the node is connected to itself. Since it usually is not, we add self-connections by replacing $\bm{A}$ with $\hat{\bm{A}} = \bm{A} + \bm{I}$ (and correspondingly $\hat{\bm{D}}$). This gives the **graph convolutional network** [@kipf2017semi]:
 
 ::: {.boxed-eq}
-$$\bm{H} = \sigma\!\big(\hat{\bm{D}}^{-1/2}\, \hat{\bm{A}}\, \hat{\bm{D}}^{-1/2}\, \bm{X}\, \bm{W}\big) \in \mathbb{R}^{n \times d'}, \qquad \bm{W} \in \mathbb{R}^{d \times d'}.$$
+$$\bm{H} = \sigma\!\big(\hat{\bm{D}}^{-1/2}\, \hat{\bm{A}}\, \hat{\bm{D}}^{-1/2}\, \bm{X}\, \bm{W}\big) \in \mathbb{R}^{n \times p'}, \qquad \bm{W} \in \mathbb{R}^{p \times p'}.$$
 :::
 
-Per node, this is $\bm{h}_i = \sigma\!\big(\sum_{i \sim j \text{ or } j = i} \tfrac{1}{\sqrt{\hat d_i \hat d_j}}\, \bm{x}_j \bm{W}\big)$, with $\hat d_i = d_i + 1$: project the neighbors through $\bm{W}$, sum them with degree normalization, and apply the nonlinearity $\sigma$ (an elementwise nonlinearity such as a ReLU).
+Per node, this is $\bm{h}_i = \sigma\!\big(\sum_{i \sim j \text{ or } i = j} \tfrac{1}{\sqrt{\hat d_i \hat d_j}}\, \bm{x}_j \bm{W}\big)$, with $\hat d_i = d_i + 1$: project the node and its neighbors through $\bm{W}$, sum them with degree normalization, and apply the nonlinearity $\sigma$ (an elementwise nonlinearity such as a ReLU).
 
-Why call it convolutional? Take an image, extract patches, and form a graph in which each pixel's neighbors are the pixels in its patch. Then this layer applies the same weight matrix $\bm{W}$ to every node and sums over its neighbors — a local, translation-invariant operation, just like a convolution (up to the degree normalization, which is constant when the patches are the same size and can be absorbed into $\bm{W}$). Stacking layers extends the reach: after one layer a node's representation depends on its neighbors, after two on its neighbors' neighbors, and so on — a notion much like the receptive field of a convolutional network (Lecture 5).
+Why call it convolutional? Take an image, extract patches, and form a graph in which each pixel's neighbors are the pixels in its patch. Then this layer applies the same weight matrix $\bm{W}$ to every node and sums over its neighbors — a local, translation-invariant operation, like a convolution (up to the degree normalization, which is constant when the patches are the same size and can be absorbed into $\bm{W}$). Unlike a convolution kernel, though, every neighbor shares the same $\bm{W}$; the name comes from graph signal processing, where this layer is a first-order approximation of a spectral graph convolution [@kipf2017semi]. Stacking layers extends the reach: after one layer a node's representation depends on its neighbors, after two on its neighbors' neighbors, and so on — a notion much like the receptive field of a convolutional network (Lecture 5).
 
 ### The graph attention network {#sec-gat}
 
@@ -222,14 +222,14 @@ Filling in the five ingredients of an attention mechanism (Lecture 7), with $\bm
 
 - **Queries, keys, and values** are all $\bm{W}\bm{h}_i$ — the same projection for all three, unlike any attention we have seen. This was tried and worked, and it projects the input once rather than three times.
 - **Comparison.** The score between nodes $i$ and $j$ passes the concatenation of their projections through a learned vector $\bm{v}$ and a LeakyReLU (a ReLU whose left side has a small nonzero slope rather than being flat):
-$$a_{ij} = \alpha(\bm{W}\bm{h}_i, \bm{W}\bm{h}_j) = \operatorname{LeakyReLU}\!\big(\bm{v}^\top [\bm{W}\bm{h}_i \,\|\, \bm{W}\bm{h}_j]\big).$$
-- **Reduction** is a softmax-weighted average over the neighbors:
+$$e_{ij} = \operatorname{LeakyReLU}\!\big(\bm{v}^\top [\bm{W}\bm{h}_i \,\|\, \bm{W}\bm{h}_j]\big).$$
+- **Reduction** is a softmax-weighted average over the neighbors (with the node itself included), using weights $\alpha_{ij} = \operatorname{softmax}_j(e_{ij})$:
 
 ::: {.boxed-eq}
-$$\bm{h}_i' = \sigma\!\Big(\sum_{i \sim j} \operatorname{softmax}(\bm{a}_i)_j\, \bm{W}\bm{h}_j\Big).$$
+$$\bm{h}_i' = \sigma\!\Big(\sum_{i \sim j \text{ or } i = j} \alpha_{ij}\, \bm{W}\bm{h}_j\Big).$$
 :::
 
-Restricting the sum to neighbors is done by masking — setting the scores for non-edges to $-\infty$ before the softmax, using the adjacency matrix, as we masked attention in Lecture 9. As usual, the attention is made multi-headed. Compared to the graph convolutional network's fixed degree-based weights, the GAT lets the comparison function *learn* how much each neighbor should count [@velickovic2018graph].
+Restricting the sum (and the softmax) to the node and its neighbors is done by masking — setting the scores for non-edges to $-\infty$ before the softmax, using the adjacency matrix with self-connections, $\hat{\bm{A}}$, as we masked attention in Lecture 9. As usual, the attention is made multi-headed. Compared to the graph convolutional network's fixed degree-based weights, the GAT lets the comparison function *learn* how much each neighbor should count [@velickovic2018graph].
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -269,10 +269,6 @@ Restricting the sum to neighbors is done by masking — setting the scores for n
 </svg></div>
 ```
 
-::: {.callout-note}
-**A strained acronym.** The graph attention network is abbreviated GAT. The extra "T" has no clear source; a plausible account is that the well-known *generative adversarial network* had already taken GAN, and the later graph attention network borrowed the shape of the acronym.
-:::
-
 Both layers map a set of node feature vectors to a new set of the same size, so they stack like any layer: several graph convolutional or graph attention layers, optionally interleaved with position-wise feed-forward networks applied to each node independently, followed by a small classifier head that outputs, say, a bot-versus-human probability per node — all trained end-to-end with backpropagation.
 
 ---
@@ -281,9 +277,9 @@ Both layers map a set of node feature vectors to a new set of the same size, so 
 
 For every model so far, increasing the number of parameters increases the computational cost: a wider MLP hidden layer, an extra layer, or more convolutional channels all add both parameters and computation. But a model's capacity — loosely, how much it can fit or memorize — grows with its parameters, and with more data we would like more capacity, hence more parameters, without paying more compute. A **mixture-of-experts** layer is one way to decouple the two.
 
-A mixture-of-experts layer replaces some layer in the model — often a position-wise feed-forward network in a transformer — with $n$ copies of it, called **experts**. The experts share the same architecture but have separate, unshared parameters. Replacing one layer with $n$ experts multiplies that layer's parameter count by $n$. Computing all $n$ experts, though, would multiply the compute by $n$ as well, gaining nothing.
+A mixture-of-experts layer replaces some layer in the model — often a position-wise feed-forward network in a transformer — with $n$ copies of it, called **experts**. The experts share the same architecture but have separate, unshared parameters. Replacing one layer with $n$ experts multiplies that layer's parameter count by $n$. Computing all $n$ experts, though, would multiply the compute by $n$ as well — no better than simply making the layer $n$ times larger.
 
-The key component is a **router**: a small layer that, for a given input, decides which experts to use. It outputs a probability for each of the $n$ experts, the **routing probabilities**, and only the top $k$ experts are actually run. Their outputs are multiplied by the routing probabilities and summed.
+The key component is a **router**: a small layer that, for a given input — in a transformer, each token separately — decides which experts to use. It outputs a probability for each of the $n$ experts, the **routing probabilities**, and only the top $k$ experts are actually run. Their outputs are multiplied by the routing probabilities and summed.
 
 ```{=html}
 <div style="overflow-x:auto; margin:1.5rem 0;">
@@ -321,7 +317,7 @@ The key component is a **router**: a small layer that, for a given input, decide
 <rect x="410" y="20" width="70" height="32" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"/>
 <text x="445" y="40" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">output</text>
 <text x="126" y="200" font-size="11" fill="#792051">routing probabilities</text>
-<text x="20" y="313" font-size="13" fill="#666">The router runs only the top-k experts; parameters grow by n, compute by only k.</text><text x="20" y="329" font-size="13" fill="#666">× weights each expert output by its routing probability.</text>
+<text x="20" y="313" font-size="13" fill="#666">The router runs only the top-k experts; parameters grow by n, compute by only k.</text><text x="20" y="329" font-size="13" fill="#666">Each selected expert is applied to x; × weights its output by the routing probability.</text>
 </svg></div>
 ```
 
@@ -332,7 +328,7 @@ The key component is a **router**: a small layer that, for a given input, decide
 This multiplies the layer's parameter count by $n$ but its compute by only about $k$ — the number of experts run per input. Since $k$ can be much smaller than $n$ (setting $k = n$ would recover the dense case and defeat the purpose), the cost is far below that of making the layer $n$ times larger. Some notes:
 
 - **The router is usually a linear classifier**, $\operatorname{softmax}(\bm{W}\bm{x})$: a weight matrix followed by a softmax to produce the $n$ routing probabilities.
-- **Routing is discrete** — only $k$ experts are run. A soft variant that runs every expert and combines them by the routing probabilities would multiply compute by $n$, gaining nothing, so the discreteness is the point. Typically $k$ is $1$ or $2$.
+- **Routing is discrete** — only $k$ experts are run. A soft variant that runs every expert and combines them by the routing probabilities would multiply compute by $n$, defeating the purpose, so the discreteness is the point. Typically $k$ is small: early MoE transformers used $k = 1$ or $2$, while recent models split the layer into many smaller experts and run around $8$ of them per token [@dai2024deepseekmoe].
 - **Gradients reach only the activated experts**, since an expert that is not run receives no gradient. The discrete top-$k$ selection has zero gradient almost everywhere, so the router is trained through a different path: multiplying each expert's output by its routing probability lets gradients flow back to the router through that multiplication.
 
 ::: {.callout-warning}
@@ -341,9 +337,9 @@ This multiplies the layer's parameter count by $n$ but its compute by only about
 
 The standard fix is a **load-balancing loss** added to the training loss. One common form, in pseudo-math, is
 
-$$\mathcal{L}_\text{balance} = \sum_\text{experts} (\text{fraction of the time the expert is chosen}) \times (\text{probability assigned to the expert}).$$
+$$\mathcal{L}_\text{balance} = \sum_\text{experts} (\text{fraction of tokens routed to the expert}) \times (\text{router probability for the expert, averaged over the batch}).$$
 
-This sum is smallest when each expert is chosen $1/n$ of the time with probability $1/n$ — evaluating to $n \cdot (1/n)^2 = 1/n$ — and largest, equal to $1$, when a single expert is always chosen with probability one. Minimizing it therefore pushes the router toward using the experts evenly. Other load-balancing losses exist; this one works reasonably [@shazeer2017outrageously; @fedus2022switch]. A more recent addition that helps is to include one **always-active expert**, routed to on every input in addition to whichever experts the router selects.
+Under uniform routing — each expert chosen $1/n$ of the time with average probability $1/n$ — this equals $n \cdot (1/n)^2 = 1/n$; it is largest, equal to $1$, when a single expert is always chosen with probability one. The fraction routed is not differentiable, so gradients flow only through the probabilities: the gradient for each expert's probability is its routing fraction, so overused experts lose probability and underused ones gain it. This encourages the router to use the experts evenly. Other load-balancing losses exist; this one works reasonably [@shazeer2017outrageously; @fedus2022switch]. A more recent addition, used in some models, is one or more **always-active (shared) experts**, applied to every token in addition to whichever experts the router selects [@dai2024deepseekmoe].
 
 ---
 
@@ -355,7 +351,7 @@ This sum is smallest when each expert is chosen $1/n$ of the time with probabili
 - **Low-rank adaptation (LoRA)** fine-tunes by adding a low-rank update $\Delta\bm{W} \approx \bm{B}\bm{A}$ (rank $r \ll n_\text{in}, n_\text{out}$) to each chosen weight matrix, freezing $\bm{W}_\text{pre}$ and training only $\bm{B}, \bm{A}$. Initialize $\bm{B}$ to zero so training starts from the pre-trained model. It is cheaper to store and communicate, adds no inference cost once merged, and lowers training memory.
 - **Graph neural networks** operate on a node feature matrix $\bm{X}$ and adjacency matrix $\bm{A}$. Multiplying $\bm{A}\bm{X}$ aggregates each node's neighbors; degree normalization prevents high-degree nodes from dominating.
 - The **graph convolutional network** is $\bm{H} = \sigma(\hat{\bm{D}}^{-1/2}\hat{\bm{A}}\hat{\bm{D}}^{-1/2}\bm{X}\bm{W})$ with self-connections $\hat{\bm{A}} = \bm{A} + \bm{I}$ — a local, translation-invariant, convolution-like operation.
-- The **graph attention network** replaces fixed degree-based weights with a learned attention mechanism over each node's neighbors (queries, keys, and values all $\bm{W}\bm{h}_i$; a LeakyReLU comparison; a softmax-weighted average restricted to neighbors by masking).
+- The **graph attention network** replaces fixed degree-based weights with a learned attention mechanism over each node's neighbors (queries, keys, and values all $\bm{W}\bm{h}_i$; a LeakyReLU comparison; a softmax-weighted average over the node and its neighbors, enforced by masking).
 - A **mixture-of-experts layer** replaces a layer with $n$ experts and a router that runs the top $k$, multiplying parameters by $n$ but compute by only $k$. It decouples parameter count from compute. A **load-balancing loss** prevents the router from **collapsing** onto one expert.
 :::
 
