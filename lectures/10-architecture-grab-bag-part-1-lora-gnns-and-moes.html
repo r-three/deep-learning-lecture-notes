@@ -53,7 +53,6 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/fuse.min.js"></script>
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
-<link href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" rel="next">
 <link href="../lectures/09-transformers-part-2-large-language-models.html" rel="prev">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
@@ -252,16 +251,6 @@ window.Quarto = {
   <a href="../lectures/10-architecture-grab-bag-part-1-lora-gnns-and-moes.html" class="sidebar-item-text sidebar-link active"><span class="chapter-title">Lecture 10: Architecture Grab Bag, Part 1 — LoRA, GNNs, and MoEs</span></a>
   </div>
 </li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></a>
-  </div>
-</li>
-        <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../lectures/12-deep-learning-engineering-fairness-accountability-and-transparency.html" class="sidebar-item-text sidebar-link"><span class="chapter-title">Lecture 12: Deep Learning Engineering; Fairness, Accountability, and Transparency</span></a>
-  </div>
-</li>
     </ul>
     </div>
 </nav>
@@ -333,7 +322,7 @@ window.Quarto = {
 <div class="definition-block">
 <p><strong>Definition.</strong> <em>Low-rank adaptation</em> (LoRA) fine-tunes a model by adding a low-rank update <span class="math inline">\bm{B}\bm{A}</span> to each chosen weight matrix, keeping the pre-trained matrix <span class="math inline">\bm{W}_\text{pre}</span> fixed and training only the new parameters <span class="math inline">\bm{B}</span> and <span class="math inline">\bm{A}</span>.</p>
 </div>
-<p>The layer computes its output using <span class="math inline">\bm{W}_\text{pre} + \bm{B}\bm{A}</span>, but during training <span class="math inline">\bm{W}_\text{pre}</span> is frozen and only <span class="math inline">\bm{B}</span> and <span class="math inline">\bm{A}</span> are updated. These are new parameters that did not exist in the model before — an additional weight matrix, summed with the pre-trained one.</p>
+<p>The layer computes its output using <span class="math inline">\bm{W}_\text{pre} + \bm{B}\bm{A}</span>, but during training <span class="math inline">\bm{W}_\text{pre}</span> is frozen and only <span class="math inline">\bm{B}</span> and <span class="math inline">\bm{A}</span> are updated. These are new parameters that did not exist in the model before — an additional weight matrix, summed with the pre-trained one. In practice the update is also scaled by a constant, so the layer uses <span class="math inline">\bm{W}_\text{pre} + \tfrac{\alpha}{r}\bm{B}\bm{A}</span>; keeping the hyperparameter <span class="math inline">\alpha</span> (called <code>lora_alpha</code> in the PEFT library) fixed while varying <span class="math inline">r</span> reduces the need to re-tune the learning rate when the rank changes <span class="citation" data-cites="hu2021lora">(<a href="#ref-hu2021lora" role="doc-biblioref">Hu et al. 2022</a>)</span>.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 560 288" width="100%" style="max-width:560px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="lA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
@@ -366,27 +355,27 @@ window.Quarto = {
 </section>
 <section id="sec-lora-init" class="level3">
 <h3 class="anchored" data-anchor-id="sec-lora-init">Initialization</h3>
-<p>Adding a random low-rank matrix to every weight matrix of a carefully pre-trained model would distort it — adding noise to parameters learned on a large task is likely to degrade the model. The standard remedy is to initialize <span class="math inline">\bm{B}</span> to zeros and <span class="math inline">\bm{A}</span> from a Gaussian, as usual. Then <span class="math inline">\bm{B}\bm{A} = \bm{0}</span> at the start, so LoRA fine-tuning begins from exactly the pre-trained model and only departs from it as training proceeds. (Because <span class="math inline">\bm{B}</span> starts at zero, one might worry that no gradient can flow; it does, because the pre-trained path acts like a residual connection around the <span class="math inline">\bm{B}\bm{A}</span> update, letting gradients reach <span class="math inline">\bm{A}</span>.) There is no strong theory behind this, but empirically it works: LoRA fine-tuning is generally not much worse than fine-tuning the full model.</p>
+<p>Adding a random low-rank matrix to every weight matrix of a carefully pre-trained model would distort it — adding noise to parameters learned on a large task is likely to degrade the model. The standard remedy is to initialize <span class="math inline">\bm{B}</span> to zeros and <span class="math inline">\bm{A}</span> from a Gaussian, as usual. Then <span class="math inline">\bm{B}\bm{A} = \bm{0}</span> at the start, so LoRA fine-tuning begins from exactly the pre-trained model and only departs from it as training proceeds. (Because <span class="math inline">\bm{B}</span> starts at zero, one might worry that no gradient can flow; it does: <span class="math inline">\bm{B}</span>’s gradient depends on <span class="math inline">\bm{A}\bm{x}</span>, which is nonzero since <span class="math inline">\bm{A}</span> is random, so <span class="math inline">\bm{B}</span> moves off zero after one step and <span class="math inline">\bm{A}</span> receives gradient from then on. If both started at zero, neither would ever receive a gradient.) There is no strong theory behind this, but empirically it works: LoRA fine-tuning is generally not much worse than fine-tuning the full model.</p>
 </section>
 <section id="sec-lora-why" class="level3">
 <h3 class="anchored" data-anchor-id="sec-lora-why">Why do this</h3>
 <p>Several benefits follow, and they explain why LoRA is worth the trouble.</p>
 <ul>
-<li><strong>The rank <span class="math inline">r</span> can be small, and varies by task.</strong> For some datasets a rank-one update (<span class="math inline">r = 1</span>) matches full fine-tuning; for others one needs <span class="math inline">r = 8</span> or <span class="math inline">16</span>. But usually <span class="math inline">r</span> can be much smaller than <span class="math inline">n_\text{in}</span> and <span class="math inline">n_\text{out}</span>. One way to see why: the pre-trained model was trained on a very broad task, and a fine-tuning task is usually a specialized subset of that — we need only steer the model, not relearn everything. The idea that fine-tuning can succeed in a low-dimensional subspace is sometimes phrased as the <em>intrinsic dimensionality</em> of the fine-tuning task being small <span class="citation" data-cites="aghajanyan2021intrinsic">(<a href="#ref-aghajanyan2021intrinsic" role="doc-biblioref">Aghajanyan et al. 2021</a>)</span>.</li>
-<li><strong>Storing and communicating a LoRA is cheaper.</strong> Full fine-tuning produces an update for every parameter, so sharing it costs as much as sharing a whole model — if the parameters take 10 gigabytes, so does the update. A LoRA update needs only <span class="math inline">n_\text{out}\, r + n_\text{in}\, r</span> values per matrix instead of <span class="math inline">n_\text{out}\, n_\text{in}</span>, so storing the result of low-rank adaptation typically takes only 1–10% of the full model’s storage.</li>
-<li><strong>Not all weight matrices need updating.</strong> The original LoRA paper <span class="citation" data-cites="hu2021lora">(<a href="#ref-hu2021lora" role="doc-biblioref">Hu et al. 2022</a>)</span>, fine-tuning transformers, updated only the attention projection matrices (query, key, value, and output); one could instead update the feed-forward matrices, or both, and all three are done in practice — and one may optionally adapt small extra parameters such as the RMSNorm gain as well. Updating fewer matrices makes the LoRA smaller still.</li>
+<li><strong>The rank <span class="math inline">r</span> can be small, and varies by task.</strong> In the original paper, <span class="math inline">r = 1</span> performed about as well as much larger ranks on some tasks when adapting the query and value projections <span class="citation" data-cites="hu2021lora">(<a href="#ref-hu2021lora" role="doc-biblioref">Hu et al. 2022</a>)</span>, though no single small rank works for every task; in practice, values such as <span class="math inline">r = 8</span> or <span class="math inline">16</span> are common. But usually <span class="math inline">r</span> can be much smaller than <span class="math inline">n_\text{in}</span> and <span class="math inline">n_\text{out}</span>. One way to see why: the pre-trained model was trained on a very broad task, and a fine-tuning task is usually a specialized subset of that — we need only steer the model, not relearn everything. The idea that fine-tuning can succeed in a low-dimensional subspace is sometimes phrased as the <em>intrinsic dimensionality</em> of the fine-tuning task being small <span class="citation" data-cites="aghajanyan2021intrinsic">(<a href="#ref-aghajanyan2021intrinsic" role="doc-biblioref">Aghajanyan et al. 2021</a>)</span>.</li>
+<li><strong>Storing and communicating a LoRA is cheaper.</strong> Full fine-tuning produces an update for every parameter, so sharing it costs as much as sharing a whole model — if the parameters take 10 gigabytes, so does the update. A LoRA update needs only <span class="math inline">n_\text{out}\, r + n_\text{in}\, r</span> values per matrix instead of <span class="math inline">n_\text{out}\, n_\text{in}</span>, so storing the result of low-rank adaptation typically takes at most a few percent of the full model’s storage, and often under 1%. (As an extreme example, adapting only the query and value projections of GPT-3 with <span class="math inline">r = 4</span> shrinks the checkpoint from 350 GB to about 35 MB <span class="citation" data-cites="hu2021lora">(<a href="#ref-hu2021lora" role="doc-biblioref">Hu et al. 2022</a>)</span>.)</li>
+<li><strong>Not all weight matrices need updating.</strong> The original LoRA paper <span class="citation" data-cites="hu2021lora">(<a href="#ref-hu2021lora" role="doc-biblioref">Hu et al. 2022</a>)</span>, fine-tuning transformers, restricted itself to the attention projection matrices (query, key, value, and output), and in most experiments adapted only the query and value projections; one could instead update the feed-forward matrices, or both, and all three are done in practice — and one may optionally adapt small extra parameters such as the RMSNorm gain as well. Updating fewer matrices makes the LoRA smaller still.</li>
 <li><strong>Inference cost is unchanged.</strong> After training, we can pre-compute <span class="math inline">\bm{W}_\text{pre} + \bm{B}\bm{A}</span> and fold the update into a single matrix, so a forward pass costs exactly what it did before. During training the two must be kept separate, since <span class="math inline">\bm{W}_\text{pre}</span> is fixed and <span class="math inline">\bm{B}\bm{A}</span> is trained, but afterward they merge. (This is not true of methods that inject new layers, which add computation at inference.) Left unmerged, a LoRA also enables serving: keep one copy of the pre-trained backbone, batch requests from many users, and add the appropriate per-user LoRA to each entry of the batch — giving each user their own fine-tuned variant without a separate full model each.</li>
-<li><strong>Training memory is reduced.</strong> When training with Adam (Lecture 4), we store, besides the parameters and cached activations, the first- and second-moment gradient accumulators, each as large as the parameters being updated. With LoRA we only maintain accumulators for <span class="math inline">\bm{B}</span> and <span class="math inline">\bm{A}</span>, which are far smaller, lowering the memory cost of training — sometimes enough to fine-tune a larger model on hardware with less memory. We return to training memory in Lecture 12.</li>
+<li><strong>Training memory is reduced.</strong> When training with Adam (Lecture 4), we store, besides the parameters and cached activations, the first- and second-moment gradient accumulators, each as large as the parameters being updated. With LoRA we only maintain gradients and accumulators for <span class="math inline">\bm{B}</span> and <span class="math inline">\bm{A}</span>, which are far smaller, lowering the memory cost of training — sometimes enough to fine-tune a larger model on hardware with less memory. We return to training memory in Lecture 12.</li>
 </ul>
 <hr>
 </section>
 </section>
 <section id="sec-gnn" class="level2">
 <h2 class="anchored" data-anchor-id="sec-gnn">Graph Neural Networks</h2>
-<p>We have applied neural networks to feature vectors, images, and sequences. Some data is instead structured as a <strong>graph</strong>, which generalizes several of these. A running example is a social network: each node is a person, and an edge between two nodes means they are connected — friends, or one following another. A task we might want is to classify the nodes: this node is a bot, that one is a human.</p>
-<p>Let the graph have <span class="math inline">n</span> nodes, each with a <span class="math inline">d</span>-dimensional feature vector <span class="math inline">\bm{x}_i \in \mathbb{R}^d</span> — in the social network, attributes such as when the person joined, how many posts they have made, how many friends they have. Stacking the node feature vectors as rows gives a <strong>node feature matrix</strong> <span class="math inline">\bm{X} \in \mathbb{R}^{n \times d}</span>. We also record the connectivity in an <strong>adjacency matrix</strong> <span class="math inline">\bm{A} \in \mathbb{R}^{n \times n}</span>, with a <span class="math inline">1</span> where two nodes are connected and <span class="math inline">0</span> otherwise. Writing <span class="math inline">i \sim j</span> for “node <span class="math inline">i</span> is connected to node <span class="math inline">j</span>,”</p>
+<p>We have applied neural networks to feature vectors, images, and sequences. Some data is instead structured as a <strong>graph</strong>, which generalizes several of these. A running example is a social network: each node is a person, and an edge between two nodes means they are connected — for example, they are friends. We assume the graph is undirected, so connections go both ways. A task we might want is to classify the nodes: this node is a bot, that one is a human.</p>
+<p>Let the graph have <span class="math inline">n</span> nodes, each with a <span class="math inline">p</span>-dimensional feature vector <span class="math inline">\bm{x}_i \in \mathbb{R}^p</span> — in the social network, attributes such as when the person joined, how many posts they have made, how many friends they have. Stacking the node feature vectors as rows gives a <strong>node feature matrix</strong> <span class="math inline">\bm{X} \in \mathbb{R}^{n \times p}</span>. We also record the connectivity in an <strong>adjacency matrix</strong> <span class="math inline">\bm{A} \in \mathbb{R}^{n \times n}</span>, with a <span class="math inline">1</span> where two nodes are connected and <span class="math inline">0</span> otherwise. Writing <span class="math inline">i \sim j</span> for “node <span class="math inline">i</span> is connected to node <span class="math inline">j</span>,”</p>
 <p><span class="math display">\bm{A}_{ij} = \begin{cases} 1 &amp; \text{if } i \sim j, \\ 0 &amp; \text{otherwise.} \end{cases}</span></p>
-<p>For an unweighted graph the entries are just <span class="math inline">0</span> or <span class="math inline">1</span>.</p>
+<p>Since the graph is undirected, <span class="math inline">\bm{A}</span> is symmetric; for a weighted graph, <span class="math inline">\bm{A}_{ij}</span> would hold the edge weight instead of <span class="math inline">1</span>.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 640 300" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="20" y="28" font-size="22" font-weight="600" fill="#333">Graph: node features X and adjacency A</text>
@@ -409,71 +398,89 @@ window.Quarto = {
 <text x="70" y="214" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">5</text>
 <circle cx="180" cy="210" r="15" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"></circle>
 <text x="180" y="214" text-anchor="middle" font-size="12" font-weight="600" fill="#205279">6</text>
-<text x="140" y="250" text-anchor="middle" font-size="13" fill="#666">n nodes, features xᵢ ∈ ℝᵈ</text>
-<text x="385" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">X  (n × d)</text>
+<text x="140" y="250" text-anchor="middle" font-size="13" fill="#666">n nodes, features xᵢ ∈ ℝᵖ</text>
+<text x="385" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#205279">X  (n × p)</text>
+<text x="312" y="84" text-anchor="end" font-size="10" fill="#999">1</text>
+<text x="312" y="104" text-anchor="end" font-size="10" fill="#999">2</text>
+<text x="312" y="124" text-anchor="end" font-size="10" fill="#999">3</text>
+<text x="312" y="144" text-anchor="end" font-size="10" fill="#999">4</text>
+<text x="312" y="164" text-anchor="end" font-size="10" fill="#999">5</text>
+<text x="312" y="184" text-anchor="end" font-size="10" fill="#999">6</text>
 <rect x="320" y="70" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
 <rect x="320" y="90" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
 <rect x="320" y="110" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
 <rect x="320" y="130" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
 <rect x="320" y="150" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
 <rect x="320" y="170" width="130" height="20" fill="#C6DEF1" stroke="#5795C7" stroke-width="1"></rect>
-<text x="458" y="84" font-size="11" fill="#666">← xᵢ</text>
-<text x="530" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#796020">A  (n × n)</text>
-<rect x="470" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="490" y="70" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="500" y="84" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="510" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="530" y="70" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="540" y="84" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="550" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="570" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="470" y="90" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="480" y="104" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="490" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="510" y="90" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="520" y="104" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="530" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="550" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="570" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="470" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="490" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="500" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="510" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="530" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="540" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="550" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="570" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="580" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="470" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="480" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="490" y="130" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="510" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="520" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="530" y="130" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="550" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="560" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="570" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="580" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="470" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="490" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="510" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="530" y="150" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="540" y="164" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="550" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="570" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="470" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="490" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="510" y="170" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="520" y="184" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="530" y="170" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="540" y="184" text-anchor="middle" font-size="10" fill="#796020">1</text>
-<rect x="550" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<rect x="570" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
-<text x="530" y="208" text-anchor="middle" font-size="12" fill="#666">Aᵢⱼ = 1 if i ~ j</text>
+<text x="385" y="250" text-anchor="middle" font-size="12" fill="#666">row i = xᵢ (node i's features)</text>
+<text x="540" y="46" text-anchor="middle" font-size="15" font-weight="600" fill="#796020">A  (n × n)</text>
+<text x="490" y="64" text-anchor="middle" font-size="10" fill="#999">1</text>
+<text x="510" y="64" text-anchor="middle" font-size="10" fill="#999">2</text>
+<text x="530" y="64" text-anchor="middle" font-size="10" fill="#999">3</text>
+<text x="550" y="64" text-anchor="middle" font-size="10" fill="#999">4</text>
+<text x="570" y="64" text-anchor="middle" font-size="10" fill="#999">5</text>
+<text x="590" y="64" text-anchor="middle" font-size="10" fill="#999">6</text>
+<text x="474" y="84" text-anchor="end" font-size="10" fill="#999">1</text>
+<text x="474" y="104" text-anchor="end" font-size="10" fill="#999">2</text>
+<text x="474" y="124" text-anchor="end" font-size="10" fill="#999">3</text>
+<text x="474" y="144" text-anchor="end" font-size="10" fill="#999">4</text>
+<text x="474" y="164" text-anchor="end" font-size="10" fill="#999">5</text>
+<text x="474" y="184" text-anchor="end" font-size="10" fill="#999">6</text>
+<rect x="480" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="500" y="70" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="510" y="84" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="520" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="540" y="70" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="550" y="84" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="560" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="580" y="70" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="480" y="90" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="490" y="104" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="500" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="520" y="90" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="530" y="104" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="540" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="560" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="580" y="90" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="480" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="500" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="510" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="520" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="540" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="550" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="560" y="110" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="580" y="110" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="590" y="124" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="480" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="490" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="500" y="130" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="520" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="530" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="540" y="130" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="560" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="570" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="580" y="130" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="590" y="144" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="480" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="500" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="520" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="540" y="150" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="550" y="164" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="560" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="580" y="150" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="480" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="500" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="520" y="170" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="530" y="184" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="540" y="170" width="20" height="20" fill="#FAEDCB" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="550" y="184" text-anchor="middle" font-size="10" fill="#796020">1</text>
+<rect x="560" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<rect x="580" y="170" width="20" height="20" fill="#fff" stroke="#C7A857" stroke-width="0.8"></rect>
+<text x="540" y="250" text-anchor="middle" font-size="12" fill="#666">Aᵢⱼ = 1 if i ~ j</text>
 </svg></div>
 <section id="sec-gnn-aggregate" class="level3">
 <h3 class="anchored" data-anchor-id="sec-gnn-aggregate">Aggregating over neighbors</h3>
-<p>With two matrices in hand, it is natural to multiply them. Consider <span class="math inline">\bm{A}\bm{X}</span>, which is <span class="math inline">n \times d</span>. Its <span class="math inline">i</span>th row is</p>
+<p>With two matrices in hand, it is natural to multiply them. Consider <span class="math inline">\bm{A}\bm{X}</span>, which is <span class="math inline">n \times p</span>. Its <span class="math inline">i</span>th row is</p>
 <p><span class="math display">(\bm{A}\bm{X})_i = \sum_{i \sim j} \bm{x}_j,</span></p>
 <p>the sum of the feature vectors of all nodes connected to node <span class="math inline">i</span> — multiplying row <span class="math inline">i</span> of <span class="math inline">\bm{A}</span> against <span class="math inline">\bm{X}</span> picks out the neighbors’ rows and adds them. So <span class="math inline">\bm{A}\bm{X}</span> produces a new feature vector for each node by <strong>aggregating information about its neighbors</strong>.</p>
 <p>One oddity is that this sum is not normalized: a node with more neighbors (a higher <strong>degree</strong>) has more terms, and so a larger sum. To fix this, let <span class="math inline">\bm{D}</span> be the diagonal <strong>degree matrix</strong>, with <span class="math inline">\bm{D}_{ii} = d_i</span> the degree of node <span class="math inline">i</span> — obtained by summing row <span class="math inline">i</span> of <span class="math inline">\bm{A}</span>. We can then normalize, in one of two ways:</p>
@@ -482,12 +489,12 @@ window.Quarto = {
 </section>
 <section id="sec-gcn" class="level3">
 <h3 class="anchored" data-anchor-id="sec-gcn">The graph convolutional network</h3>
-<p>To build a layer, recall what an ordinary layer does with feature vectors: project them through a learned matrix and apply a nonlinearity, <span class="math inline">\sigma(\bm{W}\bm{x})</span>. We do the same here, projecting each node’s feature vector through a learned <span class="math inline">\bm{W} \in \mathbb{R}^{d \times d'}</span> and combining it with the normalized neighbor aggregation. One correction is needed first: with the aggregation as written, node <span class="math inline">i</span>’s own feature vector does not contribute to its new representation unless the node is connected to itself. Since it usually is not, we add self-connections by replacing <span class="math inline">\bm{A}</span> with <span class="math inline">\hat{\bm{A}} = \bm{A} + \bm{I}</span> (and correspondingly <span class="math inline">\hat{\bm{D}}</span>). This gives the <strong>graph convolutional network</strong> <span class="citation" data-cites="kipf2017semi">(<a href="#ref-kipf2017semi" role="doc-biblioref">Kipf and Welling 2017</a>)</span>:</p>
+<p>To build a layer, recall what an ordinary layer does with feature vectors: project them through a learned matrix and apply a nonlinearity, <span class="math inline">\sigma(\bm{W}\bm{x})</span>. We do the same here, projecting each node’s feature vector through a learned <span class="math inline">\bm{W} \in \mathbb{R}^{p \times p'}</span> and combining it with the normalized neighbor aggregation. (Since nodes are rows of <span class="math inline">\bm{X}</span>, we treat each <span class="math inline">\bm{x}_i</span> as a row vector and multiply on the right: <span class="math inline">\bm{x}_i\bm{W}</span> for one node, <span class="math inline">\bm{X}\bm{W}</span> for all. This is the same layer as before, transposed: <span class="math inline">(\bm{x}_i\bm{W})^\top = \bm{W}^\top\bm{x}_i</span>.) One correction is needed first: with the aggregation as written, node <span class="math inline">i</span>’s own feature vector does not contribute to its new representation unless the node is connected to itself. Since it usually is not, we add self-connections by replacing <span class="math inline">\bm{A}</span> with <span class="math inline">\hat{\bm{A}} = \bm{A} + \bm{I}</span> (and correspondingly <span class="math inline">\hat{\bm{D}}</span>). This gives the <strong>graph convolutional network</strong> <span class="citation" data-cites="kipf2017semi">(<a href="#ref-kipf2017semi" role="doc-biblioref">Kipf and Welling 2017</a>)</span>:</p>
 <div class="boxed-eq">
-<p><span class="math display">\bm{H} = \sigma\!\big(\hat{\bm{D}}^{-1/2}\, \hat{\bm{A}}\, \hat{\bm{D}}^{-1/2}\, \bm{X}\, \bm{W}\big) \in \mathbb{R}^{n \times d'}, \qquad \bm{W} \in \mathbb{R}^{d \times d'}.</span></p>
+<p><span class="math display">\bm{H} = \sigma\!\big(\hat{\bm{D}}^{-1/2}\, \hat{\bm{A}}\, \hat{\bm{D}}^{-1/2}\, \bm{X}\, \bm{W}\big) \in \mathbb{R}^{n \times p'}, \qquad \bm{W} \in \mathbb{R}^{p \times p'}.</span></p>
 </div>
-<p>Per node, this is <span class="math inline">\bm{h}_i = \sigma\!\big(\sum_{i \sim j} \tfrac{1}{\sqrt{d_i d_j}}\, \bm{x}_j \bm{W}\big)</span>: project the neighbors through <span class="math inline">\bm{W}</span>, sum them with degree normalization, and apply the nonlinearity <span class="math inline">\sigma</span> (an elementwise nonlinearity such as a ReLU).</p>
-<p>Why call it convolutional? Take an image, extract patches, and form a graph in which each pixel’s neighbors are the pixels in its patch. Then this layer applies the same weight matrix <span class="math inline">\bm{W}</span> to every node and sums over its neighbors — a local, translation-invariant operation, just like a convolution (up to the degree normalization, which is constant when the patches are the same size and can be absorbed into <span class="math inline">\bm{W}</span>). Stacking layers extends the reach: after one layer a node’s representation depends on its neighbors, after two on its neighbors’ neighbors, and so on — a notion much like the receptive field of a convolutional network (Lecture 5).</p>
+<p>Per node, this is <span class="math inline">\bm{h}_i = \sigma\!\big(\sum_{i \sim j \text{ or } i = j} \tfrac{1}{\sqrt{\hat d_i \hat d_j}}\, \bm{x}_j \bm{W}\big)</span>, with <span class="math inline">\hat d_i = d_i + 1</span>: project the node and its neighbors through <span class="math inline">\bm{W}</span>, sum them with degree normalization, and apply the nonlinearity <span class="math inline">\sigma</span> (an elementwise nonlinearity such as a ReLU).</p>
+<p>Why call it convolutional? Take an image, extract patches, and form a graph in which each pixel’s neighbors are the pixels in its patch. Then this layer applies the same weight matrix <span class="math inline">\bm{W}</span> to every node and sums over its neighbors — a local, translation-invariant operation, like a convolution (up to the degree normalization, which is constant when the patches are the same size and can be absorbed into <span class="math inline">\bm{W}</span>). Unlike a convolution kernel, though, every neighbor shares the same <span class="math inline">\bm{W}</span>; the name comes from graph signal processing, where this layer is a first-order approximation of a spectral graph convolution <span class="citation" data-cites="kipf2017semi">(<a href="#ref-kipf2017semi" role="doc-biblioref">Kipf and Welling 2017</a>)</span>. Stacking layers extends the reach: after one layer a node’s representation depends on its neighbors, after two on its neighbors’ neighbors, and so on — a notion much like the receptive field of a convolutional network (Lecture 5).</p>
 </section>
 <section id="sec-gat" class="level3">
 <h3 class="anchored" data-anchor-id="sec-gat">The graph attention network</h3>
@@ -497,25 +504,25 @@ window.Quarto = {
 <p>Filling in the five ingredients of an attention mechanism (Lecture 7), with <span class="math inline">\bm{h}_i</span> the current node representations:</p>
 <ul>
 <li><strong>Queries, keys, and values</strong> are all <span class="math inline">\bm{W}\bm{h}_i</span> — the same projection for all three, unlike any attention we have seen. This was tried and worked, and it projects the input once rather than three times.</li>
-<li><strong>Comparison.</strong> The score between nodes <span class="math inline">i</span> and <span class="math inline">j</span> passes the concatenation of their projections through a learned vector <span class="math inline">\bm{v}</span> and a LeakyReLU (a ReLU whose left side has a small nonzero slope rather than being flat): <span class="math display">a_{ij} = \alpha(\bm{W}\bm{h}_i, \bm{W}\bm{h}_j) = \operatorname{LeakyReLU}\!\big(\bm{v}^\top [\bm{W}\bm{h}_i \,\|\, \bm{W}\bm{h}_j]\big).</span></li>
-<li><strong>Reduction</strong> is a softmax-weighted average over the neighbors:</li>
+<li><strong>Comparison.</strong> The score between nodes <span class="math inline">i</span> and <span class="math inline">j</span> passes the concatenation of their projections through a learned vector <span class="math inline">\bm{v}</span> and a LeakyReLU (a ReLU whose left side has a small nonzero slope rather than being flat): <span class="math display">e_{ij} = \operatorname{LeakyReLU}\!\big(\bm{v}^\top [\bm{W}\bm{h}_i \,\|\, \bm{W}\bm{h}_j]\big).</span></li>
+<li><strong>Reduction</strong> is a softmax-weighted average over the neighbors (with the node itself included), using weights <span class="math inline">\alpha_{ij} = \operatorname{softmax}_j(e_{ij})</span>:</li>
 </ul>
 <div class="boxed-eq">
-<p><span class="math display">\bm{h}_i' = \sigma\!\Big(\sum_{i \sim j} \operatorname{softmax}(\bm{a}_i)_j\, \bm{W}\bm{h}_j\Big).</span></p>
+<p><span class="math display">\bm{h}_i' = \sigma\!\Big(\sum_{i \sim j \text{ or } i = j} \alpha_{ij}\, \bm{W}\bm{h}_j\Big).</span></p>
 </div>
-<p>Restricting the sum to neighbors is done by masking — setting the scores for non-edges to <span class="math inline">-\infty</span> before the softmax, using the adjacency matrix, as we masked attention in Lecture 9. As usual, the attention is made multi-headed. Compared to the graph convolutional network’s fixed degree-based weights, the GAT lets the comparison function <em>learn</em> how much each neighbor should count <span class="citation" data-cites="velickovic2018graph">(<a href="#ref-velickovic2018graph" role="doc-biblioref">Veličković et al. 2018</a>)</span>.</p>
+<p>Restricting the sum (and the softmax) to the node and its neighbors is done by masking — setting the scores for non-edges to <span class="math inline">-\infty</span> before the softmax, using the adjacency matrix with self-connections, <span class="math inline">\hat{\bm{A}}</span>, as we masked attention in Lecture 9. As usual, the attention is made multi-headed. Compared to the graph convolutional network’s fixed degree-based weights, the GAT lets the comparison function <em>learn</em> how much each neighbor should count <span class="citation" data-cites="velickovic2018graph">(<a href="#ref-velickovic2018graph" role="doc-biblioref">Veličković et al. 2018</a>)</span>.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
 <svg viewbox="0 0 640 280" width="100%" style="max-width:640px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Neighbor weighting: GCN (fixed) vs GAT (learned)</text>
 <text x="180" y="60" text-anchor="middle" font-size="16" font-weight="600" fill="#333">GCN: degree weights</text>
 <line x1="180" y1="150" x2="90" y2="110" stroke="#57C7AE" stroke-width="2.5"></line>
-<text x="135" y="126" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<text x="135" y="127" text-anchor="middle" font-size="13" fill="#207965">1/√(dᵢdⱼ)</text>
 <line x1="180" y1="150" x2="270" y2="110" stroke="#57C7AE" stroke-width="2.5"></line>
-<text x="225" y="126" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<text x="225" y="127" text-anchor="middle" font-size="13" fill="#207965">1/√(dᵢdⱼ)</text>
 <line x1="180" y1="150" x2="110" y2="220" stroke="#57C7AE" stroke-width="2.5"></line>
-<text x="145" y="181" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<text x="145" y="183" text-anchor="middle" font-size="13" fill="#207965">1/√(dᵢdⱼ)</text>
 <line x1="180" y1="150" x2="250" y2="220" stroke="#57C7AE" stroke-width="2.5"></line>
-<text x="215" y="181" text-anchor="middle" font-size="10" fill="#207965">1/√(dᵢdⱼ)</text>
+<text x="215" y="183" text-anchor="middle" font-size="13" fill="#207965">1/√(dᵢdⱼ)</text>
 <circle cx="90" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"></circle>
 <circle cx="270" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"></circle>
 <circle cx="110" cy="220" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"></circle>
@@ -524,13 +531,13 @@ window.Quarto = {
 <text x="180" y="154" text-anchor="middle" font-size="12" font-weight="600" fill="#794520">i</text>
 <text x="470" y="60" text-anchor="middle" font-size="16" font-weight="600" fill="#333">GAT: learned weights</text>
 <line x1="470" y1="150" x2="380" y2="110" stroke="#8457C7" stroke-width="1.8"></line>
-<text x="425" y="126" text-anchor="middle" font-size="10" fill="#442079">α=0.1</text>
+<text x="425" y="127" text-anchor="middle" font-size="13" fill="#442079">α=0.1</text>
 <line x1="470" y1="150" x2="560" y2="110" stroke="#8457C7" stroke-width="4.0"></line>
-<text x="515" y="126" text-anchor="middle" font-size="10" fill="#442079">α=0.5</text>
+<text x="515" y="127" text-anchor="middle" font-size="13" fill="#442079">α=0.5</text>
 <line x1="470" y1="150" x2="400" y2="220" stroke="#8457C7" stroke-width="3.0"></line>
-<text x="435" y="181" text-anchor="middle" font-size="10" fill="#442079">α=0.3</text>
+<text x="435" y="183" text-anchor="middle" font-size="13" fill="#442079">α=0.3</text>
 <line x1="470" y1="150" x2="540" y2="220" stroke="#8457C7" stroke-width="1.8"></line>
-<text x="505" y="181" text-anchor="middle" font-size="10" fill="#442079">α=0.1</text>
+<text x="505" y="183" text-anchor="middle" font-size="13" fill="#442079">α=0.1</text>
 <circle cx="380" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"></circle>
 <circle cx="560" cy="110" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"></circle>
 <circle cx="400" cy="220" r="13" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.6"></circle>
@@ -539,19 +546,6 @@ window.Quarto = {
 <text x="470" y="154" text-anchor="middle" font-size="12" font-weight="600" fill="#794520">i</text>
 <text x="20" y="266" font-size="13" fill="#666">The GAT learns how much each neighbor counts; the GCN uses fixed weights based on node degrees.</text>
 </svg></div>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p><strong>A strained acronym.</strong> The graph attention network is abbreviated GAT. The extra “T” has no clear source; a plausible account is that the well-known <em>generative adversarial network</em> had already taken GAN, and the later graph attention network borrowed the shape of the acronym.</p>
-</div>
-</div>
 <p>Both layers map a set of node feature vectors to a new set of the same size, so they stack like any layer: several graph convolutional or graph attention layers, optionally interleaved with position-wise feed-forward networks applied to each node independently, followed by a small classifier head that outputs, say, a bot-versus-human probability per node — all trained end-to-end with backpropagation.</p>
 <hr>
 </section>
@@ -559,10 +553,10 @@ Note
 <section id="sec-moe" class="level2">
 <h2 class="anchored" data-anchor-id="sec-moe">Mixture-of-Experts (MoE)</h2>
 <p>For every model so far, increasing the number of parameters increases the computational cost: a wider MLP hidden layer, an extra layer, or more convolutional channels all add both parameters and computation. But a model’s capacity — loosely, how much it can fit or memorize — grows with its parameters, and with more data we would like more capacity, hence more parameters, without paying more compute. A <strong>mixture-of-experts</strong> layer is one way to decouple the two.</p>
-<p>A mixture-of-experts layer replaces some layer in the model — often a position-wise feed-forward network in a transformer — with <span class="math inline">n</span> copies of it, called <strong>experts</strong>. The experts share the same architecture but have separate, unshared parameters. Replacing one layer with <span class="math inline">n</span> experts multiplies that layer’s parameter count by <span class="math inline">n</span>. Computing all <span class="math inline">n</span> experts, though, would multiply the compute by <span class="math inline">n</span> as well, gaining nothing.</p>
-<p>The key component is a <strong>router</strong>: a small layer that, for a given input, decides which experts to use. It outputs a probability for each of the <span class="math inline">n</span> experts, the <strong>routing probabilities</strong>, and only the top <span class="math inline">k</span> experts are actually run. Their outputs are multiplied by the routing probabilities and summed.</p>
+<p>A mixture-of-experts layer replaces some layer in the model — often a position-wise feed-forward network in a transformer — with <span class="math inline">n</span> copies of it, called <strong>experts</strong>. The experts share the same architecture but have separate, unshared parameters. Replacing one layer with <span class="math inline">n</span> experts multiplies that layer’s parameter count by <span class="math inline">n</span>. Computing all <span class="math inline">n</span> experts, though, would multiply the compute by <span class="math inline">n</span> as well — no better than simply making the layer <span class="math inline">n</span> times larger.</p>
+<p>The key component is a <strong>router</strong>: a small layer that, for a given input — in a transformer, each token separately — decides which experts to use. It outputs a probability for each of the <span class="math inline">n</span> experts, the <strong>routing probabilities</strong>, and only the top <span class="math inline">k</span> experts are actually run. Their outputs are multiplied by the routing probabilities and summed.</p>
 <div style="overflow-x:auto; margin:1.5rem 0;">
-<svg viewbox="0 0 680 342" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
+<svg viewbox="0 0 680 354" width="100%" style="max-width:680px;display:block;margin:auto;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;">
 <defs><marker id="mA" markerwidth="7" markerheight="7" refx="6" refy="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#888"></path></marker></defs>
 <text x="20" y="26" font-size="22" font-weight="600" fill="#333">Mixture-of-experts layer</text>
 <rect x="300" y="270" width="80" height="32" rx="6" fill="#C6DEF1" stroke="#5795C7" stroke-width="1.5"></rect>
@@ -570,33 +564,41 @@ Note
 <rect x="300" y="210" width="80" height="34" rx="6" fill="#F2C6DE" stroke="#C75794" stroke-width="1.5"></rect>
 <text x="340" y="231" text-anchor="middle" font-size="13" font-weight="600" fill="#792051">router</text>
 <line x1="340" y1="270" x2="340" y2="244" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<rect x="40" y="120" width="76" height="34" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"></rect>
-<text x="78" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#666666">expert 1</text>
+<rect x="40" y="120" width="76" height="34" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5" stroke-dasharray="4,3"></rect>
+<text x="78" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#999999">expert 1</text>
 <rect x="160" y="120" width="76" height="34" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
 <text x="198" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#207965">expert 2</text>
+<circle cx="236" cy="120" r="9" fill="#57C7AE" stroke="#fff" stroke-width="1.5"></circle>
+<text x="236" y="123.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">✓</text>
 <path d="M340,210 L198,154" fill="none" stroke="#C75794" stroke-width="1.6"></path>
 <rect x="300" y="120" width="76" height="34" rx="6" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
 <text x="338" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#207965">expert i</text>
+<circle cx="376" cy="120" r="9" fill="#57C7AE" stroke="#fff" stroke-width="1.5"></circle>
+<text x="376" y="123.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">✓</text>
 <path d="M340,210 L338,154" fill="none" stroke="#C75794" stroke-width="1.6"></path>
-<rect x="470" y="120" width="76" height="34" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5"></rect>
-<text x="508" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#666666">expert n</text>
-<text x="394" y="172" font-size="11" fill="#792051">top-k routed</text>
+<rect x="470" y="120" width="76" height="34" rx="6" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5" stroke-dasharray="4,3"></rect>
+<text x="508" y="141" text-anchor="middle" font-size="12" font-weight="600" fill="#999999">expert n</text>
 <text x="423" y="142" text-anchor="middle" font-size="16" fill="#999">···</text>
+<rect x="490" y="62" width="14" height="14" rx="3" fill="#C9E4DE" stroke="#57C7AE" stroke-width="1.5"></rect>
+<text x="512" y="73" font-size="12" fill="#207965">selected — runs</text>
+<rect x="490" y="85" width="14" height="14" rx="3" fill="#ECECEC" stroke="#AAAAAA" stroke-width="1.5" stroke-dasharray="3,2"></rect>
+<text x="512" y="96" font-size="12" fill="#999999">not selected — idle</text>
+<text x="394" y="172" font-size="11" fill="#792051">top-k routed</text>
 <circle cx="198.0" cy="74" r="12" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></circle>
 <text x="198.0" y="79" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">×</text>
 <line x1="198.0" y1="120" x2="198.0" y2="86" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
 <circle cx="338.0" cy="74" r="12" fill="#FAEDCB" stroke="#C7A857" stroke-width="1.5"></circle>
 <text x="338.0" y="79" text-anchor="middle" font-size="16" font-weight="600" fill="#796020">×</text>
 <line x1="338.0" y1="120" x2="338.0" y2="86" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<circle cx="340" cy="40" r="14" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
-<text x="340" y="45" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
-<path d="M198,62 L340,52" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></path>
-<path d="M338,62 L340,52" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></path>
-<line x1="354" y1="36" x2="410" y2="36" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
-<rect x="410" y="20" width="70" height="32" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
-<text x="445" y="40" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">output</text>
+<circle cx="268" cy="48" r="14" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></circle>
+<text x="268" y="53" text-anchor="middle" font-size="16" font-weight="600" fill="#794520">+</text>
+<path d="M209.25,69.82 L254.87,52.88" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></path>
+<path d="M326.75,69.82 L281.13,52.88" fill="none" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></path>
+<line x1="282" y1="48" x2="310" y2="48" stroke="#888" stroke-width="1.5" marker-end="url(#mA)"></line>
+<rect x="310" y="32" width="70" height="32" rx="6" fill="#F7D9C4" stroke="#C78557" stroke-width="1.5"></rect>
+<text x="345" y="52" text-anchor="middle" font-size="13" font-weight="600" fill="#794520">output</text>
 <text x="126" y="200" font-size="11" fill="#792051">routing probabilities</text>
-<text x="20" y="313" font-size="13" fill="#666">The router runs only the top-k experts; parameters grow by n, compute by only k.</text><text x="20" y="329" font-size="13" fill="#666">× weights each expert output by its routing probability.</text>
+<text x="340" y="325" text-anchor="middle" font-size="13" fill="#666">The router runs only the top-k experts; parameters grow by n, compute by only k.</text><text x="340" y="341" text-anchor="middle" font-size="13" fill="#666">Each selected expert is applied to x; × weights its output by the routing probability.</text>
 </svg></div>
 <div class="definition-block">
 <p><strong>Definition.</strong> A <em>mixture-of-experts layer</em> consists of <span class="math inline">n</span> experts with independent parameters and a router. The router assigns a probability to each expert; the layer runs the top <span class="math inline">k</span>, weights their outputs by the routing probabilities, and sums them.</p>
@@ -604,7 +606,7 @@ Note
 <p>This multiplies the layer’s parameter count by <span class="math inline">n</span> but its compute by only about <span class="math inline">k</span> — the number of experts run per input. Since <span class="math inline">k</span> can be much smaller than <span class="math inline">n</span> (setting <span class="math inline">k = n</span> would recover the dense case and defeat the purpose), the cost is far below that of making the layer <span class="math inline">n</span> times larger. Some notes:</p>
 <ul>
 <li><strong>The router is usually a linear classifier</strong>, <span class="math inline">\operatorname{softmax}(\bm{W}\bm{x})</span>: a weight matrix followed by a softmax to produce the <span class="math inline">n</span> routing probabilities.</li>
-<li><strong>Routing is discrete</strong> — only <span class="math inline">k</span> experts are run. A soft variant that runs every expert and combines them by the routing probabilities would multiply compute by <span class="math inline">n</span>, gaining nothing, so the discreteness is the point. Typically <span class="math inline">k</span> is <span class="math inline">1</span> or <span class="math inline">2</span>.</li>
+<li><strong>Routing is discrete</strong> — only <span class="math inline">k</span> experts are run. A soft variant that runs every expert and combines them by the routing probabilities would multiply compute by <span class="math inline">n</span>, defeating the purpose, so the discreteness is the point. Typically <span class="math inline">k</span> is small: early MoE transformers used <span class="math inline">k = 1</span> or <span class="math inline">2</span>, while recent models split the layer into many smaller experts and run around <span class="math inline">8</span> of them per token <span class="citation" data-cites="dai2024deepseekmoe">(<a href="#ref-dai2024deepseekmoe" role="doc-biblioref">Dai et al. 2024</a>)</span>.</li>
 <li><strong>Gradients reach only the activated experts</strong>, since an expert that is not run receives no gradient. The discrete top-<span class="math inline">k</span> selection has zero gradient almost everywhere, so the router is trained through a different path: multiplying each expert’s output by its routing probability lets gradients flow back to the router through that multiplication.</li>
 </ul>
 <div class="callout callout-style-default callout-warning callout-titled">
@@ -620,9 +622,10 @@ Warning
 <p><strong>Router collapse.</strong> There is no supervision telling the router which expert to use for which input; it must discover this on its own. This creates a failure mode. If the router sends an input to expert <span class="math inline">i</span>, only expert <span class="math inline">i</span> is trained on that step, so an expert chosen slightly more often is trained more, becomes better, and is then chosen still more often — a feedback loop that can end with the router sending everything to one expert. The router has <strong>collapsed</strong>, and the layer is back to a single expert with <span class="math inline">n</span> times the parameters and nothing gained.</p>
 </div>
 </div>
-<p>The standard fix is a <strong>load-balancing loss</strong> added to the training loss. One common form, in pseudo-math, is</p>
-<p><span class="math display">\mathcal{L}_\text{balance} = \sum_\text{experts} (\text{fraction of the time the expert is chosen}) \times (\text{probability assigned to the expert}).</span></p>
-<p>This sum is smallest when each expert is chosen <span class="math inline">1/n</span> of the time with probability <span class="math inline">1/n</span> — evaluating to <span class="math inline">n \cdot (1/n)^2 = 1/n</span> — and largest, equal to <span class="math inline">1</span>, when a single expert is always chosen with probability one. Minimizing it therefore pushes the router toward using the experts evenly. Other load-balancing losses exist; this one works reasonably <span class="citation" data-cites="shazeer2017outrageously fedus2022switch">(<a href="#ref-shazeer2017outrageously" role="doc-biblioref">Shazeer et al. 2017</a>; <a href="#ref-fedus2022switch" role="doc-biblioref">Fedus et al. 2022</a>)</span>. A more recent addition that helps is to include one <strong>always-active expert</strong>, routed to on every input in addition to whichever experts the router selects.</p>
+<p>The standard fix is a <strong>load-balancing loss</strong> added to the training loss. One common form is</p>
+<p><span class="math display">\mathcal{L}_\text{balance} = \sum_{i=1}^n f_i P_i,</span></p>
+<p>where <span class="math inline">f_i</span> is the fraction of tokens in the batch routed to expert <span class="math inline">i</span>, and <span class="math inline">P_i</span> is the router’s probability for expert <span class="math inline">i</span>, averaged over the batch.</p>
+<p>Under uniform routing — each expert chosen <span class="math inline">1/n</span> of the time with average probability <span class="math inline">1/n</span> — this equals <span class="math inline">n \cdot (1/n)^2 = 1/n</span>; it is largest, equal to <span class="math inline">1</span>, when a single expert is always chosen with probability one. The fraction routed is not differentiable, so gradients flow only through the probabilities: the gradient for each expert’s probability is its routing fraction, so overused experts lose probability and underused ones gain it. This encourages the router to use the experts evenly. Other load-balancing losses exist; this one works reasonably <span class="citation" data-cites="shazeer2017outrageously fedus2022switch">(<a href="#ref-shazeer2017outrageously" role="doc-biblioref">Shazeer et al. 2017</a>; <a href="#ref-fedus2022switch" role="doc-biblioref">Fedus et al. 2022</a>)</span>. A more recent addition, used in some models, is one or more <strong>always-active (shared) experts</strong>, applied to every token in addition to whichever experts the router selects <span class="citation" data-cites="dai2024deepseekmoe">(<a href="#ref-dai2024deepseekmoe" role="doc-biblioref">Dai et al. 2024</a>)</span>.</p>
 <hr>
 </section>
 <section id="sec-summary" class="level2">
@@ -642,7 +645,7 @@ Note
 <li><strong>Low-rank adaptation (LoRA)</strong> fine-tunes by adding a low-rank update <span class="math inline">\Delta\bm{W} \approx \bm{B}\bm{A}</span> (rank <span class="math inline">r \ll n_\text{in}, n_\text{out}</span>) to each chosen weight matrix, freezing <span class="math inline">\bm{W}_\text{pre}</span> and training only <span class="math inline">\bm{B}, \bm{A}</span>. Initialize <span class="math inline">\bm{B}</span> to zero so training starts from the pre-trained model. It is cheaper to store and communicate, adds no inference cost once merged, and lowers training memory.</li>
 <li><strong>Graph neural networks</strong> operate on a node feature matrix <span class="math inline">\bm{X}</span> and adjacency matrix <span class="math inline">\bm{A}</span>. Multiplying <span class="math inline">\bm{A}\bm{X}</span> aggregates each node’s neighbors; degree normalization prevents high-degree nodes from dominating.</li>
 <li>The <strong>graph convolutional network</strong> is <span class="math inline">\bm{H} = \sigma(\hat{\bm{D}}^{-1/2}\hat{\bm{A}}\hat{\bm{D}}^{-1/2}\bm{X}\bm{W})</span> with self-connections <span class="math inline">\hat{\bm{A}} = \bm{A} + \bm{I}</span> — a local, translation-invariant, convolution-like operation.</li>
-<li>The <strong>graph attention network</strong> replaces fixed degree-based weights with a learned attention mechanism over each node’s neighbors (queries, keys, and values all <span class="math inline">\bm{W}\bm{h}_i</span>; a LeakyReLU comparison; a softmax-weighted average restricted to neighbors by masking).</li>
+<li>The <strong>graph attention network</strong> replaces fixed degree-based weights with a learned attention mechanism over each node’s neighbors (queries, keys, and values all <span class="math inline">\bm{W}\bm{h}_i</span>; a LeakyReLU comparison; a softmax-weighted average over the node and its neighbors, enforced by masking).</li>
 <li>A <strong>mixture-of-experts layer</strong> replaces a layer with <span class="math inline">n</span> experts and a router that runs the top <span class="math inline">k</span>, multiplying parameters by <span class="math inline">n</span> but compute by only <span class="math inline">k</span>. It decouples parameter count from compute. A <strong>load-balancing loss</strong> prevents the router from <strong>collapsing</strong> onto one expert.</li>
 </ul>
 </div>
@@ -656,6 +659,9 @@ Note
 <div id="refs" class="references csl-bib-body hanging-indent" role="list">
 <div id="ref-aghajanyan2021intrinsic" class="csl-entry" role="listitem">
 Aghajanyan, Armen, Luke Zettlemoyer, and Sonal Gupta. 2021. <span>“Intrinsic Dimensionality Explains the Effectiveness of Language Model Fine-Tuning.”</span> <em>Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics</em>.
+</div>
+<div id="ref-dai2024deepseekmoe" class="csl-entry" role="listitem">
+Dai, Damai, Chengqi Deng, Chenggang Zhao, et al. 2024. <span>“<span>D</span>eep<span>S</span>eek<span>M</span>o<span>E</span>: Towards Ultimate Expert Specialization in Mixture-of-Experts Language Models.”</span> In <em>Proceedings of the 62nd Annual Meeting of the <span>A</span>ssociation for <span>C</span>omputational <span>L</span>inguistics (Volume 1: Long Papers)</em>, edited by Lun-Wei Ku, Andre Martins, and Vivek Srikumar. Association for Computational Linguistics. <a href="https://doi.org/10.18653/v1/2024.acl-long.70">https://doi.org/10.18653/v1/2024.acl-long.70</a>.
 </div>
 <div id="ref-fedus2022switch" class="csl-entry" role="listitem">
 Fedus, William, Barret Zoph, and Noam Shazeer. 2022. <span>“Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity.”</span> <em>Journal of Machine Learning Research</em> 23 (120).
@@ -1088,9 +1094,6 @@ Veličković, Petar, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro 
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../lectures/11-architecture-grab-bag-part-2-transposed-convolution-unet-autoencoders-and-vaes.html" class="pagination-link" aria-label="Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs">
-        <span class="nav-page-text"><span class="chapter-title">Lecture 11: Architecture Grab Bag, Part 2 — Transposed Convolution, the U-Net, Autoencoders, and VAEs</span></span> <i class="bi bi-arrow-right-short"></i>
-      </a>
   </div>
 </nav>
 </div> <!-- /content -->
