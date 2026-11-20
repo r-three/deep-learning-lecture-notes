@@ -354,3 +354,36 @@
   journal={arXiv preprint arXiv:2112.00861},
   year={2021}
 }
+
+@inproceedings{dai2024deepseekmoe,
+    title = "{D}eep{S}eek{M}o{E}: Towards Ultimate Expert Specialization in Mixture-of-Experts Language Models",
+    author = "Dai, Damai  and
+      Deng, Chengqi  and
+      Zhao, Chenggang  and
+      Xu, R.X.  and
+      Gao, Huazuo  and
+      Chen, Deli  and
+      Li, Jiashi  and
+      Zeng, Wangding  and
+      Yu, Xingkai  and
+      Wu, Y.  and
+      Xie, Zhenda  and
+      Li, Y.K.  and
+      Huang, Panpan  and
+      Luo, Fuli  and
+      Ruan, Chong  and
+      Sui, Zhifang  and
+      Liang, Wenfeng",
+    editor = "Ku, Lun-Wei  and
+      Martins, Andre  and
+      Srikumar, Vivek",
+    booktitle = "Proceedings of the 62nd Annual Meeting of the {A}ssociation for {C}omputational {L}inguistics (Volume 1: Long Papers)",
+    month = aug,
+    year = "2024",
+    address = "Bangkok, Thailand",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2024.acl-long.70/",
+    doi = "10.18653/v1/2024.acl-long.70",
+    pages = "1280--1297",
+    abstract = "In the era of large language models, Mixture-of-Experts (MoE) is a promising architecture for managing computational costs when scaling up model parameters. However, conventional MoE architectures like GShard, which activate the top-$K$ out of $N$ experts, face challenges in ensuring expert specialization, i.e. each expert acquires non-overlapping and focused knowledge. In response, we propose the DeepSeekMoE architecture towards ultimate expert specialization. It involves two principal strategies: (1) finely segmenting the experts into $mN$ ones and activating $mK$ from them, allowing for a more flexible combination of activated experts; (2) isolating $K_s$ experts as shared ones, aiming at capturing common knowledge and mitigating redundancy in routed experts. Starting from a modest scale with 2B parameters, we demonstrate that DeepSeekMoE 2B achieves comparable performance with GShard 2.9B, which has 1.5 $\times$ expert parameters and computation. In addition, DeepSeekMoE 2B nearly approaches the performance of its dense counterpart with the same number of total parameters, which sets the upper bound of MoE models. Subsequently, we scale up DeepSeekMoE to 16B parameters and show that it achieves comparable performance with DeepSeek 7B and LLaMA2 7B, with only about 40{\%} of computations."
+}
